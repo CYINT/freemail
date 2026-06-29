@@ -1,0 +1,36 @@
+services:
+  admin-api:
+    build: .
+    environment:
+      FREEMAIL_APP_NAME: ${FREEMAIL_APP_NAME:-FreeMail}
+      FREEMAIL_ENV: ${FREEMAIL_ENV:-development}
+      FREEMAIL_HOSTNAME: ${FREEMAIL_HOSTNAME:-freemail.kuzuryu.ai}
+      FREEMAIL_RELEASE_VERSION: ${FREEMAIL_RELEASE_VERSION:-0.1.0-dev}
+      FREEMAIL_RELEASE_COMMIT: ${FREEMAIL_RELEASE_COMMIT:-unknown}
+    ports:
+      - "${FREEMAIL_BIND_ADDRESS:-127.0.0.1}:${FREEMAIL_API_PORT:-18090}:8080"
+    restart: unless-stopped
+
+  web:
+    image: caddy:2-alpine
+    profiles: ["web"]
+    volumes:
+      - ./apps/web:/usr/share/caddy:ro
+    ports:
+      - "${FREEMAIL_BIND_ADDRESS:-127.0.0.1}:${FREEMAIL_WEB_PORT:-18091}:80"
+    restart: unless-stopped
+
+  mail-core:
+    image: stalwartlabs/stalwart:latest
+    profiles: ["mail-core"]
+    volumes:
+      - freemail_stalwart:/opt/stalwart
+    ports:
+      - "${FREEMAIL_BIND_ADDRESS:-127.0.0.1}:${FREEMAIL_SMTP_PORT:-2525}:25"
+      - "${FREEMAIL_BIND_ADDRESS:-127.0.0.1}:${FREEMAIL_SUBMISSION_PORT:-2587}:587"
+      - "${FREEMAIL_BIND_ADDRESS:-127.0.0.1}:${FREEMAIL_IMAP_PORT:-2143}:143"
+      - "${FREEMAIL_BIND_ADDRESS:-127.0.0.1}:${FREEMAIL_JMAP_PORT:-18092}:8080"
+    restart: unless-stopped
+
+volumes:
+  freemail_stalwart:
