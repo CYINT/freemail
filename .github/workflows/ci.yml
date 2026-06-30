@@ -20,11 +20,15 @@ jobs:
           python -m pip install -r requirements-dev.txt
       - name: Lint
         run: python -m ruff check .
+      - name: Install browser QA runtime
+        run: python -m playwright install --with-deps chromium
       - name: Tests
         run: |
           python -m coverage run -m pytest
           python -m coverage report
           python -m coverage xml
+      - name: Browser webmail QA
+        run: python scripts/qa_web_browser.py
       - name: Upload coverage to Codecov
         if: ${{ env.CODECOV_TOKEN != '' }}
         uses: codecov/codecov-action@v5

@@ -332,12 +332,15 @@ h2 {
   }
 
   .folder-nav {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    display: flex;
     overflow-x: auto;
+    padding-bottom: 0.15rem;
   }
 
   .folder-nav a {
-    min-width: 8rem;
+    flex: 0 0 auto;
+    min-width: 8.5rem;
+    gap: 1rem;
   }
 
   .mail-layout {
@@ -356,6 +359,16 @@ h2 {
 }
 
 @media (max-width: 640px) {
+  .folder-nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow-x: visible;
+  }
+
+  .folder-nav a {
+    min-width: 0;
+  }
+
   .topbar,
   .reader-header {
     align-items: stretch;
