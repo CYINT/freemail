@@ -3,10 +3,12 @@ import json
 from pathlib import Path
 import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from freemail_api.release_evidence import load_release_gate_options_from_manifest  # noqa: E402
-from freemail_api.release_gate import assert_release_gate, ReleaseGateError, ReleaseGateOptions
+from freemail_api.release_gate import assert_release_gate, ReleaseGateError, ReleaseGateOptions  # noqa: E402
 
 
 def main() -> int:
