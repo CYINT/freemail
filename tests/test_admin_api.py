@@ -948,6 +948,10 @@ def test_mailbox_snapshot_returns_imap_adapter_payload(tmp_path, monkeypatch):
                         "unread": False,
                     }
                 ],
+                "limit": 1,
+                "offset": 5,
+                "nextOffset": 6,
+                "hasMore": True,
             }
 
     def fake_snapshot(**kwargs):
@@ -955,13 +959,14 @@ def test_mailbox_snapshot_returns_imap_adapter_payload(tmp_path, monkeypatch):
         assert kwargs["password"] == "secret"
         assert kwargs["folder"] == "INBOX"
         assert kwargs["limit"] == 1
+        assert kwargs["offset"] == 5
         return Snapshot()
 
     monkeypatch.setattr("freemail_api.main.list_mailbox_snapshot", fake_snapshot)
 
     with make_client(tmp_path) as client:
         response = client.get(
-            "/api/v1/mailbox/snapshot?limit=1",
+            "/api/v1/mailbox/snapshot?limit=1&offset=5",
             headers={
                 "X-FreeMail-Mailbox-Email": "admin@example.com",
                 "X-FreeMail-Mailbox-Password": "secret",
@@ -971,6 +976,22 @@ def test_mailbox_snapshot_returns_imap_adapter_payload(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert response.json()["folders"][0]["name"] == "INBOX"
     assert response.json()["messages"][0]["subject"] == "Hello"
+    assert response.json()["nextOffset"] == 6
+    assert response.json()["hasMore"] is True
+
+
+def test_mailbox_snapshot_validates_offset(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.get(
+            "/api/v1/mailbox/snapshot?offset=-1",
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+        )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "offset must be zero or greater"
 
 
 def test_mailbox_session_create_and_bearer_snapshot(tmp_path, monkeypatch):
@@ -1293,6 +1314,10 @@ def test_mailbox_search_returns_imap_results(tmp_path, monkeypatch):
                         "unread": False,
                     }
                 ],
+                "limit": 10,
+                "offset": 10,
+                "nextOffset": None,
+                "hasMore": False,
             }
 
     def fake_search(**kwargs):
@@ -1301,13 +1326,14 @@ def test_mailbox_search_returns_imap_results(tmp_path, monkeypatch):
         assert kwargs["folder"] == "INBOX"
         assert kwargs["query"] == "hello"
         assert kwargs["limit"] == 10
+        assert kwargs["offset"] == 10
         return Result()
 
     monkeypatch.setattr("freemail_api.main.search_mailbox_messages", fake_search)
 
     with make_client(tmp_path) as client:
         response = client.get(
-            "/api/v1/mailbox/search?folder=INBOX&query=hello&limit=10",
+            "/api/v1/mailbox/search?folder=INBOX&query=hello&limit=10&offset=10",
             headers={
                 "X-FreeMail-Mailbox-Email": "admin@example.com",
                 "X-FreeMail-Mailbox-Password": "secret",
@@ -1317,6 +1343,22 @@ def test_mailbox_search_returns_imap_results(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert response.json()["query"] == "hello"
     assert response.json()["messages"][0]["subject"] == "Hello"
+    assert response.json()["offset"] == 10
+    assert response.json()["hasMore"] is False
+
+
+def test_mailbox_search_validates_offset(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.get(
+            "/api/v1/mailbox/search?folder=INBOX&query=hello&offset=-1",
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+        )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "offset must be zero or greater"
 
 
 def test_mailbox_contacts_requires_mailbox_credentials(tmp_path):

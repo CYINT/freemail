@@ -108,7 +108,7 @@ The current mobile foundation covers:
 - VPN-only default API target at `https://freemail.kuzuryu.ai`
 - mailbox session creation and revocation
 - SecureStore-backed bearer-session persistence
-- inbox snapshot, message read, read/unread and star-state controls, bulk message actions, compose/send, reply, and forward workflows
+- paginated inbox snapshot/search, message read, read/unread and star-state controls, bulk message actions, compose/send, reply, and forward workflows
 - mailbox preferences and default compose signatures through the shared mailbox preferences API
 - folder navigation and non-core folder create/rename/delete controls
 - folder-scoped search and contacts

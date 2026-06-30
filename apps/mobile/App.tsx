@@ -57,6 +57,7 @@ import { clearCachedMailboxSnapshots, loadCachedMailboxSnapshot, saveCachedMailb
 import { clearStoredMailboxSession, loadStoredMailboxSession, saveMailboxSession } from "./src/sessionStore";
 
 const defaultApiBaseUrl = "https://freemail.kuzuryu.ai";
+const mailboxPageSize = 25;
 const maxComposeAttachments = 5;
 const maxComposeAttachmentBytes = 1_048_576;
 const allowedComposeAttachmentTypes = new Set(["text/plain", "text/csv", "application/pdf", "image/png", "image/jpeg"]);
@@ -67,6 +68,13 @@ type SelectedComposeAttachment = ComposeAttachment & {
   size: number;
 };
 
+type MailboxPagination = {
+  mode: "folder" | "search";
+  query: string;
+  nextOffset: number | null;
+  hasMore: boolean;
+};
+
 export default function App() {
   const [apiBaseUrl, setApiBaseUrl] = useState(defaultApiBaseUrl);
   const [email, setEmail] = useState("");
@@ -75,6 +83,12 @@ export default function App() {
   const [folder, setFolder] = useState("INBOX");
   const [folders, setFolders] = useState<MailFolder[]>([]);
   const [messages, setMessages] = useState<MailMessage[]>([]);
+  const [mailboxPagination, setMailboxPagination] = useState<MailboxPagination>({
+    mode: "folder",
+    query: "",
+    nextOffset: null,
+    hasMore: false,
+  });
   const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([]);
   const [contacts, setContacts] = useState<MailContact[]>([]);
   const [pushDevices, setPushDevices] = useState<MailboxPushDevice[]>([]);
@@ -130,6 +144,7 @@ export default function App() {
     setSession(null);
     setFolders([]);
     setMessages([]);
+    setMailboxPagination({ mode: "folder", query: "", nextOffset: null, hasMore: false });
     setContacts([]);
     setPushDevices([]);
     setPushNotifications([]);
@@ -147,14 +162,14 @@ export default function App() {
     setStatus("Signed out.");
   }
 
-  async function refreshMailbox(activeSession = session, targetFolder = folder) {
+  async function refreshMailbox(activeSession = session, targetFolder = folder, offset = 0, append = false) {
     if (!activeSession) {
       return;
     }
     setLoading(true);
-    setStatus(`Loading ${targetFolder}...`);
+    setStatus(append ? `Loading more ${targetFolder}...` : `Loading ${targetFolder}...`);
     try {
-      const cached = await loadCachedMailboxSnapshot(activeSession, targetFolder);
+      const cached = !append ? await loadCachedMailboxSnapshot(activeSession, targetFolder) : null;
       if (cached) {
         setFolder(cached.folder);
         setFolders(cached.folders);
@@ -163,7 +178,7 @@ export default function App() {
         setStatus(`Showing cached ${cached.folder} from ${formatCachedAt(cached.cachedAt)}.`);
       }
       const [snapshot, contactList, preferences] = await Promise.all([
-        loadMailboxSnapshot(activeSession, targetFolder),
+        loadMailboxSnapshot(activeSession, targetFolder, offset, mailboxPageSize),
         loadMailboxContacts(activeSession, targetFolder),
         loadMailboxPreferences(activeSession),
       ]);
@@ -171,17 +186,31 @@ export default function App() {
       const notifications = await loadMailboxPushNotifications(activeSession);
       setFolder(targetFolder);
       setFolders(snapshot.folders || []);
-      setMessages(snapshot.messages || []);
-      setSelectedMessageIds([]);
+      setMessages((current) => (append ? [...current, ...(snapshot.messages || [])] : snapshot.messages || []));
+      if (!append) {
+        setSelectedMessageIds([]);
+        setSelectedMessage(null);
+      }
+      setMailboxPagination({
+        mode: "folder",
+        query: "",
+        nextOffset: snapshot.nextOffset ?? null,
+        hasMore: Boolean(snapshot.hasMore),
+      });
       setContacts(contactList.contacts || []);
       setPushDevices(devices || []);
       setPushNotifications(notifications || []);
       setMailboxPreferences(preferences);
       setPreferenceDisplayName(preferences.displayName || "");
       setPreferenceSignature(preferences.signature || "");
-      setSelectedMessage(null);
-      await saveCachedMailboxSnapshot(activeSession, targetFolder, snapshot, contactList.contacts || []);
-      setStatus(`Loaded ${snapshot.messages?.length || 0} messages from ${targetFolder}.`);
+      if (!append) {
+        await saveCachedMailboxSnapshot(activeSession, targetFolder, snapshot, contactList.contacts || []);
+      }
+      setStatus(
+        append
+          ? `Loaded ${snapshot.messages?.length || 0} more messages from ${targetFolder}.`
+          : `Loaded ${snapshot.messages?.length || 0} messages from ${targetFolder}.`,
+      );
     } catch (error) {
       setStatus(readableError(error));
     } finally {
@@ -281,7 +310,45 @@ export default function App() {
       setMessages(result.messages || []);
       setSelectedMessageIds([]);
       setSelectedMessage(null);
+      setMailboxPagination({
+        mode: "search",
+        query,
+        nextOffset: result.nextOffset ?? null,
+        hasMore: Boolean(result.hasMore),
+      });
       setStatus(`Found ${result.messages?.length || 0} messages in ${folder}.`);
+    } catch (error) {
+      setStatus(readableError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadMoreMessages() {
+    if (!session || !mailboxPagination.hasMore || mailboxPagination.nextOffset === null) {
+      return;
+    }
+    setLoading(true);
+    try {
+      if (mailboxPagination.mode === "search") {
+        const result = await searchMailbox(
+          session,
+          folder,
+          mailboxPagination.query,
+          mailboxPagination.nextOffset,
+          mailboxPageSize,
+        );
+        setMessages((current) => [...current, ...(result.messages || [])]);
+        setMailboxPagination({
+          mode: "search",
+          query: mailboxPagination.query,
+          nextOffset: result.nextOffset ?? null,
+          hasMore: Boolean(result.hasMore),
+        });
+        setStatus(`Loaded ${result.messages?.length || 0} more matches.`);
+        return;
+      }
+      await refreshMailbox(session, folder, mailboxPagination.nextOffset, true);
     } catch (error) {
       setStatus(readableError(error));
     } finally {
@@ -754,6 +821,11 @@ export default function App() {
                   </Pressable>
                 )}
               />
+              {mailboxPagination.hasMore ? (
+                <Pressable style={styles.secondaryButton} onPress={loadMoreMessages}>
+                  <Text>{mailboxPagination.mode === "search" ? "Load more matches" : "Load more"}</Text>
+                </Pressable>
+              ) : null}
             </View>
 
             <View style={styles.readerPanel}>

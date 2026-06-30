@@ -166,7 +166,7 @@ COMPONENT_READINESS = {
     "webmail": {
         "status": "beta-ready",
         "evidence": [
-            "mailbox session login, folder navigation, search, contacts, message read, read/unread state, star state, compose, attachments, archive, move, and delete controls",
+            "mailbox session login, paginated folder navigation and search, contacts, message read, read/unread state, star state, compose, attachments, archive, move, and delete controls",
             "bulk message actions for read/unread, star/unstar, archive, spam, delete, and move",
             "persistent mailbox preferences with default compose signatures",
             "server-side Drafts persistence and compose reopen support for saved drafts",
@@ -181,7 +181,7 @@ COMPONENT_READINESS = {
     "mobile": {
         "status": "source-ready",
         "evidence": [
-            "Expo/React Native client with VPN API target, mailbox sessions, message workflows, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder controls, contacts, attachments, offline metadata cache, and push-device flows",
+            "Expo/React Native client with VPN API target, mailbox sessions, paginated message workflows, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder controls, contacts, attachments, offline metadata cache, and push-device flows",
             "bulk read/star/archive/spam/delete/move client controls over the shared mailbox API",
             "mobile preference controls for default compose signatures",
             "compose/send path uses the shared mailbox API contract with Sent Items persistence status",
@@ -625,6 +625,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def mailbox_snapshot(
         folder: str = "INBOX",
         limit: int = 25,
+        offset: int = 0,
         authorization: str | None = Header(default=None),
         x_freemail_mailbox_email: str | None = Header(default=None),
         x_freemail_mailbox_password: str | None = Header(default=None),
@@ -638,6 +639,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         if limit < 1 or limit > 100:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="limit must be between 1 and 100")
+        if offset < 0:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="offset must be zero or greater")
         try:
             snapshot = list_mailbox_snapshot(
                 email=credentials.email,
@@ -646,6 +649,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 port=active_settings.imap_port,
                 folder=folder,
                 limit=limit,
+                offset=offset,
             )
         except OSError as error:
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
@@ -658,6 +662,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         query: str,
         folder: str = "INBOX",
         limit: int = 25,
+        offset: int = 0,
         authorization: str | None = Header(default=None),
         x_freemail_mailbox_email: str | None = Header(default=None),
         x_freemail_mailbox_password: str | None = Header(default=None),
@@ -674,6 +679,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="query is required")
         if limit < 1 or limit > 100:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="limit must be between 1 and 100")
+        if offset < 0:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="offset must be zero or greater")
         try:
             result = search_mailbox_messages(
                 email=credentials.email,
@@ -683,6 +690,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 folder=folder,
                 query=clean_query,
                 limit=limit,
+                offset=offset,
             )
         except OSError as error:
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error

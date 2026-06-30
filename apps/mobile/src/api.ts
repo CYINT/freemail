@@ -37,6 +37,10 @@ export type MailboxSnapshot = {
   email: string;
   folders: MailFolder[];
   messages: MailMessage[];
+  limit: number;
+  offset: number;
+  nextOffset: number | null;
+  hasMore: boolean;
 };
 
 export type MailboxSearch = {
@@ -44,6 +48,10 @@ export type MailboxSearch = {
   folder: string;
   query: string;
   messages: MailMessage[];
+  limit: number;
+  offset: number;
+  nextOffset: number | null;
+  hasMore: boolean;
 };
 
 export type MailContact = {
@@ -151,14 +159,25 @@ export async function revokeMailboxSession(session: MailboxSession): Promise<voi
   });
 }
 
-export async function loadMailboxSnapshot(session: MailboxSession, folder = "INBOX"): Promise<MailboxSnapshot> {
-  const path = `/api/v1/mailbox/snapshot?folder=${encodeURIComponent(folder)}&limit=25`;
+export async function loadMailboxSnapshot(
+  session: MailboxSession,
+  folder = "INBOX",
+  offset = 0,
+  limit = 25,
+): Promise<MailboxSnapshot> {
+  const path = `/api/v1/mailbox/snapshot?folder=${encodeURIComponent(folder)}&limit=${limit}&offset=${offset}`;
   const response = await request(session.apiBaseUrl, path, { headers: mailboxHeaders(session) });
   return response.json();
 }
 
-export async function searchMailbox(session: MailboxSession, folder: string, query: string): Promise<MailboxSearch> {
-  const path = `/api/v1/mailbox/search?folder=${encodeURIComponent(folder)}&query=${encodeURIComponent(query)}&limit=25`;
+export async function searchMailbox(
+  session: MailboxSession,
+  folder: string,
+  query: string,
+  offset = 0,
+  limit = 25,
+): Promise<MailboxSearch> {
+  const path = `/api/v1/mailbox/search?folder=${encodeURIComponent(folder)}&query=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}`;
   const response = await request(session.apiBaseUrl, path, { headers: mailboxHeaders(session) });
   return response.json();
 }

@@ -9,6 +9,7 @@ from freemail_api.mailbox_imap import (
     MailboxFolder,
     MailboxMessage,
     MailboxMessageDetail,
+    MailboxMessagePage,
     MailboxSearchResult,
     MovedMailboxMessage,
     MailboxSnapshot,
@@ -130,6 +131,10 @@ def test_snapshot_serializes_nested_records():
                 starred=True,
             )
         ],
+        limit=25,
+        offset=0,
+        next_offset=None,
+        has_more=False,
     )
 
     assert snapshot.as_dict() == {
@@ -147,6 +152,10 @@ def test_snapshot_serializes_nested_records():
                 "starred": True,
             }
         ],
+        "limit": 25,
+        "offset": 0,
+        "next_offset": None,
+        "has_more": False,
     }
 
 
@@ -185,10 +194,15 @@ def test_search_result_serializes_messages():
                 starred=True,
             )
         ],
+        limit=25,
+        offset=0,
+        next_offset=None,
+        has_more=False,
     )
 
     assert result.as_dict()["query"] == "hello"
     assert result.as_dict()["messages"][0]["subject"] == "Hello"
+    assert result.as_dict()["has_more"] is False
 
 
 def test_contacts_serializes_records():
@@ -286,7 +300,8 @@ def test_list_folders_counts_messages_and_unread():
 
 
 def test_list_messages_parses_headers_and_seen_flag():
-    messages = _list_messages(FakeImap(), folder="INBOX", limit=1)
+    page = _list_messages(FakeImap(), folder="INBOX", limit=1)
+    messages = page.messages
 
     assert len(messages) == 1
     assert messages[0].subject == "Hello"
@@ -294,20 +309,43 @@ def test_list_messages_parses_headers_and_seen_flag():
     assert messages[0].recipients == "admin@example.com"
     assert messages[0].unread is False
     assert messages[0].starred is True
+    assert page.next_offset == 1
+    assert page.has_more is True
+
+
+def test_list_messages_paginates_newest_first_with_offset():
+    page = _list_messages(FakeImap(), folder="INBOX", limit=1, offset=1)
+
+    assert page.messages[0].message_id == "2"
+    assert page.next_offset == 2
+    assert page.has_more is True
+
+
+def test_message_page_serializes_pagination_state():
+    page = MailboxMessagePage(messages=[], next_offset=50, has_more=True)
+
+    assert page.next_offset == 50
+    assert page.has_more is True
 
 
 def test_search_messages_uses_sender_recipient_subject_and_body_criteria():
     imap = FakeImap()
 
-    messages = _search_messages(imap, folder="INBOX", query="hello", limit=2)
+    page = _search_messages(imap, folder="INBOX", query="hello", limit=2)
+    messages = page.messages
 
     assert len(messages) == 2
     assert messages[0].subject == "Hello"
+    assert page.next_offset == 2
     assert imap.search_calls[-1] == (None, _search_criteria("hello"))
 
 
 def test_search_messages_returns_empty_for_blank_query():
-    assert _search_messages(FakeImap(), folder="INBOX", query=" ", limit=10) == []
+    assert _search_messages(FakeImap(), folder="INBOX", query=" ", limit=10) == MailboxMessagePage(
+        messages=[],
+        next_offset=None,
+        has_more=False,
+    )
 
 
 def test_list_contacts_deduplicates_addresses_by_frequency():

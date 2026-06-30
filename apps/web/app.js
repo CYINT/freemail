@@ -6,6 +6,7 @@ const folderRenameAction = document.querySelector("#folder-rename-action");
 const folderDeleteAction = document.querySelector("#folder-delete-action");
 const messageList = document.querySelector("#message-list");
 const bulkToolbar = document.querySelector(".bulk-toolbar");
+const loadMoreAction = document.querySelector("#load-more-action");
 const statusNode = document.querySelector("#mailbox-status");
 const readerSubject = document.querySelector("#reader-subject");
 const readerMeta = document.querySelector("#reader-meta");
@@ -63,6 +64,7 @@ const adminResults = document.querySelector("#admin-results");
 const mailboxSessionStorageKey = "freemail.mailboxSession";
 const adminSessionStorageKey = "freemail.adminSession";
 const protectedFolders = ["inbox", "sent items", "drafts", "junk mail", "deleted items", "archive"];
+const mailboxPageSize = 25;
 
 let mailboxSession = {
   email: "",
@@ -79,6 +81,13 @@ let adminSession = {
 };
 let selectedMessageDetail = null;
 let selectedMessageIds = new Set();
+let visibleMessages = [];
+let mailboxPagination = {
+  mode: "folder",
+  query: "",
+  nextOffset: null,
+  hasMore: false,
+};
 let mailboxPreferences = {
   displayName: "",
   signature: "",
@@ -104,6 +113,10 @@ composeForm?.addEventListener("submit", async (event) => {
 
 saveDraftAction?.addEventListener("click", async () => {
   await saveMailboxDraft(await composePayload());
+});
+
+loadMoreAction?.addEventListener("click", async () => {
+  await loadMoreMailboxMessages();
 });
 
 preferencesForm?.addEventListener("submit", async (event) => {
@@ -446,16 +459,17 @@ function renderMailboxPreferences() {
   }
 }
 
-async function loadMailboxSnapshot(folder) {
+async function loadMailboxSnapshot(folder, { offset = 0, append = false } = {}) {
   if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
     setStatus("Sign in to load live mail.", "idle");
     return;
   }
-  setStatus(`Loading ${folder}...`, "loading");
+  setStatus(append ? `Loading more ${folder}...` : `Loading ${folder}...`, "loading");
   try {
     const url = new URL("/api/v1/mailbox/snapshot", mailboxSession.apiBaseUrl);
     url.searchParams.set("folder", folder);
-    url.searchParams.set("limit", "25");
+    url.searchParams.set("limit", String(mailboxPageSize));
+    url.searchParams.set("offset", String(offset));
     const response = await fetch(url, {
       headers: mailboxHeaders(),
     });
@@ -465,18 +479,30 @@ async function loadMailboxSnapshot(folder) {
     const snapshot = await response.json();
     mailboxSession.folder = folder;
     persistMailboxSession(mailboxSession);
-    selectedMessageIds = new Set();
-    clearSearch();
+    if (!append) {
+      selectedMessageIds = new Set();
+      clearSearch();
+    }
+    mailboxPagination = {
+      mode: "folder",
+      query: "",
+      nextOffset: snapshot.nextOffset ?? null,
+      hasMore: Boolean(snapshot.hasMore),
+    };
     renderFolders(snapshot.folders || [], folder);
-    renderMessages(snapshot.messages || []);
-    setStatus(`Loaded ${snapshot.messages?.length || 0} messages from ${folder}.`, "ready");
+    renderMessages(snapshot.messages || [], { append });
+    const totalLoaded = visibleMessages.length;
+    setStatus(
+      `Loaded ${totalLoaded} message${totalLoaded === 1 ? "" : "s"} from ${folder}${mailboxPagination.hasMore ? "." : "."}`,
+      "ready",
+    );
     loadMailboxContacts({ quiet: true });
   } catch (error) {
     setStatus(`Mailbox load failed: ${readableError(error)}`, "error");
   }
 }
 
-async function searchMailboxMessages(query) {
+async function searchMailboxMessages(query, { offset = 0, append = false } = {}) {
   if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
     setStatus("Sign in to search mail.", "error");
     return;
@@ -485,12 +511,13 @@ async function searchMailboxMessages(query) {
     await loadMailboxSnapshot(mailboxSession.folder);
     return;
   }
-  setStatus(`Searching ${mailboxSession.folder}...`, "loading");
+  setStatus(append ? `Loading more matches for "${query}"...` : `Searching ${mailboxSession.folder}...`, "loading");
   try {
     const url = new URL("/api/v1/mailbox/search", mailboxSession.apiBaseUrl);
     url.searchParams.set("folder", mailboxSession.folder);
     url.searchParams.set("query", query);
-    url.searchParams.set("limit", "25");
+    url.searchParams.set("limit", String(mailboxPageSize));
+    url.searchParams.set("offset", String(offset));
     const response = await fetch(url, {
       headers: mailboxHeaders(),
     });
@@ -498,12 +525,37 @@ async function searchMailboxMessages(query) {
       throw new Error(await response.text());
     }
     const result = await response.json();
-    selectedMessageIds = new Set();
-    renderMessages(result.messages || []);
-    setStatus(`Found ${result.messages?.length || 0} messages for "${query}".`, "ready");
+    if (!append) {
+      selectedMessageIds = new Set();
+    }
+    mailboxPagination = {
+      mode: "search",
+      query,
+      nextOffset: result.nextOffset ?? null,
+      hasMore: Boolean(result.hasMore),
+    };
+    renderMessages(result.messages || [], { append });
+    setStatus(`Showing ${visibleMessages.length} matches for "${query}".`, "ready");
   } catch (error) {
     setStatus(`Search failed: ${readableError(error)}`, "error");
   }
+}
+
+async function loadMoreMailboxMessages() {
+  if (!mailboxPagination.hasMore || mailboxPagination.nextOffset === null) {
+    return;
+  }
+  if (mailboxPagination.mode === "search") {
+    await searchMailboxMessages(mailboxPagination.query, {
+      offset: mailboxPagination.nextOffset,
+      append: true,
+    });
+    return;
+  }
+  await loadMailboxSnapshot(mailboxSession.folder, {
+    offset: mailboxPagination.nextOffset,
+    append: true,
+  });
 }
 
 async function archiveMailboxMessage(message) {
@@ -901,11 +953,12 @@ function renderFolders(folders, activeFolder) {
   renderFolderTools(activeFolder);
 }
 
-function renderMessages(messages) {
+function renderMessages(messages, { append = false } = {}) {
   if (!messageList) {
     return;
   }
-  if (!messages.length) {
+  visibleMessages = append ? [...visibleMessages, ...messages] : messages;
+  if (!visibleMessages.length) {
     selectedMessageDetail = null;
     selectedMessageIds = new Set();
     replaceMessageListChildren(emptyMessage());
@@ -916,17 +969,24 @@ function renderMessages(messages) {
     renderDraftActions(null);
     return;
   }
-  const rows = messages.map((message, index) => messageRow(message, index === 0));
+  const rows = visibleMessages.map((message, index) => messageRow(message, !append && index === 0));
   replaceMessageListChildren(...rows);
-  selectMessage(messages[0], rows[0]);
+  if (!append) {
+    selectMessage(visibleMessages[0], rows[0]);
+  }
 }
 
 function replaceMessageListChildren(...children) {
+  const paginationToolbar = loadMoreAction?.parentElement || null;
+  if (loadMoreAction) {
+    loadMoreAction.hidden = !mailboxPagination.hasMore;
+    loadMoreAction.textContent = mailboxPagination.mode === "search" ? "Load more matches" : "Load more";
+  }
   if (bulkToolbar) {
-    messageList.replaceChildren(bulkToolbar, ...children);
+    messageList.replaceChildren(...[bulkToolbar, ...children, paginationToolbar].filter(Boolean));
     return;
   }
-  messageList.replaceChildren(...children);
+  messageList.replaceChildren(...[...children, paginationToolbar].filter(Boolean));
 }
 
 function messageRow(message, selected) {

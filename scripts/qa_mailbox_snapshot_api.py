@@ -13,6 +13,7 @@ def main() -> int:
     parser.add_argument("--secrets-json")
     parser.add_argument("--folder", default="INBOX")
     parser.add_argument("--limit", type=int, default=10)
+    parser.add_argument("--offset", type=int, default=0)
     args = parser.parse_args()
 
     try:
@@ -21,7 +22,7 @@ def main() -> int:
         print(str(exc), file=sys.stderr)
         return 1
 
-    query = parse.urlencode({"folder": args.folder, "limit": args.limit})
+    query = parse.urlencode({"folder": args.folder, "limit": args.limit, "offset": args.offset})
     url = f"{args.base_url.rstrip('/')}/api/v1/mailbox/snapshot?{query}"
     api_request = request.Request(
         url,
@@ -41,6 +42,10 @@ def main() -> int:
         "email": data.get("email"),
         "folderCount": len(data.get("folders", [])),
         "messageCount": len(data.get("messages", [])),
+        "limit": data.get("limit"),
+        "offset": data.get("offset"),
+        "nextOffset": data.get("nextOffset"),
+        "hasMore": data.get("hasMore"),
         "folders": [folder.get("name") for folder in data.get("folders", [])],
     }
     print(json.dumps(redacted, indent=2, sort_keys=True))

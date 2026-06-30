@@ -312,6 +312,10 @@ class MailboxSnapshotRecord(ApiModel):
     email: EmailStr
     folders: list[MailboxFolderSummary]
     messages: list[MailboxMessageSummary]
+    limit: int = 25
+    offset: int = 0
+    next_offset: int | None = None
+    has_more: bool = False
 
 
 class MailboxSearchRecord(ApiModel):
@@ -319,6 +323,10 @@ class MailboxSearchRecord(ApiModel):
     folder: str
     query: str
     messages: list[MailboxMessageSummary]
+    limit: int = 25
+    offset: int = 0
+    next_offset: int | None = None
+    has_more: bool = False
 
 
 class MailboxContactRecord(ApiModel):

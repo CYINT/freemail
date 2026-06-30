@@ -56,16 +56,31 @@ class MailboxFolder:
 
 
 @dataclass(frozen=True)
+class MailboxMessagePage:
+    messages: list[MailboxMessage]
+    next_offset: int | None
+    has_more: bool
+
+
+@dataclass(frozen=True)
 class MailboxSnapshot:
     email: str
     folders: list[MailboxFolder]
     messages: list[MailboxMessage]
+    limit: int
+    offset: int
+    next_offset: int | None
+    has_more: bool
 
     def as_dict(self) -> dict[str, object]:
         return {
             "email": self.email,
             "folders": [folder.as_dict() for folder in self.folders],
             "messages": [message.as_dict() for message in self.messages],
+            "limit": self.limit,
+            "offset": self.offset,
+            "next_offset": self.next_offset,
+            "has_more": self.has_more,
         }
 
 
@@ -75,6 +90,10 @@ class MailboxSearchResult:
     folder: str
     query: str
     messages: list[MailboxMessage]
+    limit: int
+    offset: int
+    next_offset: int | None
+    has_more: bool
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -82,6 +101,10 @@ class MailboxSearchResult:
             "folder": self.folder,
             "query": self.query,
             "messages": [message.as_dict() for message in self.messages],
+            "limit": self.limit,
+            "offset": self.offset,
+            "next_offset": self.next_offset,
+            "has_more": self.has_more,
         }
 
 
@@ -183,6 +206,7 @@ def list_mailbox_snapshot(
     port: int,
     folder: str = "INBOX",
     limit: int = 25,
+    offset: int = 0,
     timeout_seconds: float = 10.0,
     verify_tls: bool = False,
 ) -> MailboxSnapshot:
@@ -190,8 +214,16 @@ def list_mailbox_snapshot(
     with imaplib.IMAP4_SSL(host, port, ssl_context=tls_context, timeout=timeout_seconds) as imap:
         imap.login(email, password)
         folders = _list_folders(imap)
-        messages = _list_messages(imap, folder=folder, limit=limit)
-    return MailboxSnapshot(email=email, folders=folders, messages=messages)
+        page = _list_messages(imap, folder=folder, limit=limit, offset=offset)
+    return MailboxSnapshot(
+        email=email,
+        folders=folders,
+        messages=page.messages,
+        limit=limit,
+        offset=offset,
+        next_offset=page.next_offset,
+        has_more=page.has_more,
+    )
 
 
 def archive_mailbox_message(
@@ -324,14 +356,24 @@ def search_mailbox_messages(
     folder: str,
     query: str,
     limit: int = 25,
+    offset: int = 0,
     timeout_seconds: float = 10.0,
     verify_tls: bool = False,
 ) -> MailboxSearchResult:
     tls_context = _tls_context(verify_tls=verify_tls)
     with imaplib.IMAP4_SSL(host, port, ssl_context=tls_context, timeout=timeout_seconds) as imap:
         imap.login(email, password)
-        messages = _search_messages(imap, folder=folder, query=query, limit=limit)
-    return MailboxSearchResult(email=email, folder=folder, query=query, messages=messages)
+        page = _search_messages(imap, folder=folder, query=query, limit=limit, offset=offset)
+    return MailboxSearchResult(
+        email=email,
+        folder=folder,
+        query=query,
+        messages=page.messages,
+        limit=limit,
+        offset=offset,
+        next_offset=page.next_offset,
+        has_more=page.has_more,
+    )
 
 
 def list_mailbox_contacts(
@@ -602,16 +644,16 @@ def _list_folders(imap: imaplib.IMAP4_SSL) -> list[MailboxFolder]:
     return folders
 
 
-def _list_messages(imap: imaplib.IMAP4_SSL, *, folder: str, limit: int) -> list[MailboxMessage]:
+def _list_messages(imap: imaplib.IMAP4_SSL, *, folder: str, limit: int, offset: int = 0) -> MailboxMessagePage:
     status, _data = imap.select(f'"{folder}"', readonly=True)
     if status != "OK":
-        return []
+        return MailboxMessagePage(messages=[], next_offset=None, has_more=False)
     search_status, search_data = imap.search(None, "ALL")
     if search_status != "OK" or not search_data:
-        return []
-    message_ids = search_data[0].split()[-limit:]
+        return MailboxMessagePage(messages=[], next_offset=None, has_more=False)
+    page_ids, next_offset = _page_message_ids(search_data[0].split(), limit=limit, offset=offset)
     messages = []
-    for message_id in reversed(message_ids):
+    for message_id in page_ids:
         fetch_status, fetch_data = imap.fetch(message_id, "(FLAGS BODY.PEEK[HEADER])")
         if fetch_status != "OK" or not fetch_data or not isinstance(fetch_data[0], tuple):
             continue
@@ -629,26 +671,42 @@ def _list_messages(imap: imaplib.IMAP4_SSL, *, folder: str, limit: int) -> list[
                 starred="\\Flagged" in flags,
             )
         )
-    return messages
+    return MailboxMessagePage(messages=messages, next_offset=next_offset, has_more=next_offset is not None)
 
 
-def _search_messages(imap: imaplib.IMAP4_SSL, *, folder: str, query: str, limit: int) -> list[MailboxMessage]:
+def _search_messages(
+    imap: imaplib.IMAP4_SSL,
+    *,
+    folder: str,
+    query: str,
+    limit: int,
+    offset: int = 0,
+) -> MailboxMessagePage:
     clean_query = query.strip()
     if not clean_query:
-        return []
+        return MailboxMessagePage(messages=[], next_offset=None, has_more=False)
     status, _data = imap.select(f'"{folder}"', readonly=True)
     if status != "OK":
-        return []
+        return MailboxMessagePage(messages=[], next_offset=None, has_more=False)
     search_status, search_data = imap.search(None, *_search_criteria(clean_query))
     if search_status != "OK" or not search_data:
-        return []
-    message_ids = search_data[0].split()[-limit:]
+        return MailboxMessagePage(messages=[], next_offset=None, has_more=False)
+    page_ids, next_offset = _page_message_ids(search_data[0].split(), limit=limit, offset=offset)
     messages = []
-    for message_id in reversed(message_ids):
+    for message_id in page_ids:
         message = _message_header(imap, folder=folder, message_id=message_id)
         if message:
             messages.append(message)
-    return messages
+    return MailboxMessagePage(messages=messages, next_offset=next_offset, has_more=next_offset is not None)
+
+
+def _page_message_ids(message_ids: list[bytes], *, limit: int, offset: int) -> tuple[list[bytes], int | None]:
+    newest_first = list(reversed(message_ids))
+    start = max(0, offset)
+    end = start + limit
+    page = newest_first[start:end]
+    next_offset = end if end < len(newest_first) else None
+    return page, next_offset
 
 
 def _list_contacts(imap: imaplib.IMAP4_SSL, *, folder: str, limit: int) -> list[MailboxContact]:

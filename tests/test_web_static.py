@@ -56,7 +56,7 @@ def test_static_web_validation_flags_credential_storage():
         '<button id="bulk-read-action">Read</button><button id="bulk-unread-action">Unread</button>'
         '<button id="bulk-star-action">Star</button><button id="bulk-unstar-action">Unstar</button>'
         '<button id="bulk-archive-action">Archive</button><button id="bulk-spam-action">Spam</button>'
-        '<button id="bulk-delete-action">Delete</button>'
+        '<button id="bulk-delete-action">Delete</button><button id="load-more-action">Load more</button>'
         '<section class="message-list"><div class="bulk-toolbar"></div><article class="message-row reader compose-panel">'
         "Inbox Compose Reply Forward Mark read Mark unread Attach Send Junk Mail Spam Delete</article></section></main>"
     )
@@ -78,6 +78,7 @@ def test_static_web_validation_flags_credential_storage():
         "setMailboxMessageReadState({}, true); Message marked read; Message marked unread; "
         "setMailboxMessageStarState({}, true); Message starred; Message unstarred; "
         "bulkMailboxMessages('archive', 'Bulk messages archived'); selectedMessageIds.add('1'); "
+        "loadMoreMailboxMessages(); nextOffset; hasMore; Load more; "
         "fetch('/api/v1/mailbox/preferences'); loadMailboxPreferences(); saveMailboxPreferences(); "
         "renderMailboxPreferences(); Preferences saved; withSignature('body'); "
         "fetch('/api/v1/mailbox/draft'); saveMailboxDraft({}); Draft saved; composePayload(); "
