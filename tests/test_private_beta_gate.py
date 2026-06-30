@@ -8,7 +8,7 @@ from freemail_api.private_beta_gate import PrivateBetaGateOptions, run_private_b
 def test_private_beta_gate_runtime_only_checks_vpn_boundary(monkeypatch):
     def fake_fetch(url):
         if url.endswith("/health"):
-            return {"status": "ok", "vpnOnly": True, "release": {"commit": "unknown"}}
+            return {"status": "ok", "vpnOnly": True, "release": {"commit": "abc123"}}
         if url.endswith("/deployment"):
             return {"exposure": "vpn-only", "publicInternet": False, "requiredBoundary": "Dragonscale/VPN clients only"}
         if url.endswith("/metadata/readiness"):
@@ -22,7 +22,9 @@ def test_private_beta_gate_runtime_only_checks_vpn_boundary(monkeypatch):
 
     monkeypatch.setattr("freemail_api.release_gate._fetch_json", fake_fetch)
 
-    result = run_private_beta_gate(PrivateBetaGateOptions(skip_dns=True, skip_evidence=True))
+    result = run_private_beta_gate(
+        PrivateBetaGateOptions(runtime_commit="abc123", skip_dns=True, skip_evidence=True)
+    )
 
     assert result["passed"] is True
     assert [check["name"] for check in result["checks"]] == [
@@ -31,6 +33,33 @@ def test_private_beta_gate_runtime_only_checks_vpn_boundary(monkeypatch):
         "metadata-readiness",
         "mail-core-readiness",
     ]
+
+
+def test_private_beta_gate_runtime_rejects_stale_commit(monkeypatch):
+    def fake_fetch(url):
+        if url.endswith("/health"):
+            return {"status": "ok", "vpnOnly": True, "release": {"commit": "old456"}}
+        if url.endswith("/deployment"):
+            return {"exposure": "vpn-only", "publicInternet": False, "requiredBoundary": "Dragonscale/VPN clients only"}
+        if url.endswith("/metadata/readiness"):
+            return {
+                "status": "ready",
+                "backend": "sqlite",
+                "schemaRevision": "sqlite-schema-v1",
+                "checks": [{"name": "domains", "status": "pass", "missingColumns": []}],
+            }
+        return {"status": "ready", "tcpReachable": True, "protocolReady": True}
+
+    monkeypatch.setattr("freemail_api.release_gate._fetch_json", fake_fetch)
+
+    result = run_private_beta_gate(
+        PrivateBetaGateOptions(runtime_commit="abc123", skip_dns=True, skip_evidence=True)
+    )
+
+    assert result["passed"] is False
+    assert result["checks"][0]["name"] == "runtime-health"
+    assert result["checks"][0]["status"] == "fail"
+    assert result["checks"][0]["details"]["releaseCommit"] == "old456"
 
 
 def test_private_beta_gate_requires_domain_dns_inputs_when_dns_enabled():

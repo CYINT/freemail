@@ -29,6 +29,10 @@ def main() -> int:
     parser.add_argument("--deployment-url", default="https://freemail.kuzuryu.ai/api/v1/deployment")
     parser.add_argument("--metadata-readiness-url", default="https://freemail.kuzuryu.ai/api/v1/metadata/readiness")
     parser.add_argument("--readiness-url", default="https://freemail.kuzuryu.ai/api/v1/mail-core/readiness")
+    parser.add_argument(
+        "--runtime-commit",
+        help="Expected runtime release commit. Defaults to the current Git HEAD when runtime checks are enabled.",
+    )
     parser.add_argument("--skip-runtime", action="store_true")
     args = parser.parse_args()
 
@@ -59,6 +63,7 @@ def _options_from_args(args: argparse.Namespace, manifest: PrivateBetaGateOption
         deployment_url=args.deployment_url,
         metadata_readiness_url=args.metadata_readiness_url,
         readiness_url=args.readiness_url,
+        runtime_commit=args.runtime_commit or _manifest_value(manifest, "runtime_commit"),
         skip_runtime=args.skip_runtime,
     )
 

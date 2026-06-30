@@ -10,6 +10,7 @@ import dns.resolver
 
 from .dns_policy import verify_dns_posture
 from .release_gate import _check
+from .release_gate import _command
 from .release_gate import _check_restore_drill_evidence
 from .release_gate import _file_evidence_details
 from .release_gate import _check_runtime
@@ -35,18 +36,20 @@ class PrivateBetaGateOptions:
     deployment_url: str | None = "https://freemail.kuzuryu.ai/api/v1/deployment"
     metadata_readiness_url: str | None = "https://freemail.kuzuryu.ai/api/v1/metadata/readiness"
     readiness_url: str | None = "https://freemail.kuzuryu.ai/api/v1/mail-core/readiness"
+    runtime_commit: str | None = None
     skip_runtime: bool = False
 
 
 def run_private_beta_gate(options: PrivateBetaGateOptions) -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
     if not options.skip_runtime:
+        runtime_commit = _expected_runtime_commit(options)
         checks.extend(
             _check_runtime(
                 options.health_url,
                 options.deployment_url,
                 options.readiness_url,
-                "unknown",
+                runtime_commit,
                 metadata_readiness_url=options.metadata_readiness_url,
             )
         )
@@ -60,6 +63,15 @@ def run_private_beta_gate(options: PrivateBetaGateOptions) -> dict[str, Any]:
         "domain": options.domain,
         "checks": checks,
     }
+
+
+def _expected_runtime_commit(options: PrivateBetaGateOptions) -> str:
+    if options.runtime_commit and options.runtime_commit.strip():
+        return options.runtime_commit.strip()
+    try:
+        return _command(["git", "rev-parse", "HEAD"])
+    except Exception:
+        return ""
 
 
 def _check_dns_posture(options: PrivateBetaGateOptions) -> dict[str, Any]:

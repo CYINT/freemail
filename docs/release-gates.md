@@ -146,6 +146,8 @@ Before private-beta use, run the private-beta gate. Runtime-only development mod
 .\.venv\Scripts\python.exe scripts\private_beta_gate.py --skip-dns --skip-evidence
 ```
 
+The runtime check expects `/health` to report the current Git commit by default, matching the hard release gate's stale-deployment protection. Pass `--runtime-commit <sha>` only when validating a deployed candidate from a different checkout.
+
 For a controlled domain, first export DNS guidance from the admin API, capture observed DNS values, run controlled mail-flow and queue checks, apply the Stalwart mail-core plan, collect credential-free apply evidence, collect deliverability/abuse evidence, collect backup evidence, collect restore-drill evidence, record decision-owner acceptance, then run:
 
 ```powershell
