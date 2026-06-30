@@ -27,6 +27,7 @@ import {
   createMailboxSession,
   deleteMailboxContact,
   deleteMailboxFolder,
+  deleteMailboxSenderRule,
   emptyMailboxFolder,
   importMailboxMessageSource,
   loadMailboxAttachment,
@@ -37,6 +38,7 @@ import {
   loadMailboxPreferences,
   loadMailboxPushDevices,
   loadMailboxPushNotifications,
+  loadMailboxSenderRules,
   loadMailboxSessions,
   loadMailboxSnapshot,
   loadMailboxThread,
@@ -52,6 +54,7 @@ import {
   MailMessageHeaders,
   MailboxPushDevice,
   MailboxPushNotification,
+  MailboxSenderRule,
   moveMailboxMessage,
   renameMailboxFolder,
   registerMailboxPushDevice,
@@ -62,6 +65,7 @@ import {
   searchMailbox,
   saveMailboxDraft,
   saveMailboxContact,
+  saveMailboxSenderRule,
   SavedMailContact,
   sendMailboxMessage,
   setMailboxMessageReadState,
@@ -109,6 +113,7 @@ export default function App() {
   const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([]);
   const [contacts, setContacts] = useState<MailContact[]>([]);
   const [savedContacts, setSavedContacts] = useState<SavedMailContact[]>([]);
+  const [senderRules, setSenderRules] = useState<MailboxSenderRule[]>([]);
   const [pushDevices, setPushDevices] = useState<MailboxPushDevice[]>([]);
   const [pushNotifications, setPushNotifications] = useState<MailboxPushNotification[]>([]);
   const [mailboxSessions, setMailboxSessions] = useState<MailboxSessionSummary[]>([]);
@@ -118,6 +123,9 @@ export default function App() {
   const [renameFolderName, setRenameFolderName] = useState("");
   const [savedContactName, setSavedContactName] = useState("");
   const [savedContactEmail, setSavedContactEmail] = useState("");
+  const [senderRuleEmail, setSenderRuleEmail] = useState("");
+  const [senderRuleAction, setSenderRuleAction] = useState<"allow" | "block">("block");
+  const [senderRuleNotes, setSenderRuleNotes] = useState("");
   const [pushDeviceId, setPushDeviceId] = useState("");
   const [pushToken, setPushToken] = useState("");
   const [mailboxPreferences, setMailboxPreferences] = useState<MailboxPreferences | null>(null);
@@ -138,6 +146,7 @@ export default function App() {
         setEmail(stored.email);
         refreshMailbox(stored, "INBOX");
         refreshMailboxSessions(stored);
+        refreshSenderRules(stored);
       }
     });
   }, []);
@@ -156,6 +165,7 @@ export default function App() {
       setPassword("");
       await refreshMailbox(created, "INBOX");
       await refreshMailboxSessions(created);
+      await refreshSenderRules(created);
     } catch (error) {
       setStatus(readableError(error));
     } finally {
@@ -171,6 +181,7 @@ export default function App() {
     setMailboxPagination({ mode: "folder", query: "", nextOffset: null, hasMore: false });
     setContacts([]);
     setSavedContacts([]);
+    setSenderRules([]);
     setPushDevices([]);
     setPushNotifications([]);
     setMailboxSessions([]);
@@ -216,6 +227,7 @@ export default function App() {
       setMailboxPagination({ mode: "folder", query: "", nextOffset: null, hasMore: false });
       setContacts([]);
       setSavedContacts([]);
+      setSenderRules([]);
       setPushDevices([]);
       setPushNotifications([]);
       setMailboxPreferences(null);
@@ -254,6 +266,7 @@ export default function App() {
         setMailboxPagination({ mode: "folder", query: "", nextOffset: null, hasMore: false });
         setContacts([]);
         setSavedContacts([]);
+        setSenderRules([]);
         setPushDevices([]);
         setPushNotifications([]);
         setMailboxPreferences(null);
@@ -295,6 +308,7 @@ export default function App() {
         loadMailboxPreferences(activeSession),
       ]);
       const savedContactList = await loadSavedMailboxContacts(activeSession);
+      const senderRuleList = await loadMailboxSenderRules(activeSession);
       const devices = await loadMailboxPushDevices(activeSession);
       const notifications = await loadMailboxPushNotifications(activeSession);
       setFolder(targetFolder);
@@ -312,6 +326,7 @@ export default function App() {
       });
       setContacts(contactList.contacts || []);
       setSavedContacts(savedContactList.contacts || []);
+      setSenderRules(senderRuleList.rules || []);
       setPushDevices(devices || []);
       setPushNotifications(notifications || []);
       setMailboxPreferences(preferences);
@@ -386,6 +401,55 @@ export default function App() {
       const saved = await loadSavedMailboxContacts(session);
       setSavedContacts(saved.contacts || []);
       setStatus("Contact deleted.");
+    } catch (error) {
+      setStatus(readableError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function refreshSenderRules(activeSession = session) {
+    if (!activeSession) {
+      return;
+    }
+    try {
+      const rules = await loadMailboxSenderRules(activeSession);
+      setSenderRules(rules.rules || []);
+    } catch (error) {
+      setStatus(`Sender rules refresh failed: ${readableError(error)}`);
+    }
+  }
+
+  async function saveSenderRule() {
+    if (!session || !senderRuleEmail.trim()) {
+      setStatus("Enter a sender email before saving a rule.");
+      return;
+    }
+    setLoading(true);
+    setStatus("Saving sender rule...");
+    try {
+      await saveMailboxSenderRule(session, senderRuleEmail.trim(), senderRuleAction, senderRuleNotes.trim());
+      await refreshSenderRules(session);
+      setSenderRuleEmail("");
+      setSenderRuleNotes("");
+      setStatus(`${senderRuleAction === "allow" ? "Allowed" : "Blocked"} sender.`);
+    } catch (error) {
+      setStatus(readableError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function deleteSenderRule(ruleId: number) {
+    if (!session) {
+      return;
+    }
+    setLoading(true);
+    setStatus("Deleting sender rule...");
+    try {
+      await deleteMailboxSenderRule(session, ruleId);
+      await refreshSenderRules(session);
+      setStatus("Sender rule deleted.");
     } catch (error) {
       setStatus(readableError(error));
     } finally {
@@ -1226,6 +1290,60 @@ export default function App() {
             </View>
 
             <View style={styles.panel}>
+              <View style={styles.rowHeader}>
+                <Text style={styles.sectionTitle}>Sender rules</Text>
+                <Pressable style={styles.secondaryButton} onPress={() => refreshSenderRules()}>
+                  <Text>Refresh</Text>
+                </Pressable>
+              </View>
+              <TextInput
+                value={senderRuleEmail}
+                onChangeText={setSenderRuleEmail}
+                style={styles.input}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                placeholder="sender@example.com"
+              />
+              <View style={styles.segmentedControl}>
+                <Pressable
+                  style={[styles.segmentButton, senderRuleAction === "block" ? styles.segmentButtonSelected : null]}
+                  onPress={() => setSenderRuleAction("block")}
+                >
+                  <Text style={senderRuleAction === "block" ? styles.segmentButtonSelectedText : null}>Block</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.segmentButton, senderRuleAction === "allow" ? styles.segmentButtonSelected : null]}
+                  onPress={() => setSenderRuleAction("allow")}
+                >
+                  <Text style={senderRuleAction === "allow" ? styles.segmentButtonSelectedText : null}>Allow</Text>
+                </Pressable>
+              </View>
+              <TextInput
+                value={senderRuleNotes}
+                onChangeText={setSenderRuleNotes}
+                style={styles.input}
+                placeholder="Notes"
+              />
+              <Pressable style={styles.secondaryButton} onPress={saveSenderRule}>
+                <Text>Save sender rule</Text>
+              </Pressable>
+              {senderRules.map((rule) => (
+                <View key={rule.id} style={styles.pushDeviceRow}>
+                  <View>
+                    <Text style={styles.sender}>{rule.senderEmail}</Text>
+                    <Text style={styles.meta}>
+                      {rule.action === "allow" ? "Allowed" : "Blocked"}
+                      {rule.notes ? ` - ${rule.notes}` : ""}
+                    </Text>
+                  </View>
+                  <Pressable style={styles.secondaryButton} onPress={() => deleteSenderRule(rule.id)}>
+                    <Text>Delete</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+
+            <View style={styles.panel}>
               <Text style={styles.sectionTitle}>Push devices</Text>
               <View style={styles.inlineControls}>
                 <TextInput
@@ -1581,6 +1699,16 @@ const styles = StyleSheet.create({
   input: { borderColor: "#cbd5e1", borderRadius: 8, borderWidth: 1, minHeight: 44, paddingHorizontal: 10 },
   signatureInput: { minHeight: 92, paddingTop: 10, textAlignVertical: "top" },
   composeBody: { minHeight: 110, paddingTop: 10, textAlignVertical: "top" },
+  segmentedControl: {
+    borderColor: "#cbd5e1",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    overflow: "hidden",
+  },
+  segmentButton: { alignItems: "center", flex: 1, minHeight: 38, justifyContent: "center" },
+  segmentButtonSelected: { backgroundColor: "#176b5f" },
+  segmentButtonSelectedText: { color: "#ffffff", fontWeight: "700" },
   primaryButton: { alignItems: "center", backgroundColor: "#176b5f", borderRadius: 8, minHeight: 44, justifyContent: "center" },
   primaryButtonText: { color: "#ffffff", fontWeight: "700" },
   secondaryButton: {

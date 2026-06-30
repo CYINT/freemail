@@ -211,6 +211,7 @@ textarea:focus-visible,
   padding: 0.25rem 0.55rem;
 }
 
+.sender-rules-panel,
 .sessions-panel {
   display: grid;
   gap: 0.55rem;
@@ -218,6 +219,7 @@ textarea:focus-visible,
   padding-top: 0.75rem;
 }
 
+.sender-rules-panel > div:first-child,
 .sessions-panel > div:first-child {
   display: flex;
   align-items: center;
@@ -226,11 +228,13 @@ textarea:focus-visible,
   color: #3a4856;
 }
 
+.sender-rules-panel button,
 .sessions-panel button {
   min-height: 32px;
   padding: 0.25rem 0.55rem;
 }
 
+.sender-rules-panel ul,
 .sessions-panel ul {
   display: grid;
   gap: 0.3rem;
@@ -239,6 +243,7 @@ textarea:focus-visible,
   list-style: none;
 }
 
+.sender-rules-panel li,
 .sessions-panel li {
   display: flex;
   align-items: center;
@@ -246,6 +251,8 @@ textarea:focus-visible,
   gap: 0.5rem;
 }
 
+.sender-rules-panel li span,
+.sender-rules-panel p,
 .sessions-panel li span,
 .sessions-panel p {
   margin: 0;
@@ -253,10 +260,27 @@ textarea:focus-visible,
   font-size: 0.82rem;
 }
 
+.sender-rules-panel li button,
 .sessions-panel li button {
   min-height: 28px;
   padding: 0.18rem 0.5rem;
   font-size: 0.78rem;
+}
+
+.sender-rule-form {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.sender-rule-form input,
+.sender-rule-form select {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid #c8d2dc;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #18212b;
+  padding: 0.4rem 0.55rem;
 }
 
 .saved-contact-form {

@@ -61,6 +61,24 @@
           <label>Signature <textarea id="preference-signature" name="signature" rows="4" maxlength="4000" placeholder="Regards,&#10;FreeMail"></textarea></label>
           <button type="submit">Save preferences</button>
         </form>
+        <section class="sender-rules-panel" aria-label="Sender rules">
+          <div>
+            <strong>Sender rules</strong>
+            <button id="sender-rules-refresh" type="button">Load</button>
+          </div>
+          <form class="sender-rule-form" id="sender-rule-form" aria-label="Save sender rule">
+            <input id="sender-rule-email" name="senderEmail" type="email" placeholder="sender@example.com">
+            <select id="sender-rule-action" name="action">
+              <option value="block">Block</option>
+              <option value="allow">Allow</option>
+            </select>
+            <input id="sender-rule-notes" name="notes" type="text" placeholder="Notes" maxlength="2000">
+            <button type="submit">Save rule</button>
+          </form>
+          <div id="sender-rules-list">
+            <p>Sign in to manage sender rules.</p>
+          </div>
+        </section>
         <section class="sessions-panel" aria-label="Mailbox sessions">
           <div>
             <strong>Sessions</strong>

@@ -66,6 +66,13 @@ def test_metadata_backup_round_trip_preserves_core_metadata_and_key_material(tmp
             display_name="Saved Contact",
             notes="Release contact",
         )
+        database.upsert_mailbox_sender_rule(
+            connection,
+            email="admin@example.com",
+            sender_email="blocked@example.net",
+            action="block",
+            notes="Abuse report",
+        )
         backup = export_metadata_backup(connection, generated_at="2026-06-30T00:00:00+00:00")
 
     assert backup["schemaVersion"] == 1
@@ -86,6 +93,8 @@ def test_metadata_backup_round_trip_preserves_core_metadata_and_key_material(tmp
     assert backup["tables"]["mailboxes"][0]["quota_bytes"] == 10_737_418_240
     assert backup["tables"]["mailbox_preferences"][0]["signature"] == "Regards,\nAdmin"
     assert backup["tables"]["mailbox_contacts"][0]["contact_email"] == "saved@example.net"
+    assert backup["tables"]["mailbox_sender_rules"][0]["sender_email"] == "blocked@example.net"
+    assert backup["tables"]["mailbox_sender_rules"][0]["action"] == "block"
 
     with database.connect(str(target_path)) as connection:
         restore_metadata_backup(connection, backup)
@@ -105,6 +114,9 @@ def test_metadata_backup_round_trip_preserves_core_metadata_and_key_material(tmp
         ]
         assert [dict(row) for row in database.list_rows(connection, "mailbox_contacts")] == backup["tables"][
             "mailbox_contacts"
+        ]
+        assert [dict(row) for row in database.list_rows(connection, "mailbox_sender_rules")] == backup["tables"][
+            "mailbox_sender_rules"
         ]
         assert connection.execute("SELECT COUNT(*) FROM admin_sessions").fetchone()[0] == 0
         assert connection.execute("SELECT COUNT(*) FROM mailbox_sessions").fetchone()[0] == 0
@@ -241,6 +253,25 @@ def test_metadata_restore_accepts_schema_one_backup_without_saved_contacts(tmp_p
         contacts = database.list_rows(connection, "mailbox_contacts")
 
     assert contacts == []
+
+
+def test_metadata_restore_accepts_schema_one_backup_without_sender_rules(tmp_path):
+    source_path = tmp_path / "source.sqlite"
+    target_path = tmp_path / "target.sqlite"
+    database.initialize(str(source_path))
+    database.initialize(str(target_path))
+
+    with database.connect(str(source_path)) as connection:
+        _seed_metadata(connection)
+        backup = export_metadata_backup(connection)
+
+    del backup["tables"]["mailbox_sender_rules"]
+
+    with database.connect(str(target_path)) as connection:
+        restore_metadata_backup(connection, backup)
+        rules = database.list_rows(connection, "mailbox_sender_rules")
+
+    assert rules == []
 
 
 def test_metadata_restore_validates_schema_version(tmp_path):

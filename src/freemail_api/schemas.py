@@ -457,6 +457,34 @@ class SavedMailboxContactDeleteRecord(ApiModel):
     contact_id: int
 
 
+class MailboxSenderRuleCreate(ApiModel):
+    sender_email: EmailStr
+    action: str = Field(pattern=r"^(allow|block)$")
+    notes: str = Field(default="", max_length=2000)
+
+
+class MailboxSenderRuleRecord(ApiModel):
+    id: int
+    mailbox_email: EmailStr
+    sender_email: EmailStr
+    action: str
+    notes: str
+    created_at: str
+    updated_at: str
+
+    model_config = ConfigDict(alias_generator=to_camel, from_attributes=True, populate_by_name=True)
+
+
+class MailboxSenderRulesRecord(ApiModel):
+    mailbox_email: EmailStr
+    rules: list[MailboxSenderRuleRecord]
+
+
+class MailboxSenderRuleDeleteRecord(ApiModel):
+    deleted: bool
+    rule_id: int
+
+
 class MailboxSessionCreate(ApiModel):
     email: EmailStr
     password: str = Field(min_length=1, max_length=512)

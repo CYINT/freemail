@@ -125,6 +125,21 @@ export type SavedMailboxContacts = {
   contacts: SavedMailContact[];
 };
 
+export type MailboxSenderRule = {
+  id: number;
+  mailboxEmail: string;
+  senderEmail: string;
+  action: "allow" | "block";
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type MailboxSenderRules = {
+  mailboxEmail: string;
+  rules: MailboxSenderRule[];
+};
+
 export type MailboxPushDevice = {
   id: number;
   mailboxEmail: string;
@@ -316,6 +331,37 @@ export async function saveMailboxContact(
 
 export async function deleteMailboxContact(session: MailboxSession, contactId: number): Promise<void> {
   await request(session.apiBaseUrl, `/api/v1/mailbox/saved-contacts/${contactId}`, {
+    method: "DELETE",
+    headers: mailboxHeaders(session),
+  });
+}
+
+export async function loadMailboxSenderRules(session: MailboxSession): Promise<MailboxSenderRules> {
+  const response = await request(session.apiBaseUrl, "/api/v1/mailbox/sender-rules", {
+    headers: mailboxHeaders(session),
+  });
+  return response.json();
+}
+
+export async function saveMailboxSenderRule(
+  session: MailboxSession,
+  senderEmail: string,
+  action: "allow" | "block",
+  notes = "",
+): Promise<MailboxSenderRule> {
+  const response = await request(session.apiBaseUrl, "/api/v1/mailbox/sender-rules", {
+    method: "PUT",
+    headers: {
+      ...mailboxHeaders(session),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ senderEmail, action, notes }),
+  });
+  return response.json();
+}
+
+export async function deleteMailboxSenderRule(session: MailboxSession, ruleId: number): Promise<void> {
+  await request(session.apiBaseUrl, `/api/v1/mailbox/sender-rules/${ruleId}`, {
     method: "DELETE",
     headers: mailboxHeaders(session),
   });

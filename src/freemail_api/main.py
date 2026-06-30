@@ -108,6 +108,10 @@ from .schemas import (
     MailboxSearchRecord,
     MailboxSendCreate,
     MailboxSendRecord,
+    MailboxSenderRuleCreate,
+    MailboxSenderRuleDeleteRecord,
+    MailboxSenderRuleRecord,
+    MailboxSenderRulesRecord,
     MailboxSessionCreate,
     MailboxSessionDeleteRecord,
     MailboxSessionRecord,
@@ -196,7 +200,7 @@ COMPONENT_READINESS = {
     "webmail": {
         "status": "beta-ready",
         "evidence": [
-            "mailbox session login, session inspection, targeted and bulk session revocation, paginated and thread-aware folder navigation and search, conversation lookup, contacts, message read, header inspection, EML import/export, read/unread state, star state, compose, attachments, archive, move, delete, and empty-folder controls",
+            "mailbox session login, session inspection, targeted and bulk session revocation, paginated and thread-aware folder navigation and search, conversation lookup, contacts, sender allow/block rules, message read, header inspection, EML import/export, read/unread state, star state, compose, attachments, archive, move, delete, and empty-folder controls",
             "bulk message actions for read/unread, star/unstar, archive, spam, delete, and move",
             "persistent mailbox preferences with default compose signatures and saved address-book contacts",
             "server-side Drafts persistence and compose reopen support for saved drafts",
@@ -211,7 +215,7 @@ COMPONENT_READINESS = {
     "mobile": {
         "status": "source-ready",
         "evidence": [
-            "Expo/React Native client with VPN API target, mailbox sessions, targeted and bulk session revocation, paginated and thread-aware message workflows, conversation lookup, header inspection, EML import/export/share, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder and empty-folder controls, extracted and saved contacts, attachments, offline metadata cache, and push-device flows",
+            "Expo/React Native client with VPN API target, mailbox sessions, targeted and bulk session revocation, paginated and thread-aware message workflows, conversation lookup, header inspection, EML import/export/share, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder and empty-folder controls, extracted and saved contacts, sender allow/block rules, attachments, offline metadata cache, and push-device flows",
             "bulk read/star/archive/spam/delete/move client controls over the shared mailbox API",
             "mobile preference controls for default compose signatures",
             "compose/send path uses the shared mailbox API contract with Sent Items persistence status",
@@ -748,6 +752,71 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 contact_id=contact_id,
             ),
             "contact_id": contact_id,
+        }
+
+    @app.get("/api/v1/mailbox/sender-rules", response_model=MailboxSenderRulesRecord)
+    def mailbox_sender_rules_list(
+        authorization: str | None = Header(default=None),
+        x_freemail_mailbox_email: str | None = Header(default=None),
+        x_freemail_mailbox_password: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=x_freemail_mailbox_email,
+            x_freemail_mailbox_password=x_freemail_mailbox_password,
+            connection=connection,
+        )
+        normalized_email = credentials.email.lower()
+        return {
+            "mailbox_email": normalized_email,
+            "rules": _rows_to_dicts(database.list_mailbox_sender_rules(connection, email=normalized_email)),
+        }
+
+    @app.put("/api/v1/mailbox/sender-rules", response_model=MailboxSenderRuleRecord)
+    def mailbox_sender_rule_upsert(
+        payload: MailboxSenderRuleCreate,
+        authorization: str | None = Header(default=None),
+        x_freemail_mailbox_email: str | None = Header(default=None),
+        x_freemail_mailbox_password: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=x_freemail_mailbox_email,
+            x_freemail_mailbox_password=x_freemail_mailbox_password,
+            connection=connection,
+        )
+        rule = database.upsert_mailbox_sender_rule(
+            connection,
+            email=credentials.email,
+            sender_email=str(payload.sender_email),
+            action=payload.action,
+            notes=payload.notes,
+        )
+        return dict(rule)
+
+    @app.delete("/api/v1/mailbox/sender-rules/{rule_id}", response_model=MailboxSenderRuleDeleteRecord)
+    def mailbox_sender_rule_delete(
+        rule_id: int,
+        authorization: str | None = Header(default=None),
+        x_freemail_mailbox_email: str | None = Header(default=None),
+        x_freemail_mailbox_password: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=x_freemail_mailbox_email,
+            x_freemail_mailbox_password=x_freemail_mailbox_password,
+            connection=connection,
+        )
+        return {
+            "deleted": database.delete_mailbox_sender_rule(
+                connection,
+                email=credentials.email,
+                rule_id=rule_id,
+            ),
+            "rule_id": rule_id,
         }
 
     @app.post("/api/v1/mailbox/push/devices", response_model=MailboxPushDeviceRecord)

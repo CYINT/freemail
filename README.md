@@ -24,9 +24,9 @@ The FreeMail program includes:
 
 This repository is at the implementation baseline. It contains:
 
-- A FastAPI admin/runtime API with persistent SQLite-backed domain, user, user-password rotation, mailbox, mailbox-quota, alias, and filterable audit-log surfaces.
-- A static webmail preview shell with inbox, paginated search and folder loading, thread-aware conversation lookup, saved and extracted contacts, message reader, header inspection, read/unread and star controls, EML import/export, bulk message actions, persistent preferences/signatures, account session management, compose, draft saving and editing, folder navigation and empty-folder controls, token-gated admin setup, and responsive layout QA.
-- An Expo/React Native mobile client scaffold with secure session storage, account session management, paginated and thread-aware mailbox workflows, conversation lookup, saved and extracted contacts, persistent preferences/signatures, draft saving and editing, message header inspection, read/unread and star controls, EML import/export/share, bulk archive/spam/delete/read/star actions, folder emptying, and static QA.
+- A FastAPI admin/runtime API with persistent SQLite-backed domain, user, user-password rotation, mailbox, mailbox-quota, alias, mailbox sender-rule, and filterable audit-log surfaces.
+- A static webmail preview shell with inbox, paginated search and folder loading, thread-aware conversation lookup, saved and extracted contacts, sender allow/block rules, message reader, header inspection, read/unread and star controls, EML import/export, bulk message actions, persistent preferences/signatures, account session management, compose, draft saving and editing, folder navigation and empty-folder controls, token-gated admin setup, and responsive layout QA.
+- An Expo/React Native mobile client scaffold with secure session storage, account session management, paginated and thread-aware mailbox workflows, conversation lookup, saved and extracted contacts, sender allow/block rules, persistent preferences/signatures, draft saving and editing, message header inspection, read/unread and star controls, EML import/export/share, bulk archive/spam/delete/read/star actions, folder emptying, and static QA.
 - A Docker Compose stack with VPN-only loopback bindings by default.
 - A Stalwart mail-core candidate profile for the first architecture spike.
 - CI for linting, tests, repository secret scanning, dependency audit, Compose validation, and image build.
@@ -252,6 +252,14 @@ PUT /api/v1/mailbox/saved-contacts
 DELETE /api/v1/mailbox/saved-contacts/{contactId}
 ```
 
+Mailbox sender rules are durable mailbox metadata for allow/block abuse triage and are included in metadata backups:
+
+```text
+GET /api/v1/mailbox/sender-rules
+PUT /api/v1/mailbox/sender-rules
+DELETE /api/v1/mailbox/sender-rules/{ruleId}
+```
+
 Folder management uses the browser bearer session or per-request mailbox credentials:
 
 ```text
@@ -388,7 +396,7 @@ The exporter matches DKIM signatures by selector to avoid duplicate Stalwart sig
 
 ## Backup And Restore
 
-Read `docs/backup-restore.md` before relying on backups. The metadata backup tools export API metadata, audit logs, encrypted admin MFA secrets, and DKIM key material; they intentionally exclude admin sessions, mailbox sessions, outbound rate-limit counters, push-device registrations, and Stalwart mail-store data.
+Read `docs/backup-restore.md` before relying on backups. The metadata backup tools export API metadata, audit logs, encrypted admin MFA secrets, DKIM key material, mailbox preferences, saved contacts, and mailbox sender rules; they intentionally exclude admin sessions, mailbox sessions, outbound rate-limit counters, push-device registrations, and Stalwart mail-store data.
 
 Collect both release-packet backup artifacts into one ignored directory:
 

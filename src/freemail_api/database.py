@@ -165,6 +165,20 @@ CREATE TABLE IF NOT EXISTS mailbox_contacts (
 
 CREATE INDEX IF NOT EXISTS idx_mailbox_contacts_mailbox
 ON mailbox_contacts(mailbox_email, contact_email);
+
+CREATE TABLE IF NOT EXISTS mailbox_sender_rules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mailbox_email TEXT NOT NULL,
+    sender_email TEXT NOT NULL,
+    action TEXT NOT NULL,
+    notes TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(mailbox_email, sender_email)
+);
+
+CREATE INDEX IF NOT EXISTS idx_mailbox_sender_rules_mailbox
+ON mailbox_sender_rules(mailbox_email, action, sender_email);
 """
 
 
@@ -245,6 +259,15 @@ REQUIRED_TABLE_COLUMNS = {
         "created_at",
         "updated_at",
     },
+    "mailbox_sender_rules": {
+        "id",
+        "mailbox_email",
+        "sender_email",
+        "action",
+        "notes",
+        "created_at",
+        "updated_at",
+    },
 }
 
 
@@ -301,6 +324,7 @@ def list_rows(connection: sqlite3.Connection, table: str) -> list[sqlite3.Row]:
         "dkim_keys",
         "mailbox_preferences",
         "mailbox_contacts",
+        "mailbox_sender_rules",
     }
     if table not in allowed_tables:
         raise ValueError(f"Unsupported table: {table}")
@@ -874,6 +898,66 @@ def delete_saved_mailbox_contact(connection: sqlite3.Connection, *, email: str, 
     return cursor.rowcount > 0
 
 
+def list_mailbox_sender_rules(connection: sqlite3.Connection, *, email: str) -> list[sqlite3.Row]:
+    return list(
+        connection.execute(
+            """
+            SELECT id, mailbox_email, sender_email, action, notes, created_at, updated_at
+            FROM mailbox_sender_rules
+            WHERE mailbox_email = ?
+            ORDER BY action, sender_email COLLATE NOCASE
+            """,
+            [email.lower()],
+        )
+    )
+
+
+def upsert_mailbox_sender_rule(
+    connection: sqlite3.Connection,
+    *,
+    email: str,
+    sender_email: str,
+    action: str,
+    notes: str,
+) -> sqlite3.Row:
+    if action not in {"allow", "block"}:
+        raise ValueError("sender rule action must be allow or block")
+    normalized_email = email.lower()
+    normalized_sender = sender_email.lower()
+    connection.execute(
+        """
+        INSERT INTO mailbox_sender_rules (mailbox_email, sender_email, action, notes, updated_at)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(mailbox_email, sender_email) DO UPDATE SET
+            action = excluded.action,
+            notes = excluded.notes,
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        [normalized_email, normalized_sender, action, notes.strip()],
+    )
+    connection.commit()
+    row = connection.execute(
+        """
+        SELECT id, mailbox_email, sender_email, action, notes, created_at, updated_at
+        FROM mailbox_sender_rules
+        WHERE mailbox_email = ? AND sender_email = ?
+        """,
+        [normalized_email, normalized_sender],
+    ).fetchone()
+    if row is None:
+        raise MissingRecordError(f"sender rule {sender_email} was not found")
+    return row
+
+
+def delete_mailbox_sender_rule(connection: sqlite3.Connection, *, email: str, rule_id: int) -> bool:
+    cursor = connection.execute(
+        "DELETE FROM mailbox_sender_rules WHERE mailbox_email = ? AND id = ?",
+        [email.lower(), rule_id],
+    )
+    connection.commit()
+    return cursor.rowcount > 0
+
+
 def upsert_mailbox_push_device(
     connection: sqlite3.Connection,
     *,
@@ -1040,6 +1124,8 @@ def _metadata_order_column(table: str) -> str:
         return "user_id"
     if table == "mailbox_contacts":
         return "mailbox_email, contact_email"
+    if table == "mailbox_sender_rules":
+        return "mailbox_email, action, sender_email"
     if table == "mailbox_preferences":
         return "mailbox_email"
     return "id"
@@ -1107,6 +1193,26 @@ def _migrate_schema(connection: sqlite3.Connection) -> None:
     )
     connection.execute(
         "CREATE INDEX IF NOT EXISTS idx_mailbox_contacts_mailbox ON mailbox_contacts(mailbox_email, contact_email)"
+    )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS mailbox_sender_rules (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            mailbox_email TEXT NOT NULL,
+            sender_email TEXT NOT NULL,
+            action TEXT NOT NULL,
+            notes TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(mailbox_email, sender_email)
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_mailbox_sender_rules_mailbox
+        ON mailbox_sender_rules(mailbox_email, action, sender_email)
+        """
     )
     connection.commit()
 

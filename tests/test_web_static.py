@@ -77,6 +77,8 @@ def test_static_web_validation_flags_credential_storage():
         "fetch('/api/v1/mailbox/thread'); loadMailboxThread({}); load-thread-action; Conversation; "
         "fetch('/api/v1/mailbox/contacts'); "
         "fetch('/api/v1/mailbox/saved-contacts'); saveMailboxContact({}); deleteMailboxContact(1); saved-contact; "
+        "fetch('/api/v1/mailbox/sender-rules'); loadMailboxSenderRules(); saveMailboxSenderRule({}); "
+        "deleteMailboxSenderRule(1); renderMailboxSenderRules([]); sender-rules-refresh; "
         "fetch('/api/v1/mailbox/folder'); fetch('/api/v1/mailbox/folder/empty'); "
         "fetch('/api/v1/mailbox/message/headers'); "
         "fetch('/api/v1/mailbox/message/attachment'); fetch('/api/v1/mailbox/message/source'); "

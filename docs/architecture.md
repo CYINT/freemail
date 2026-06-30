@@ -34,6 +34,7 @@ The first persistence boundary is:
 - `dkim_keys`: generated DKIM private keys and public DNS TXT values
 - `audit_log`: administrative changes
 - `mailbox_preferences`: mailbox-scoped display names and default compose signatures
+- `mailbox_sender_rules`: mailbox-scoped sender allow/block rules for abuse triage
 - `admin_sessions`: runtime-only hashed administrator bearer sessions, excluded from metadata backups
 
 Future migrations can move this store to PostgreSQL without changing the external API contract.
