@@ -944,9 +944,12 @@ def test_mailbox_snapshot_returns_imap_adapter_payload(tmp_path, monkeypatch):
                         "subject": "Hello",
                         "sender": "sender@example.net",
                         "recipients": "admin@example.com",
-                        "date": "",
-                        "unread": False,
-                    }
+                            "date": "",
+                            "unread": False,
+                            "threadId": "thread-1121e6e169058c3a",
+                            "threadSubject": "Hello",
+                            "inReplyTo": None,
+                        }
                 ],
                 "limit": 1,
                 "offset": 5,
@@ -976,6 +979,7 @@ def test_mailbox_snapshot_returns_imap_adapter_payload(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert response.json()["folders"][0]["name"] == "INBOX"
     assert response.json()["messages"][0]["subject"] == "Hello"
+    assert response.json()["messages"][0]["threadId"] == "thread-1121e6e169058c3a"
     assert response.json()["nextOffset"] == 6
     assert response.json()["hasMore"] is True
 
@@ -1310,9 +1314,12 @@ def test_mailbox_search_returns_imap_results(tmp_path, monkeypatch):
                         "subject": "Hello",
                         "sender": "sender@example.net",
                         "recipients": "admin@example.com",
-                        "date": "",
-                        "unread": False,
-                    }
+                            "date": "",
+                            "unread": False,
+                            "thread_id": "thread-1121e6e169058c3a",
+                            "thread_subject": "Hello",
+                            "in_reply_to": None,
+                        }
                 ],
                 "limit": 10,
                 "offset": 10,
@@ -1343,6 +1350,7 @@ def test_mailbox_search_returns_imap_results(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert response.json()["query"] == "hello"
     assert response.json()["messages"][0]["subject"] == "Hello"
+    assert response.json()["messages"][0]["threadId"] == "thread-1121e6e169058c3a"
     assert response.json()["offset"] == 10
     assert response.json()["hasMore"] is False
 
@@ -1789,6 +1797,9 @@ def test_mailbox_message_returns_imap_detail_payload(tmp_path, monkeypatch):
                 "recipients": "admin@example.com",
                 "date": "",
                 "unread": False,
+                "thread_id": "thread-1121e6e169058c3a",
+                "thread_subject": "Hello",
+                "in_reply_to": None,
                 "body": "Body text",
                 "attachments": [
                     {
@@ -1820,6 +1831,7 @@ def test_mailbox_message_returns_imap_detail_payload(tmp_path, monkeypatch):
 
     assert response.status_code == 200
     assert response.json()["subject"] == "Hello"
+    assert response.json()["threadId"] == "thread-1121e6e169058c3a"
     assert response.json()["body"] == "Body text"
     assert response.json()["attachments"][0]["filename"] == "report.txt"
 

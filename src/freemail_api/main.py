@@ -166,7 +166,7 @@ COMPONENT_READINESS = {
     "webmail": {
         "status": "beta-ready",
         "evidence": [
-            "mailbox session login, paginated folder navigation and search, contacts, message read, read/unread state, star state, compose, attachments, archive, move, and delete controls",
+            "mailbox session login, paginated and thread-aware folder navigation and search, contacts, message read, read/unread state, star state, compose, attachments, archive, move, and delete controls",
             "bulk message actions for read/unread, star/unstar, archive, spam, delete, and move",
             "persistent mailbox preferences with default compose signatures",
             "server-side Drafts persistence and compose reopen support for saved drafts",
@@ -181,7 +181,7 @@ COMPONENT_READINESS = {
     "mobile": {
         "status": "source-ready",
         "evidence": [
-            "Expo/React Native client with VPN API target, mailbox sessions, paginated message workflows, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder controls, contacts, attachments, offline metadata cache, and push-device flows",
+            "Expo/React Native client with VPN API target, mailbox sessions, paginated and thread-aware message workflows, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder controls, contacts, attachments, offline metadata cache, and push-device flows",
             "bulk read/star/archive/spam/delete/move client controls over the shared mailbox API",
             "mobile preference controls for default compose signatures",
             "compose/send path uses the shared mailbox API contract with Sent Items persistence status",

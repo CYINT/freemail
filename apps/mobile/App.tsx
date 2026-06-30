@@ -817,6 +817,7 @@ export default function App() {
                     </Pressable>
                     <Text style={styles.sender}>{item.sender || "Unknown sender"}</Text>
                     <Text style={styles.subject}>{item.starred ? `* ${item.subject || "(no subject)"}` : item.subject || "(no subject)"}</Text>
+                    {threadHint(item) ? <Text style={styles.threadHint}>{threadHint(item)}</Text> : null}
                     <Text style={styles.meta}>{item.recipients}</Text>
                   </Pressable>
                 )}
@@ -830,7 +831,7 @@ export default function App() {
 
             <View style={styles.readerPanel}>
               <Text style={styles.sectionTitle}>{selectedSubject}</Text>
-              <Text style={styles.meta}>{selectedMessage ? `From ${selectedMessage.sender}` : "Open a message to read it."}</Text>
+              <Text style={styles.meta}>{selectedMessage ? readerMetadata(selectedMessage) : "Open a message to read it."}</Text>
               <Text style={styles.body}>{selectedMessage?.body || ""}</Text>
               {selectedMessage ? (
                 <View style={styles.inlineControls}>
@@ -1095,6 +1096,21 @@ function formatBytes(size: number): string {
   return `${Math.round(size / 104_857.6) / 10} MB`;
 }
 
+function threadHint(message: MailMessage): string {
+  const subject = message.subject || "(no subject)";
+  const threadSubject = message.threadSubject || subject;
+  if (!message.inReplyTo && threadSubject === subject) {
+    return "";
+  }
+  return `Thread: ${threadSubject}`;
+}
+
+function readerMetadata(message: MailMessage): string {
+  const base = `From ${message.sender || "Unknown sender"}`;
+  const threadSubject = message.threadSubject || message.subject || "(no subject)";
+  return message.threadId ? `${base} | Thread ${threadSubject}` : base;
+}
+
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#f5f7fb" },
   container: { flex: 1, padding: 16, gap: 12 },
@@ -1168,6 +1184,7 @@ const styles = StyleSheet.create({
   },
   sender: { color: "#1f2937", fontWeight: "700" },
   subject: { color: "#1f2937", fontSize: 16 },
+  threadHint: { color: "#697386", fontSize: 12 },
   meta: { color: "#697386", fontSize: 12 },
   body: { color: "#1f2937", fontSize: 15, lineHeight: 22, marginTop: 4 },
   input: { borderColor: "#cbd5e1", borderRadius: 8, borderWidth: 1, minHeight: 44, paddingHorizontal: 10 },

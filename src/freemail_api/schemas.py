@@ -208,6 +208,9 @@ class MailboxMessageSummary(ApiModel):
     date: str
     unread: bool
     starred: bool = False
+    thread_id: str
+    thread_subject: str
+    in_reply_to: str | None = None
 
 
 class MailboxAttachmentRecord(ApiModel):

@@ -411,6 +411,11 @@ h2 {
   color: #52616f;
 }
 
+.thread-hint {
+  color: #697386;
+  font-size: 0.78rem;
+}
+
 .sender {
   color: #243140;
   font-weight: 700;

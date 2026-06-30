@@ -4,7 +4,9 @@ from dataclasses import asdict, dataclass
 from email.utils import getaddresses
 from email.parser import BytesParser
 from email.policy import default
+from hashlib import sha256
 import imaplib
+import re
 import ssl
 
 
@@ -18,6 +20,9 @@ class MailboxMessage:
     date: str
     unread: bool
     starred: bool
+    thread_id: str
+    thread_subject: str
+    in_reply_to: str | None
 
     def as_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -659,18 +664,7 @@ def _list_messages(imap: imaplib.IMAP4_SSL, *, folder: str, limit: int, offset: 
             continue
         header = BytesParser(policy=default).parsebytes(fetch_data[0][1])
         flags = _flags_from_fetch(fetch_data[0][0])
-        messages.append(
-            MailboxMessage(
-                folder=folder,
-                message_id=message_id.decode("ascii"),
-                subject=str(header.get("subject", "")),
-                sender=str(header.get("from", "")),
-                recipients=str(header.get("to", "")),
-                date=str(header.get("date", "")),
-                unread="\\Seen" not in flags,
-                starred="\\Flagged" in flags,
-            )
-        )
+        messages.append(_message_from_header(folder=folder, message_id=message_id, header=header, flags=flags))
     return MailboxMessagePage(messages=messages, next_offset=next_offset, has_more=next_offset is not None)
 
 
@@ -753,16 +747,7 @@ def _message_header(imap: imaplib.IMAP4_SSL, *, folder: str, message_id: bytes) 
         return None
     header = BytesParser(policy=default).parsebytes(fetch_data[0][1])
     flags = _flags_from_fetch(fetch_data[0][0])
-    return MailboxMessage(
-        folder=folder,
-        message_id=message_id.decode("ascii"),
-        subject=str(header.get("subject", "")),
-        sender=str(header.get("from", "")),
-        recipients=str(header.get("to", "")),
-        date=str(header.get("date", "")),
-        unread="\\Seen" not in flags,
-        starred="\\Flagged" in flags,
-    )
+    return _message_from_header(folder=folder, message_id=message_id, header=header, flags=flags)
 
 
 def _search_criteria(query: str) -> tuple[str, ...]:
@@ -796,6 +781,7 @@ def _get_message(imap: imaplib.IMAP4_SSL, *, folder: str, message_id: str) -> Ma
         raise imaplib.IMAP4.error("Mailbox message not found")
     parsed = BytesParser(policy=default).parsebytes(fetch_data[0][1])
     flags = _flags_from_fetch(fetch_data[0][0])
+    thread_id, thread_subject, in_reply_to = _thread_metadata(parsed)
     return MailboxMessageDetail(
         folder=folder,
         message_id=message_id,
@@ -805,9 +791,54 @@ def _get_message(imap: imaplib.IMAP4_SSL, *, folder: str, message_id: str) -> Ma
         date=str(parsed.get("date", "")),
         unread="\\Seen" not in flags,
         starred="\\Flagged" in flags,
+        thread_id=thread_id,
+        thread_subject=thread_subject,
+        in_reply_to=in_reply_to,
         body=_body_from_message(parsed),
         attachments=_attachments_from_message(parsed),
     )
+
+
+def _message_from_header(*, folder: str, message_id: bytes, header, flags: set[str]) -> MailboxMessage:
+    thread_id, thread_subject, in_reply_to = _thread_metadata(header)
+    return MailboxMessage(
+        folder=folder,
+        message_id=message_id.decode("ascii"),
+        subject=str(header.get("subject", "")),
+        sender=str(header.get("from", "")),
+        recipients=str(header.get("to", "")),
+        date=str(header.get("date", "")),
+        unread="\\Seen" not in flags,
+        starred="\\Flagged" in flags,
+        thread_id=thread_id,
+        thread_subject=thread_subject,
+        in_reply_to=in_reply_to,
+    )
+
+
+def _thread_metadata(header) -> tuple[str, str, str | None]:
+    subject = str(header.get("subject", ""))
+    thread_subject = _normalized_thread_subject(subject)
+    references = _message_id_tokens(str(header.get("references", "")))
+    in_reply_to_tokens = _message_id_tokens(str(header.get("in-reply-to", "")))
+    own_message_id = _message_id_tokens(str(header.get("message-id", "")))
+    root_token = (references or in_reply_to_tokens or own_message_id or [thread_subject or "(no subject)"])[0]
+    digest = sha256(root_token.lower().encode("utf-8")).hexdigest()[:16]
+    return f"thread-{digest}", thread_subject, in_reply_to_tokens[-1] if in_reply_to_tokens else None
+
+
+def _message_id_tokens(value: str) -> list[str]:
+    return re.findall(r"<[^>]+>", value)
+
+
+def _normalized_thread_subject(subject: str) -> str:
+    normalized = " ".join(subject.strip().split())
+    while True:
+        stripped = re.sub(r"^(?:(?:re|fw|fwd)\s*:\s*)+", "", normalized, flags=re.IGNORECASE).strip()
+        if stripped == normalized:
+            break
+        normalized = stripped
+    return normalized or "(no subject)"
 
 
 def _get_attachment(

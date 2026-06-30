@@ -79,6 +79,7 @@ def test_static_web_validation_flags_credential_storage():
         "setMailboxMessageStarState({}, true); Message starred; Message unstarred; "
         "bulkMailboxMessages('archive', 'Bulk messages archived'); selectedMessageIds.add('1'); "
         "loadMoreMailboxMessages(); nextOffset; hasMore; Load more; "
+        "threadId; threadSubject; threadHint({}); Thread: "
         "fetch('/api/v1/mailbox/preferences'); loadMailboxPreferences(); saveMailboxPreferences(); "
         "renderMailboxPreferences(); Preferences saved; withSignature('body'); "
         "fetch('/api/v1/mailbox/draft'); saveMailboxDraft({}); Draft saved; composePayload(); "

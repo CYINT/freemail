@@ -36,6 +36,7 @@ from freemail_api.mailbox_imap import (
     _list_folders,
     _list_messages,
     _message_ids_for_move,
+    _normalized_thread_subject,
     _move_message,
     _parse_folder,
     _quote_search_value,
@@ -44,6 +45,7 @@ from freemail_api.mailbox_imap import (
     _search_messages,
     _set_message_flagged,
     _set_message_seen,
+    _thread_metadata,
     _tls_context,
 )
 
@@ -80,6 +82,9 @@ class FakeImap:
             b"From: sender@example.com\r\n"
             b"To: admin@example.com\r\n"
             b"Date: Mon, 01 Jan 2024 00:00:00 +0000\r\n"
+            b"Message-ID: <message-3@example.com>\r\n"
+            b"In-Reply-To: <message-1@example.com>\r\n"
+            b"References: <message-1@example.com> <message-2@example.com>\r\n"
             b"\r\n"
         )
         payload = headers + body if "BODY.PEEK[]" in query else headers
@@ -129,6 +134,9 @@ def test_snapshot_serializes_nested_records():
                 date="Mon, 01 Jan 2024 00:00:00 +0000",
                 unread=False,
                 starred=True,
+                thread_id="thread-1121e6e169058c3a",
+                thread_subject="Hello",
+                in_reply_to="<message-1@example.com>",
             )
         ],
         limit=25,
@@ -150,6 +158,9 @@ def test_snapshot_serializes_nested_records():
                 "date": "Mon, 01 Jan 2024 00:00:00 +0000",
                 "unread": False,
                 "starred": True,
+                "thread_id": "thread-1121e6e169058c3a",
+                "thread_subject": "Hello",
+                "in_reply_to": "<message-1@example.com>",
             }
         ],
         "limit": 25,
@@ -169,6 +180,9 @@ def test_message_detail_serializes_body():
         date="Mon, 01 Jan 2024 00:00:00 +0000",
         unread=False,
         starred=True,
+        thread_id="thread-1121e6e169058c3a",
+        thread_subject="Hello",
+        in_reply_to="<message-1@example.com>",
         body="Body text",
         attachments=[MailboxAttachment("0", "report.txt", "text/plain", 6)],
     )
@@ -192,6 +206,9 @@ def test_search_result_serializes_messages():
                 date="Mon, 01 Jan 2024 00:00:00 +0000",
                 unread=False,
                 starred=True,
+                thread_id="thread-1121e6e169058c3a",
+                thread_subject="Hello",
+                in_reply_to="<message-1@example.com>",
             )
         ],
         limit=25,
@@ -309,6 +326,9 @@ def test_list_messages_parses_headers_and_seen_flag():
     assert messages[0].recipients == "admin@example.com"
     assert messages[0].unread is False
     assert messages[0].starred is True
+    assert messages[0].thread_id == "thread-1121e6e169058c3a"
+    assert messages[0].thread_subject == "Hello"
+    assert messages[0].in_reply_to == "<message-1@example.com>"
     assert page.next_offset == 1
     assert page.has_more is True
 
@@ -393,7 +413,39 @@ def test_get_message_parses_body_and_headers():
     assert message.body == "Body text"
     assert message.unread is False
     assert message.starred is True
+    assert message.thread_subject == "Hello"
+    assert message.in_reply_to == "<message-1@example.com>"
     assert message.attachments == []
+
+
+def test_thread_metadata_prefers_reference_root_and_normalizes_subject():
+    message = EmailMessage()
+    message["Subject"] = "Re: Fwd: Launch Plan"
+    message["Message-ID"] = "<reply@example.com>"
+    message["In-Reply-To"] = "<parent@example.com>"
+    message["References"] = "<root@example.com> <parent@example.com>"
+
+    thread_id, thread_subject, in_reply_to = _thread_metadata(message)
+
+    assert thread_id == "thread-f7f0c35ba6b570d0"
+    assert thread_subject == "Launch Plan"
+    assert in_reply_to == "<parent@example.com>"
+
+
+def test_thread_metadata_falls_back_to_normalized_subject():
+    message = EmailMessage()
+    message["Subject"] = "Re: Status"
+
+    thread_id, thread_subject, in_reply_to = _thread_metadata(message)
+
+    assert thread_id == "thread-073c1634c496cdb6"
+    assert thread_subject == "Status"
+    assert in_reply_to is None
+
+
+def test_normalized_thread_subject_removes_reply_prefixes():
+    assert _normalized_thread_subject(" Re: Fwd:  Hello   Team ") == "Hello Team"
+    assert _normalized_thread_subject(" ") == "(no subject)"
 
 
 def test_attachment_summaries_extract_attachment_parts():

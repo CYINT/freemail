@@ -19,6 +19,9 @@ export type MailMessage = {
   date: string;
   unread: boolean;
   starred: boolean;
+  threadId: string;
+  threadSubject: string;
+  inReplyTo?: string | null;
 };
 
 export type MailAttachment = {

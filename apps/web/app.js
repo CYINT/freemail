@@ -1013,6 +1013,7 @@ function messageRow(message, selected) {
   row.innerHTML = `
     <span class="sender">${escapeHtml(message.sender || "Unknown sender")}</span>
     <strong>${escapeHtml(message.starred ? `* ${message.subject || "(no subject)"}` : message.subject || "(no subject)")}</strong>
+    ${threadHint(message)}
     <p>${escapeHtml(message.recipients || "")}</p>
     <time>${escapeHtml(shortDate(message.date))}</time>
   `;
@@ -1034,13 +1035,13 @@ async function selectMessage(message, row) {
   });
   row.classList.add("selected");
   readerSubject.textContent = message.subject || "(no subject)";
-  readerMeta.textContent = `From ${message.sender || "Unknown sender"} to ${message.recipients || mailboxSession.email}`;
+  readerMeta.textContent = readerMetadata(message);
   renderMessageBody("Loading message...");
   try {
     const detail = await loadMailboxMessage(message.folder, message.messageId);
     selectedMessageDetail = detail;
     readerSubject.textContent = detail.subject || "(no subject)";
-    readerMeta.textContent = `From ${detail.sender || "Unknown sender"} to ${detail.recipients || mailboxSession.email}`;
+    readerMeta.textContent = readerMetadata(detail);
     renderMessageBody(detail.body || "(No plain text body)");
     renderMessageAttachments(detail);
     renderDraftActions(detail);
@@ -1050,6 +1051,26 @@ async function selectMessage(message, row) {
     renderMessageAttachments(null);
     renderDraftActions(null);
   }
+}
+
+function threadHint(message) {
+  if (!message.threadId) {
+    return "";
+  }
+  const subject = message.subject || "(no subject)";
+  const threadSubject = message.threadSubject || subject;
+  if (!message.inReplyTo && threadSubject === subject) {
+    return "";
+  }
+  return `<small class="thread-hint">Thread: ${escapeHtml(threadSubject)}</small>`;
+}
+
+function readerMetadata(message) {
+  const base = `From ${message.sender || "Unknown sender"} to ${message.recipients || mailboxSession.email}`;
+  if (!message.threadId) {
+    return base;
+  }
+  return `${base} | Thread ${message.threadSubject || message.subject || "(no subject)"}`;
 }
 
 function addComposeRecipient(email) {
