@@ -53,6 +53,7 @@ Invoke-RestMethod https://freemail.kuzuryu.ai/api/v1/mail-core/readiness
   --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
   --mobile-release-evidence .freemail-qa\mobile-release-evidence.json `
   --require-mobile-store-submission `
+  --private-beta-evidence .freemail-qa\private-beta-gate-example.com.json `
   --release-notes docs\release-notes\v0.1.0-private-beta.md `
   --release-version v0.1.0-private-beta
 ```

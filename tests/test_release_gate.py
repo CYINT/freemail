@@ -13,11 +13,13 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
     mail_store = tmp_path / "mail-store.tar.gz"
     mobile_evidence = tmp_path / "mobile-release-evidence.json"
     mobile_app_config = tmp_path / "app.json"
+    private_beta_evidence = tmp_path / "private-beta-gate.json"
     release_notes = tmp_path / "release-notes.md"
     metadata.write_text("{}", encoding="utf-8")
     mail_store.write_bytes(b"archive")
     write_json(mobile_app_config, valid_mobile_app_config())
     write_json(mobile_evidence, valid_mobile_release_evidence())
+    write_json(private_beta_evidence, valid_private_beta_evidence())
     release_notes.write_text(
         "# FreeMail v0.1.0-private-beta\n\n"
         "Verification: CI, release gates, and backup evidence passed.\n\n"
@@ -62,6 +64,7 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
             mobile_release_evidence=mobile_evidence,
             mobile_app_config=mobile_app_config,
             require_mobile_store_submission=True,
+            private_beta_evidence=private_beta_evidence,
             release_notes=release_notes,
             release_version="v0.1.0-private-beta",
         )
@@ -74,6 +77,9 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
     assert checks_by_name["mobile-release-evidence"]["details"]["evidenceDetails"]["sha256"] == hashlib.sha256(
         mobile_evidence.read_bytes()
     ).hexdigest()
+    assert checks_by_name["private-beta-evidence"]["details"]["sha256"] == hashlib.sha256(
+        private_beta_evidence.read_bytes()
+    ).hexdigest()
     assert checks_by_name["release-notes"]["details"]["sha256"] == hashlib.sha256(
         release_notes.read_bytes()
     ).hexdigest()
@@ -85,6 +91,7 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
         "metadata-backup",
         "mail-store-backup",
         "mobile-release-evidence",
+        "private-beta-evidence",
         "release-notes",
         "runtime-health",
         "deployment-boundary",
@@ -103,6 +110,7 @@ def test_release_gate_fails_without_backup_evidence(tmp_path, monkeypatch):
             skip_github_ci=True,
             skip_release_notes=True,
             skip_mobile_evidence=True,
+            skip_private_beta_evidence=True,
             skip_runtime=True,
         )
     )
@@ -160,6 +168,49 @@ def test_release_gate_reports_failed_mobile_release_evidence(tmp_path, monkeypat
     assert check["details"]["failedChecks"] == ["ios-signed-build"]
 
 
+def test_release_gate_fails_without_private_beta_evidence(tmp_path, monkeypatch):
+    monkeypatch.setattr(release_gate, "_command", lambda command: "abc123" if command[-1] == "HEAD" else "")
+
+    result = run_release_gate(
+        ReleaseGateOptions(
+            skip_github_ci=True,
+            skip_backup_evidence=True,
+            skip_mobile_evidence=True,
+            skip_release_notes=True,
+            skip_runtime=True,
+        )
+    )
+
+    check = next(check for check in result["checks"] if check["name"] == "private-beta-evidence")
+    assert result["passed"] is False
+    assert check["status"] == "fail"
+    assert "required" in check["details"]["error"]
+
+
+def test_release_gate_reports_failed_private_beta_evidence(tmp_path, monkeypatch):
+    private_beta_evidence = tmp_path / "private-beta-gate.json"
+    payload = valid_private_beta_evidence()
+    payload["checks"][2]["status"] = "fail"
+    write_json(private_beta_evidence, payload)
+    monkeypatch.setattr(release_gate, "_command", lambda command: "abc123" if command[-1] == "HEAD" else "")
+
+    result = run_release_gate(
+        ReleaseGateOptions(
+            private_beta_evidence=private_beta_evidence,
+            skip_github_ci=True,
+            skip_backup_evidence=True,
+            skip_mobile_evidence=True,
+            skip_release_notes=True,
+            skip_runtime=True,
+        )
+    )
+
+    check = next(check for check in result["checks"] if check["name"] == "private-beta-evidence")
+    assert result["passed"] is False
+    assert check["status"] == "fail"
+    assert check["details"]["failedChecks"] == ["queue-evidence"]
+
+
 def test_assert_release_gate_raises_for_failed_checks(tmp_path, monkeypatch):
     monkeypatch.setattr(release_gate, "_command", lambda command: "dirty" if command == ["git", "status", "--short"] else "abc123")
 
@@ -169,6 +220,7 @@ def test_assert_release_gate_raises_for_failed_checks(tmp_path, monkeypatch):
                 skip_github_ci=True,
                 skip_backup_evidence=True,
                 skip_mobile_evidence=True,
+                skip_private_beta_evidence=True,
                 skip_release_notes=True,
                 skip_runtime=True,
             )
@@ -348,6 +400,22 @@ def valid_mobile_release_evidence():
             "publicInternet": False,
             "requiredBoundary": "Dragonscale/VPN clients only",
         },
+    }
+
+
+def valid_private_beta_evidence():
+    return {
+        "passed": True,
+        "domain": "example.com",
+        "checks": [
+            {"name": "controlled-domain-dns", "status": "pass", "details": {}},
+            {"name": "controlled-mail-flow-evidence", "status": "pass", "details": {}},
+            {"name": "queue-evidence", "status": "pass", "details": {}},
+            {"name": "deliverability-abuse-evidence", "status": "pass", "details": {}},
+            {"name": "metadata-backup-evidence", "status": "pass", "details": {}},
+            {"name": "mail-store-backup-evidence", "status": "pass", "details": {}},
+            {"name": "private-beta-acceptance", "status": "pass", "details": {}},
+        ],
     }
 
 

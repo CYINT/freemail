@@ -10,6 +10,7 @@ Run the gate from a clean checkout after pushing the candidate commit to `CYINT/
   --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
   --mobile-release-evidence .freemail-qa\mobile-release-evidence.json `
   --require-mobile-store-submission `
+  --private-beta-evidence .freemail-qa\private-beta-gate-example.com.json `
   --release-notes docs\release-notes\v0.1.0-private-beta.md `
   --release-version v0.1.0-private-beta
 ```
@@ -24,6 +25,7 @@ The gate verifies:
 - `docker compose config --quiet`
 - metadata and mail-store backup evidence files exist, are non-empty, and have SHA-256 checksums recorded in the gate output
 - mobile signed-build and store-submission evidence passes `scripts/mobile_release_gate.py` with credential-free proof for both iOS and Android
+- private-beta gate output passes for at least one controlled domain and includes DNS, mail-flow, queue, deliverability/abuse, backup, and decision-owner acceptance checks
 - release notes exist, are non-empty, include the candidate version, include verification, known-limitations, and VPN-boundary language, contain no placeholder markers, and have a SHA-256 checksum recorded in the gate output
 - `https://freemail.kuzuryu.ai/health` reports VPN-only health and release metadata
 - `https://freemail.kuzuryu.ai/api/v1/deployment` reports `vpn-only` exposure and `publicInternet: false`
@@ -33,7 +35,7 @@ The gate verifies:
 For offline development only, individual external checks can be skipped:
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\release_gate.py --skip-github-ci --skip-runtime --skip-backup-evidence --skip-mobile-evidence --skip-release-notes
+.\.venv\Scripts\python.exe scripts\release_gate.py --skip-github-ci --skip-runtime --skip-backup-evidence --skip-mobile-evidence --skip-private-beta-evidence --skip-release-notes
 ```
 
 Do not use skipped gates as release evidence.
@@ -126,7 +128,7 @@ Release provenance for a candidate consists of:
 - repository secret/signing-material scan completion in that workflow
 - direct runtime dependency license-policy scan completion in that workflow
 - release notes path and checksum, committed under `docs/release-notes/`
-- release-gate JSON output, including backup file and release-notes SHA-256 checksums
+- release-gate JSON output, including backup, mobile, private-beta, and release-notes SHA-256 checksums
 - mobile-release-gate JSON output, including signed-build and store-submission evidence checksums
 - private-beta gate JSON output for each controlled domain, including evidence-file SHA-256 checksums
 - deliverability/abuse evidence for each controlled domain

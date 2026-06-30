@@ -21,11 +21,13 @@ def main() -> int:
     parser.add_argument("--mail-store-backup", type=Path)
     parser.add_argument("--mobile-release-evidence", type=Path)
     parser.add_argument("--mobile-app-config", type=Path, default=Path("apps/mobile/app.json"))
+    parser.add_argument("--private-beta-evidence", type=Path)
     parser.add_argument("--release-notes", type=Path)
     parser.add_argument("--release-version")
     parser.add_argument("--skip-github-ci", action="store_true")
     parser.add_argument("--skip-backup-evidence", action="store_true")
     parser.add_argument("--skip-mobile-evidence", action="store_true")
+    parser.add_argument("--skip-private-beta-evidence", action="store_true")
     parser.add_argument("--require-mobile-store-submission", action="store_true")
     parser.add_argument("--skip-release-notes", action="store_true")
     parser.add_argument("--skip-runtime", action="store_true")
@@ -43,11 +45,13 @@ def main() -> int:
         mail_store_backup=args.mail_store_backup,
         mobile_release_evidence=args.mobile_release_evidence,
         mobile_app_config=args.mobile_app_config,
+        private_beta_evidence=args.private_beta_evidence,
         release_notes=args.release_notes,
         release_version=args.release_version,
         skip_github_ci=args.skip_github_ci,
         skip_backup_evidence=args.skip_backup_evidence,
         skip_mobile_evidence=args.skip_mobile_evidence,
+        skip_private_beta_evidence=args.skip_private_beta_evidence,
         require_mobile_store_submission=args.require_mobile_store_submission,
         skip_release_notes=args.skip_release_notes,
         skip_runtime=args.skip_runtime,

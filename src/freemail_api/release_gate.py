@@ -26,11 +26,13 @@ class ReleaseGateOptions:
     mail_store_backup: Path | None = None
     mobile_release_evidence: Path | None = None
     mobile_app_config: Path = Path("apps/mobile/app.json")
+    private_beta_evidence: Path | None = None
     release_notes: Path | None = None
     release_version: str | None = None
     skip_github_ci: bool = False
     skip_backup_evidence: bool = False
     skip_mobile_evidence: bool = False
+    skip_private_beta_evidence: bool = False
     require_mobile_store_submission: bool = False
     skip_release_notes: bool = False
     skip_runtime: bool = False
@@ -55,6 +57,8 @@ def run_release_gate(options: ReleaseGateOptions) -> dict[str, Any]:
                 require_store_submission=options.require_mobile_store_submission,
             )
         )
+    if not options.skip_private_beta_evidence:
+        checks.append(_check_private_beta_evidence(options.private_beta_evidence))
     if not options.skip_release_notes:
         checks.append(_check_release_notes(options.release_notes, options.release_version))
     if not options.skip_runtime:
@@ -177,6 +181,46 @@ def _check_mobile_release_evidence(
     )
 
 
+def _check_private_beta_evidence(path: Path | None) -> dict[str, Any]:
+    if path is None:
+        return _check("private-beta-evidence", False, {"error": "private-beta gate output path is required"})
+    payload = _load_json_file(path)
+    checks = payload.get("checks")
+    check_names = [check.get("name") for check in checks if isinstance(check, dict)] if isinstance(checks, list) else []
+    required_checks = {
+        "controlled-domain-dns",
+        "controlled-mail-flow-evidence",
+        "queue-evidence",
+        "deliverability-abuse-evidence",
+        "metadata-backup-evidence",
+        "mail-store-backup-evidence",
+        "private-beta-acceptance",
+    }
+    details = _file_evidence_details(path)
+    details.update(
+        {
+            "domain": payload.get("domain"),
+            "passed": payload.get("passed"),
+            "missingChecks": sorted(required_checks.difference(check_names)),
+            "failedChecks": [
+                check.get("name")
+                for check in checks
+                if isinstance(check, dict) and check.get("status") != "pass"
+            ]
+            if isinstance(checks, list)
+            else ["checks"],
+        }
+    )
+    passed = (
+        payload.get("passed") is True
+        and bool(str(payload.get("domain", "")).strip())
+        and isinstance(checks, list)
+        and not details["missingChecks"]
+        and not details["failedChecks"]
+    )
+    return _check("private-beta-evidence", passed, details)
+
+
 def _check_release_notes(path: Path | None, release_version: str | None) -> dict[str, Any]:
     if path is None:
         return _check("release-notes", False, {"error": "release notes path is required"})
@@ -204,6 +248,14 @@ def _check_release_notes(path: Path | None, release_version: str | None) -> dict
         }
     )
     return _check("release-notes", version_present and not missing_terms and not placeholders, details)
+
+
+def _load_json_file(path: Path) -> dict[str, Any]:
+    with path.open("r", encoding="utf-8-sig") as handle:
+        payload = json.load(handle)
+    if not isinstance(payload, dict):
+        raise ReleaseGateError(f"{path} must contain a JSON object")
+    return payload
 
 
 def _file_evidence_details(path: Path, exists: bool | None = None, size: int | None = None) -> dict[str, Any]:
