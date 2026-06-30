@@ -9,6 +9,7 @@ from freemail_api.private_beta_evidence import (
     PrivateBetaEvidenceTemplateOptions,
     create_private_beta_evidence_templates,
     load_private_beta_gate_options_from_manifest,
+    summarize_private_beta_evidence_manifest,
 )
 from freemail_api.private_beta_gate import PrivateBetaGateOptions, run_private_beta_gate
 
@@ -49,6 +50,10 @@ def test_private_beta_evidence_templates_create_draft_packet(tmp_path):
     assert options.mail_core_apply_evidence == tmp_path / "mail-core-apply.example.com.json"
     assert options.metadata_backup == tmp_path / "metadata-backup.example.com.json"
     assert options.mail_store_backup == tmp_path / "stalwart-mail-store.example.com.tar.gz"
+    status = summarize_private_beta_evidence_manifest(tmp_path / "private-beta-evidence-manifest.example.com.json")
+    assert status["ready"] is False
+    assert "--mail-flow-evidence" in status["missingArtifacts"]
+    assert "--mail-core-apply-evidence" in status["draftBlockingArtifacts"]
 
 
 def test_private_beta_evidence_templates_do_not_accidentally_pass_gate(tmp_path):
@@ -245,3 +250,69 @@ def test_private_beta_gate_script_accepts_manifest_packet(tmp_path):
     payload = json.loads(result.stdout)
     assert payload["passed"] is True
     assert "mail-core-apply-evidence" in {check["name"] for check in payload["checks"]}
+
+
+def test_private_beta_packet_status_script_accepts_completed_packet(tmp_path):
+    _write_complete_manifest_packet(tmp_path)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/private_beta_packet_status.py",
+            "--manifest",
+            str(tmp_path / "private-beta-evidence-manifest.example.com.json"),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["ready"] is True
+    assert payload["missingArtifacts"] == []
+    assert payload["emptyArtifacts"] == []
+    assert payload["draftBlockingArtifacts"] == []
+    assert all("sha256" in artifact for artifact in payload["artifacts"])
+
+
+def _write_complete_manifest_packet(tmp_path):
+    create_private_beta_evidence_templates(
+        PrivateBetaEvidenceTemplateOptions(
+            domain="example.com",
+            output_dir=tmp_path,
+            checked_at=datetime(2026, 6, 30, tzinfo=timezone.utc),
+        )
+    )
+    (tmp_path / "observed-dns.example.com.json").write_text(
+        json.dumps({"observedRecords": [{"type": "MX", "name": "example.com", "values": ["10 mail.example.com."]}]}),
+        encoding="utf-8",
+    )
+    (tmp_path / "mail-flow.example.com.json").write_text(
+        json.dumps({"passed": True, "checkedAt": "2026-06-30T00:00:00Z"}),
+        encoding="utf-8",
+    )
+    (tmp_path / "queue.example.com.json").write_text(
+        json.dumps({"passed": True, "pending": 0, "due": 0, "reviewedAt": "2026-06-30T00:00:00Z"}),
+        encoding="utf-8",
+    )
+    (tmp_path / "mail-core-apply.example.com.json").write_text(
+        json.dumps(
+            {
+                "applied": True,
+                "appliedAt": "2026-06-30T00:00:00Z",
+                "domain": "example.com",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "deliverability.example.com.json").write_text(
+        json.dumps({"passed": True, "checkedAt": "2026-06-30T00:00:00Z"}),
+        encoding="utf-8",
+    )
+    (tmp_path / "metadata-backup.example.com.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "stalwart-mail-store.example.com.tar.gz").write_bytes(b"backup")
+    (tmp_path / "private-beta-acceptance.example.com.json").write_text(
+        json.dumps({"accepted": True, "acceptedAt": "2026-06-30T00:00:00Z"}),
+        encoding="utf-8",
+    )

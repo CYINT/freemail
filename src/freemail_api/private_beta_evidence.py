@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -77,6 +78,26 @@ def load_private_beta_gate_options_from_manifest(path: Path) -> PrivateBetaGateO
         mail_store_backup=_manifest_input_path(path, inputs, "--mail-store-backup"),
         acceptance=_manifest_input_path(path, inputs, "--acceptance"),
     )
+
+
+def summarize_private_beta_evidence_manifest(path: Path) -> dict[str, Any]:
+    payload = _load_json(path)
+    inputs = payload.get("privateBetaGateInputs")
+    if not isinstance(inputs, dict):
+        raise ValueError("private-beta evidence manifest must contain privateBetaGateInputs")
+    artifacts = [_artifact_status(path, flag, inputs.get(flag)) for flag in sorted(inputs)]
+    return {
+        "domain": payload.get("domain"),
+        "manifest": str(path),
+        "draftOnly": payload.get("draftOnly"),
+        "ready": all(artifact["ready"] for artifact in artifacts),
+        "missingArtifacts": [artifact["flag"] for artifact in artifacts if artifact["status"] == "missing"],
+        "emptyArtifacts": [artifact["flag"] for artifact in artifacts if artifact["status"] == "empty"],
+        "draftBlockingArtifacts": [
+            artifact["flag"] for artifact in artifacts if artifact.get("draftBlocking") is True
+        ],
+        "artifacts": artifacts,
+    }
 
 
 def _normalize_domain(domain: str) -> str:
@@ -219,12 +240,61 @@ def _manifest_input_path(manifest_path: Path, inputs: dict[str, Any], flag: str)
     return value if value.is_absolute() else manifest_path.parent / value
 
 
+def _artifact_status(manifest_path: Path, flag: str, raw_value: Any) -> dict[str, Any]:
+    path = _manifest_input_path(manifest_path, {flag: raw_value}, flag)
+    details: dict[str, Any] = {"flag": flag, "path": str(path) if path else None}
+    if path is None:
+        details.update({"status": "missing", "ready": False, "error": "manifest entry must be a non-empty path"})
+        return details
+    if not path.exists():
+        details.update({"status": "missing", "ready": False})
+        return details
+    if not path.is_file():
+        details.update({"status": "not-file", "ready": False})
+        return details
+    size = path.stat().st_size
+    details["bytes"] = size
+    if size <= 0:
+        details.update({"status": "empty", "ready": False})
+        return details
+    details["sha256"] = _sha256_file(path)
+    draft_blocking = _draft_blocking_marker(path)
+    details["draftBlocking"] = draft_blocking
+    details.update({"status": "present", "ready": not draft_blocking})
+    return details
+
+
+def _draft_blocking_marker(path: Path) -> bool:
+    if path.suffix.lower() != ".json":
+        return False
+    try:
+        payload = _load_json(path)
+    except (OSError, json.JSONDecodeError, ValueError):
+        return True
+    return any(
+        payload.get(field) is False
+        for field in (
+            "passed",
+            "applied",
+            "accepted",
+        )
+    )
+
+
 def _load_json(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8-sig") as handle:
         payload = json.load(handle)
     if not isinstance(payload, dict):
         raise ValueError(f"{path} must contain a JSON object")
     return payload
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _write_json(path: Path, payload: dict[str, Any], *, force: bool) -> None:

@@ -411,6 +411,13 @@ To avoid hand-authoring the JSON packet, create draft evidence templates first:
 
 The generated files are credential-free drafts. They intentionally keep `passed`, `applied`, and `accepted` false until controlled-domain DNS, mail flow, mail-core apply, queue, deliverability, backup, and owner-review evidence are actually recorded.
 
+Check packet inventory before running the full private-beta gate:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\private_beta_packet_status.py `
+  --manifest .freemail-qa\private-beta\private-beta-evidence-manifest.example.com.json
+```
+
 `scripts\private_beta_gate.py --manifest` loads the generated packet paths and lets explicit flags override any manifest entry, which is useful when metadata or mail-store backups are stored in a shared backup directory.
 
 Generate queue evidence with `scripts\qa_stalwart_queue.py` after controlled mail-flow tests; the private-beta gate requires a clear queue with zero pending and due messages.
