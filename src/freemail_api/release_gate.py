@@ -47,6 +47,7 @@ def run_release_gate(options: ReleaseGateOptions) -> dict[str, Any]:
         _check_clean_git(),
         _check_remote_commit(options.remote, options.branch, commit),
         _check_compose_config(),
+        _check_compose_loopback_bindings(),
     ]
     if not options.skip_repo_secret_scan:
         checks.append(_check_repo_secret_scan())
@@ -115,6 +116,46 @@ def _check_remote_commit(remote: str, branch: str, commit: str) -> dict[str, Any
 def _check_compose_config() -> dict[str, Any]:
     _command(["docker", "compose", "config", "--quiet"])
     return _check("compose-config", True, {})
+
+
+def _check_compose_loopback_bindings() -> dict[str, Any]:
+    output = _command(["docker", "compose", "--profile", "web", "--profile", "mail-core", "config", "--format", "json"])
+    payload = json.loads(output)
+    services = payload.get("services") if isinstance(payload, dict) else None
+    bindings: list[dict[str, Any]] = []
+    violations: list[dict[str, Any]] = []
+    if isinstance(services, dict):
+        for service_name, service in sorted(services.items()):
+            ports = service.get("ports") if isinstance(service, dict) else None
+            if not isinstance(ports, list):
+                continue
+            for port in ports:
+                if not isinstance(port, dict):
+                    continue
+                binding = {
+                    "service": service_name,
+                    "hostIp": port.get("host_ip"),
+                    "published": str(port.get("published", "")),
+                    "target": port.get("target"),
+                    "protocol": port.get("protocol", "tcp"),
+                }
+                bindings.append(binding)
+                if not _is_loopback_host_ip(port.get("host_ip")):
+                    violations.append(binding)
+    return _check(
+        "compose-loopback-bindings",
+        not violations,
+        {
+            "profiles": ["web", "mail-core"],
+            "bindings": bindings,
+            "violations": violations,
+        },
+    )
+
+
+def _is_loopback_host_ip(value: object) -> bool:
+    normalized = str(value or "").strip().lower()
+    return normalized in {"127.0.0.1", "::1", "localhost"}
 
 
 def _check_github_ci(repo: str, commit: str) -> dict[str, Any]:

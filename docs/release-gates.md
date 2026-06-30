@@ -70,6 +70,7 @@ The gate verifies:
 - tracked repository files pass the secret/signing-material scan
 - direct runtime dependencies pass the AGPL-compatible license policy scan
 - `docker compose config --quiet`
+- resolved Compose port bindings for the API, web, and mail-core profiles are loopback-only
 - metadata and mail-store backup evidence files exist, are non-empty, and have SHA-256 checksums recorded in the gate output
 - mobile signed-build and store-submission evidence passes `scripts/mobile_release_gate.py` with credential-free proof for both iOS and Android
 - private-beta gate output passes for at least one controlled domain and includes DNS, mail-flow, queue, mail-core apply, deliverability/abuse, backup, and decision-owner acceptance checks

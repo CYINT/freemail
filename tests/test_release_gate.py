@@ -36,6 +36,8 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
             return "abc123\trefs/heads/main"
         if command == ["docker", "compose", "config", "--quiet"]:
             return ""
+        if command == ["docker", "compose", "--profile", "web", "--profile", "mail-core", "config", "--format", "json"]:
+            return json.dumps(valid_compose_config())
         if command[1:] == ["scripts/qa_repo_secrets.py"]:
             return "repo secret QA passed"
         if command[1:] == ["scripts/qa_license_policy.py"]:
@@ -91,6 +93,7 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
         "git-clean",
         "remote-sha",
         "compose-config",
+        "compose-loopback-bindings",
         "repo-secret-scan",
         "license-policy-scan",
         "github-ci",
@@ -107,7 +110,7 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
 
 
 def test_release_gate_fails_without_backup_evidence(tmp_path, monkeypatch):
-    monkeypatch.setattr(release_gate, "_command", lambda command: "abc123" if command[-1] == "HEAD" else "")
+    monkeypatch.setattr(release_gate, "_command", fake_basic_release_command)
 
     result = run_release_gate(
         ReleaseGateOptions(
@@ -132,7 +135,7 @@ def test_release_gate_fails_without_mobile_release_evidence(tmp_path, monkeypatc
     mail_store = tmp_path / "mail-store.tar.gz"
     metadata.write_text("{}", encoding="utf-8")
     mail_store.write_bytes(b"archive")
-    monkeypatch.setattr(release_gate, "_command", lambda command: "abc123" if command[-1] == "HEAD" else "")
+    monkeypatch.setattr(release_gate, "_command", fake_basic_release_command)
 
     result = run_release_gate(
         ReleaseGateOptions(
@@ -159,7 +162,7 @@ def test_release_gate_reports_failed_mobile_release_evidence(tmp_path, monkeypat
     payload = valid_mobile_release_evidence()
     payload["builds"]["ios"]["signed"] = False
     write_json(mobile_evidence, payload)
-    monkeypatch.setattr(release_gate, "_command", lambda command: "abc123" if command[-1] == "HEAD" else "")
+    monkeypatch.setattr(release_gate, "_command", fake_basic_release_command)
 
     result = run_release_gate(
         ReleaseGateOptions(
@@ -181,7 +184,7 @@ def test_release_gate_reports_failed_mobile_release_evidence(tmp_path, monkeypat
 
 
 def test_release_gate_fails_without_private_beta_evidence(tmp_path, monkeypatch):
-    monkeypatch.setattr(release_gate, "_command", lambda command: "abc123" if command[-1] == "HEAD" else "")
+    monkeypatch.setattr(release_gate, "_command", fake_basic_release_command)
 
     result = run_release_gate(
         ReleaseGateOptions(
@@ -206,7 +209,7 @@ def test_release_gate_reports_failed_private_beta_evidence(tmp_path, monkeypatch
     payload = valid_private_beta_evidence()
     payload["checks"][2]["status"] = "fail"
     write_json(private_beta_evidence, payload)
-    monkeypatch.setattr(release_gate, "_command", lambda command: "abc123" if command[-1] == "HEAD" else "")
+    monkeypatch.setattr(release_gate, "_command", fake_basic_release_command)
 
     result = run_release_gate(
         ReleaseGateOptions(
@@ -228,7 +231,12 @@ def test_release_gate_reports_failed_private_beta_evidence(tmp_path, monkeypatch
 
 
 def test_assert_release_gate_raises_for_failed_checks(tmp_path, monkeypatch):
-    monkeypatch.setattr(release_gate, "_command", lambda command: "dirty" if command == ["git", "status", "--short"] else "abc123")
+    def fake_command(command):
+        if command == ["git", "status", "--short"]:
+            return "dirty"
+        return fake_basic_release_command(command)
+
+    monkeypatch.setattr(release_gate, "_command", fake_command)
 
     with pytest.raises(ReleaseGateError, match="git-clean"):
         assert_release_gate(
@@ -289,6 +297,35 @@ def test_runtime_metadata_readiness_requires_ready_sqlite_schema(monkeypatch):
     assert checks[0]["name"] == "metadata-readiness"
     assert checks[0]["status"] == "fail"
     assert checks[0]["details"]["checks"][0]["missingColumns"] == ["status"]
+
+
+def test_compose_loopback_bindings_accepts_loopback_published_ports(monkeypatch):
+    monkeypatch.setattr(release_gate, "_command", lambda _command: json.dumps(valid_compose_config()))
+
+    check = release_gate._check_compose_loopback_bindings()
+
+    assert check["status"] == "pass"
+    assert check["details"]["violations"] == []
+    assert {binding["service"] for binding in check["details"]["bindings"]} == {"admin-api", "mail-core", "web"}
+
+
+def test_compose_loopback_bindings_rejects_public_published_ports(monkeypatch):
+    payload = valid_compose_config()
+    payload["services"]["web"]["ports"][0]["host_ip"] = "0.0.0.0"
+    monkeypatch.setattr(release_gate, "_command", lambda _command: json.dumps(payload))
+
+    check = release_gate._check_compose_loopback_bindings()
+
+    assert check["status"] == "fail"
+    assert check["details"]["violations"] == [
+        {
+            "service": "web",
+            "hostIp": "0.0.0.0",
+            "published": "18091",
+            "target": 80,
+            "protocol": "tcp",
+        }
+    ]
 
 
 def test_backup_file_check_requires_non_empty_file(tmp_path):
@@ -365,6 +402,63 @@ def valid_mobile_app_config():
             "ios": {"bundleIdentifier": "technology.cyint.freemail"},
             "android": {"package": "technology.cyint.freemail"},
             "extra": {"apiBaseUrl": "https://freemail.kuzuryu.ai"},
+        }
+    }
+
+
+def fake_basic_release_command(command):
+    if command == ["git", "rev-parse", "HEAD"]:
+        return "abc123"
+    if command == ["git", "status", "--short"]:
+        return ""
+    if command == ["git", "ls-remote", "origin", "refs/heads/main"]:
+        return "abc123\trefs/heads/main"
+    if command == ["docker", "compose", "config", "--quiet"]:
+        return ""
+    if command == ["docker", "compose", "--profile", "web", "--profile", "mail-core", "config", "--format", "json"]:
+        return json.dumps(valid_compose_config())
+    raise AssertionError(command)
+
+
+def valid_compose_config():
+    return {
+        "services": {
+            "admin-api": {
+                "ports": [
+                    {
+                        "host_ip": "127.0.0.1",
+                        "published": "18090",
+                        "target": 8080,
+                        "protocol": "tcp",
+                    }
+                ]
+            },
+            "mail-core": {
+                "ports": [
+                    {
+                        "host_ip": "127.0.0.1",
+                        "published": "2525",
+                        "target": 25,
+                        "protocol": "tcp",
+                    },
+                    {
+                        "host_ip": "127.0.0.1",
+                        "published": "2465",
+                        "target": 465,
+                        "protocol": "tcp",
+                    },
+                ]
+            },
+            "web": {
+                "ports": [
+                    {
+                        "host_ip": "127.0.0.1",
+                        "published": "18091",
+                        "target": 80,
+                        "protocol": "tcp",
+                    }
+                ]
+            },
         }
     }
 

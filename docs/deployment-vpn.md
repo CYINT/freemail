@@ -14,6 +14,7 @@ freemail.kuzuryu.ai
 
 - DNS should route `freemail.kuzuryu.ai` to the private Dragonscale/VPN target.
 - Docker service ports must bind to `127.0.0.1` on the host.
+- `scripts/release_gate.py` verifies the resolved API, web, and mail-core Compose port bindings are loopback-only before accepting release evidence.
 - A local bridge or reverse proxy may expose HTTPS to VPN clients only.
 - No WAN port-forwarding should be added for FreeMail until a later release gate explicitly changes that posture.
 
