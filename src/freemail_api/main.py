@@ -17,11 +17,14 @@ from .attachment_policy import parse_allowed_content_types
 from .attachment_policy import validate_attachments
 from .mail_core import probe_mail_core
 from .mailbox_imap import archive_mailbox_message
+from .mailbox_imap import create_mailbox_folder
+from .mailbox_imap import delete_mailbox_folder
 from .mailbox_imap import get_mailbox_attachment
 from .mailbox_imap import get_mailbox_message
 from .mailbox_imap import list_mailbox_contacts
 from .mailbox_imap import list_mailbox_snapshot
 from .mailbox_imap import move_mailbox_message
+from .mailbox_imap import rename_mailbox_folder
 from .mailbox_imap import search_mailbox_messages
 from .mailbox_smtp import OutboundAttachment
 from .mailbox_smtp import send_mailbox_message
@@ -42,6 +45,10 @@ from .schemas import (
     MailboxArchiveRecord,
     MailboxContactsRecord,
     MailboxCreate,
+    MailboxFolderCreate,
+    MailboxFolderDelete,
+    MailboxFolderMutationRecord,
+    MailboxFolderRename,
     MailboxMessageDetailRecord,
     MailboxMoveCreate,
     MailboxMoveRecord,
@@ -69,6 +76,7 @@ from .settings import Settings
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     active_settings = settings or get_settings()
+    protected_folders = {"inbox", "sent items", "drafts", "junk mail", "deleted items", "archive"}
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
@@ -86,7 +94,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.add_middleware(
             CORSMiddleware,
             allow_origins=cors_origins,
-            allow_methods=["DELETE", "GET", "POST", "OPTIONS"],
+            allow_methods=["DELETE", "GET", "PATCH", "POST", "OPTIONS"],
             allow_headers=[
                 "Authorization",
                 "Content-Type",
@@ -150,6 +158,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if not x_freemail_mailbox_email or not x_freemail_mailbox_password:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Mailbox credentials required")
         return MailboxCredentials(email=x_freemail_mailbox_email, password=x_freemail_mailbox_password)
+
+    def reject_protected_folder(folder: str, *, action: str) -> None:
+        if folder.strip().lower() in protected_folders:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=f"Core mailbox folders cannot be {action}",
+            )
 
     @app.get("/health")
     def health() -> dict[str, object]:
@@ -376,6 +391,93 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except imaplib.IMAP4.error as error:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mailbox message not found") from error
         return message.as_dict()
+
+    @app.post("/api/v1/mailbox/folder", response_model=MailboxFolderMutationRecord)
+    def mailbox_folder_create(
+        payload: MailboxFolderCreate,
+        authorization: str | None = Header(default=None),
+        x_freemail_mailbox_email: str | None = Header(default=None),
+        x_freemail_mailbox_password: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=x_freemail_mailbox_email,
+            x_freemail_mailbox_password=x_freemail_mailbox_password,
+            connection=connection,
+        )
+        try:
+            created = create_mailbox_folder(
+                email=credentials.email,
+                password=credentials.password,
+                host=active_settings.mail_core_host,
+                port=active_settings.imap_port,
+                folder=payload.folder,
+            )
+        except OSError as error:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+        except imaplib.IMAP4.error as error:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)) from error
+        return created.as_dict()
+
+    @app.patch("/api/v1/mailbox/folder", response_model=MailboxFolderMutationRecord)
+    def mailbox_folder_rename(
+        payload: MailboxFolderRename,
+        authorization: str | None = Header(default=None),
+        x_freemail_mailbox_email: str | None = Header(default=None),
+        x_freemail_mailbox_password: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=x_freemail_mailbox_email,
+            x_freemail_mailbox_password=x_freemail_mailbox_password,
+            connection=connection,
+        )
+        reject_protected_folder(payload.folder, action="renamed")
+        try:
+            renamed = rename_mailbox_folder(
+                email=credentials.email,
+                password=credentials.password,
+                host=active_settings.mail_core_host,
+                port=active_settings.imap_port,
+                folder=payload.folder,
+                target_folder=payload.target_folder,
+            )
+        except OSError as error:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+        except imaplib.IMAP4.error as error:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)) from error
+        return renamed.as_dict()
+
+    @app.api_route("/api/v1/mailbox/folder", methods=["DELETE"], response_model=MailboxFolderMutationRecord)
+    def mailbox_folder_delete(
+        payload: MailboxFolderDelete,
+        authorization: str | None = Header(default=None),
+        x_freemail_mailbox_email: str | None = Header(default=None),
+        x_freemail_mailbox_password: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=x_freemail_mailbox_email,
+            x_freemail_mailbox_password=x_freemail_mailbox_password,
+            connection=connection,
+        )
+        reject_protected_folder(payload.folder, action="deleted")
+        try:
+            deleted = delete_mailbox_folder(
+                email=credentials.email,
+                password=credentials.password,
+                host=active_settings.mail_core_host,
+                port=active_settings.imap_port,
+                folder=payload.folder,
+            )
+        except OSError as error:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+        except imaplib.IMAP4.error as error:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)) from error
+        return deleted.as_dict()
 
     @app.get("/api/v1/mailbox/message/attachment")
     def mailbox_attachment(

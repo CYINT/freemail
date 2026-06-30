@@ -36,6 +36,10 @@ def test_static_web_validation_flags_credential_storage():
         '<input id="api-base-url"><p id="mailbox-status">Ready</p></form>'
         '<button id="mailbox-logout">Sign out</button>'
         '<form id="mailbox-search"><input id="search-query"></form>'
+        '<form id="folder-tools"><input id="folder-name">'
+        '<button id="folder-create-action">Create</button>'
+        '<button id="folder-rename-action">Rename</button>'
+        '<button id="folder-delete-action">Delete</button></form>'
         '<div id="message-body"></div>'
         '<div id="message-attachments"></div>'
         '<form class="compose-panel" id="compose-form"><input id="compose-attachments"></form>'
@@ -53,11 +57,13 @@ def test_static_web_validation_flags_credential_storage():
         "fetch('/api/v1/mailbox/session', {headers: {Authorization: 'Bearer token'}}); "
         "fetch('/api/v1/mailbox/snapshot'); fetch('/api/v1/mailbox/search'); fetch('/api/v1/mailbox/message'); "
         "fetch('/api/v1/mailbox/contacts'); "
+        "fetch('/api/v1/mailbox/folder'); "
         "fetch('/api/v1/mailbox/message/attachment'); fetch('/api/v1/mailbox/message/archive'); "
         "fetch('/api/v1/mailbox/message/move'); "
         "renderMessageBody('body'); renderMessageAttachments({}); downloadMailboxAttachment({}, {}); "
         "filesToAttachments([]); fileToBase64({}); archiveMailboxMessage({}); moveMailboxMessage({}, 'Trash', 'Done'); "
         "searchMailboxMessages('term'); loadMailboxContacts(); renderContacts([]); "
+        "createMailboxFolder('x'); renameMailboxFolder('y'); deleteMailboxFolder('z'); mutateMailboxFolder('POST', {}); "
         "restoreMailboxSession(); persistMailboxSession({}); forgetMailboxSession(); clearSearch(); "
         "prefillReply({}); prefillForward({}); quoteMessage({}, 'reply'); "
         "fetch('/api/v1/mailbox/send', {method: \"POST\", "

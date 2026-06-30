@@ -180,6 +180,26 @@ class MailboxMoveRecord(ApiModel):
     target_folder: str
 
 
+class MailboxFolderCreate(ApiModel):
+    folder: str = Field(min_length=1, max_length=160, pattern=r'^[^"/\\\r\n]+$')
+
+
+class MailboxFolderRename(ApiModel):
+    folder: str = Field(min_length=1, max_length=160, pattern=r'^[^"/\\\r\n]+$')
+    target_folder: str = Field(min_length=1, max_length=160, pattern=r'^[^"/\\\r\n]+$')
+
+
+class MailboxFolderDelete(ApiModel):
+    folder: str = Field(min_length=1, max_length=160, pattern=r'^[^"/\\\r\n]+$')
+
+
+class MailboxFolderMutationRecord(ApiModel):
+    folder: str
+    action: str
+    success: bool
+    target_folder: str | None = None
+
+
 class MailboxSnapshotRecord(ApiModel):
     email: EmailStr
     folders: list[MailboxFolderSummary]

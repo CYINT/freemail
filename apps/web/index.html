@@ -32,6 +32,14 @@
           <a href="#Junk%20Mail" data-folder="Junk Mail"><span>Junk Mail</span><span>0</span></a>
           <a href="#Deleted%20Items" data-folder="Deleted Items"><span>Trash</span><span>0</span></a>
         </nav>
+        <form class="folder-tools" id="folder-tools" aria-label="Manage folders">
+          <label>Folder <input id="folder-name" name="folderName" type="text" placeholder="Clients" maxlength="160"></label>
+          <div>
+            <button id="folder-create-action" type="submit">Create</button>
+            <button id="folder-rename-action" type="button">Rename</button>
+            <button id="folder-delete-action" type="button">Delete</button>
+          </div>
+        </form>
         <section class="contacts-panel" aria-label="Contacts">
           <div>
             <strong>Contacts</strong>

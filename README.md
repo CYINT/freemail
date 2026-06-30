@@ -113,6 +113,7 @@ The first read-only mailbox API uses per-request IMAP credentials and does not s
 .\.venv\Scripts\python.exe scripts\qa_mailbox_session_api.py --email admin@example.com --secrets-json secrets\mail-core-users.json
 .\.venv\Scripts\python.exe scripts\qa_mailbox_search_api.py --email admin@example.com --secrets-json secrets\mail-core-users.json
 .\.venv\Scripts\python.exe scripts\qa_mailbox_contacts_api.py --email admin@example.com --secrets-json secrets\mail-core-users.json
+.\.venv\Scripts\python.exe scripts\qa_mailbox_folder_api.py --email admin@example.com --secrets-json secrets\mail-core-users.json
 ```
 
 `FREEMAIL_SESSION_SECRET` must be set for browser mailbox sessions. Use a long random value and keep it out of source control. Existing per-request mailbox credential QA scripts remain available for API smoke coverage.
@@ -132,6 +133,16 @@ GET /api/v1/mailbox/contacts?folder=INBOX&limit=100
 ```
 
 The webmail contacts panel can load those records from the browser's bearer session and click a contact into the compose recipient field.
+
+Folder management uses the browser bearer session or per-request mailbox credentials:
+
+```text
+POST /api/v1/mailbox/folder
+PATCH /api/v1/mailbox/folder
+DELETE /api/v1/mailbox/folder
+```
+
+Create accepts `{ "folder": "Clients" }`, rename accepts `{ "folder": "Clients", "targetFolder": "Customers" }`, and delete accepts `{ "folder": "Customers" }`. The webmail sidebar exposes create, rename-current-folder, and delete-current-folder controls while protecting core folders such as `INBOX`.
 
 The first mailbox send API uses the same per-request credential posture and submits through authenticated implicit-TLS SMTP:
 

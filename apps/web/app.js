@@ -1,5 +1,9 @@
 const loginForm = document.querySelector("#mailbox-login");
 const folderNav = document.querySelector("#folder-nav");
+const folderTools = document.querySelector("#folder-tools");
+const folderNameInput = document.querySelector("#folder-name");
+const folderRenameAction = document.querySelector("#folder-rename-action");
+const folderDeleteAction = document.querySelector("#folder-delete-action");
 const messageList = document.querySelector("#message-list");
 const statusNode = document.querySelector("#mailbox-status");
 const readerSubject = document.querySelector("#reader-subject");
@@ -23,6 +27,7 @@ const composeBody = document.querySelector("#compose-body");
 const composeAttachments = document.querySelector("#compose-attachments");
 
 const mailboxSessionStorageKey = "freemail.mailboxSession";
+const protectedFolders = ["inbox", "sent items", "drafts", "junk mail", "deleted items", "archive"];
 
 let mailboxSession = {
   email: "",
@@ -62,6 +67,20 @@ searchForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = new FormData(searchForm);
   await searchMailboxMessages(String(form.get("query") || "").trim());
+});
+
+folderTools?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = new FormData(folderTools);
+  await createMailboxFolder(String(form.get("folderName") || "").trim());
+});
+
+folderRenameAction?.addEventListener("click", async () => {
+  await renameMailboxFolder(String(folderNameInput?.value || "").trim());
+});
+
+folderDeleteAction?.addEventListener("click", async () => {
+  await deleteMailboxFolder(mailboxSession.folder);
 });
 
 replyAction?.addEventListener("click", () => {
@@ -314,6 +333,90 @@ async function loadMailboxContacts({ quiet = false } = {}) {
   }
 }
 
+async function createMailboxFolder(folder) {
+  if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
+    setStatus("Sign in before creating folders.", "error");
+    return;
+  }
+  if (!validFolderName(folder)) {
+    setStatus("Enter a folder name without quotes or slashes.", "error");
+    return;
+  }
+  setStatus(`Creating ${folder}...`, "loading");
+  try {
+    await mutateMailboxFolder("POST", { folder });
+    await loadMailboxSnapshot(folder);
+    setStatus(`Created ${folder}.`, "ready");
+  } catch (error) {
+    setStatus(`Create folder failed: ${readableError(error)}`, "error");
+  }
+}
+
+async function renameMailboxFolder(targetFolder) {
+  const folder = mailboxSession.folder;
+  if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
+    setStatus("Sign in before renaming folders.", "error");
+    return;
+  }
+  if (protectedFolder(folder)) {
+    setStatus("Core folders cannot be renamed.", "error");
+    return;
+  }
+  if (!validFolderName(targetFolder)) {
+    setStatus("Enter a new folder name without quotes or slashes.", "error");
+    return;
+  }
+  if (targetFolder === folder) {
+    setStatus("Enter a different folder name before renaming.", "error");
+    return;
+  }
+  setStatus(`Renaming ${folder}...`, "loading");
+  try {
+    await mutateMailboxFolder("PATCH", { folder, targetFolder });
+    await loadMailboxSnapshot(targetFolder);
+    setStatus(`Renamed ${folder} to ${targetFolder}.`, "ready");
+  } catch (error) {
+    setStatus(`Rename folder failed: ${readableError(error)}`, "error");
+  }
+}
+
+async function deleteMailboxFolder(folder) {
+  if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
+    setStatus("Sign in before deleting folders.", "error");
+    return;
+  }
+  if (protectedFolder(folder)) {
+    setStatus("Core folders cannot be deleted.", "error");
+    return;
+  }
+  if (!window.confirm(`Delete folder "${folder}"?`)) {
+    return;
+  }
+  setStatus(`Deleting ${folder}...`, "loading");
+  try {
+    await mutateMailboxFolder("DELETE", { folder });
+    await loadMailboxSnapshot("INBOX");
+    setStatus(`Deleted ${folder}.`, "ready");
+  } catch (error) {
+    setStatus(`Delete folder failed: ${readableError(error)}`, "error");
+  }
+}
+
+async function mutateMailboxFolder(method, payload) {
+  const response = await fetch(new URL("/api/v1/mailbox/folder", mailboxSession.apiBaseUrl), {
+    method,
+    headers: {
+      ...mailboxHeaders(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+  return response.json();
+}
+
 async function sendMailboxMessage(message) {
   if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
     setStatus("Load a mailbox before sending.", "error");
@@ -389,6 +492,7 @@ function renderFolders(folders, activeFolder) {
       return link;
     }),
   );
+  renderFolderTools(activeFolder);
 }
 
 function renderMessages(messages) {
@@ -464,6 +568,28 @@ function addComposeRecipient(email) {
   }
   composeTo.value = existing.join(", ");
   composeTo.focus();
+}
+
+function renderFolderTools(activeFolder) {
+  if (folderNameInput) {
+    folderNameInput.value = protectedFolder(activeFolder) ? "" : activeFolder;
+    folderNameInput.placeholder = protectedFolder(activeFolder) ? "New folder" : "Rename current folder";
+  }
+  const disabled = protectedFolder(activeFolder);
+  if (folderRenameAction) {
+    folderRenameAction.disabled = disabled;
+  }
+  if (folderDeleteAction) {
+    folderDeleteAction.disabled = disabled;
+  }
+}
+
+function validFolderName(folder) {
+  return Boolean(folder && !/[\\/"\r\n]/.test(folder));
+}
+
+function protectedFolder(folder) {
+  return protectedFolders.includes(String(folder || "").trim().toLowerCase());
 }
 
 function prefillReply(message) {

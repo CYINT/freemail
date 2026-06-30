@@ -11,12 +11,15 @@ from freemail_api.mailbox_imap import (
     MailboxSearchResult,
     MovedMailboxMessage,
     MailboxSnapshot,
+    MutatedMailboxFolder,
     _archive_message,
     _attachment_contents_from_message,
     _attachments_from_message,
     _body_from_message,
     _contacts_from_header,
     _count_from_select,
+    _create_folder,
+    _delete_folder,
     _ensure_folder,
     _flags_from_fetch,
     _get_attachment,
@@ -27,6 +30,7 @@ from freemail_api.mailbox_imap import (
     _move_message,
     _parse_folder,
     _quote_search_value,
+    _rename_folder,
     _search_criteria,
     _search_messages,
     _tls_context,
@@ -41,6 +45,8 @@ class FakeImap:
         self.stored_flags = []
         self.expunge_called = False
         self.search_calls = []
+        self.renamed_folders = []
+        self.deleted_folders = []
 
     def list(self):
         return "OK", [b'(\\HasNoChildren) "/" "INBOX"', b'(\\HasNoChildren) "/" "Sent Items"']
@@ -71,6 +77,14 @@ class FakeImap:
 
     def create(self, folder):
         self.created_folders.append(folder)
+        return "OK", []
+
+    def rename(self, folder, target_folder):
+        self.renamed_folders.append((folder, target_folder))
+        return "OK", []
+
+    def delete(self, folder):
+        self.deleted_folders.append(folder)
         return "OK", []
 
     def copy(self, message_id, folder):
@@ -196,6 +210,17 @@ def test_moved_message_serializes_move_result():
         "message_id": "7",
         "target_folder": "Deleted Items",
         "moved": True,
+    }
+
+
+def test_mutated_folder_serializes_folder_action():
+    mutation = MutatedMailboxFolder(folder="Clients", target_folder="Customers", action="rename", success=True)
+
+    assert mutation.as_dict() == {
+        "folder": "Clients",
+        "target_folder": "Customers",
+        "action": "rename",
+        "success": True,
     }
 
 
@@ -351,6 +376,30 @@ def test_ensure_folder_creates_missing_archive_folder():
     assert imap.created_folders == ['"Archive"']
 
 
+def test_create_folder_calls_imap_create():
+    imap = FakeImap()
+
+    _create_folder(imap, "Clients")
+
+    assert imap.created_folders == ['"Clients"']
+
+
+def test_rename_folder_calls_imap_rename():
+    imap = FakeImap()
+
+    _rename_folder(imap, folder="Clients", target_folder="Customers")
+
+    assert imap.renamed_folders == [('"Clients"', '"Customers"')]
+
+
+def test_delete_folder_calls_imap_delete():
+    imap = FakeImap()
+
+    _delete_folder(imap, "Customers")
+
+    assert imap.deleted_folders == ['"Customers"']
+
+
 def test_body_from_message_prefers_plain_text_part():
     message = EmailMessage()
     message.set_content("Plain body")
@@ -380,3 +429,5 @@ def test_unverified_tls_context_disables_certificate_verification():
     context = _tls_context(verify_tls=False)
 
     assert context.check_hostname is False
+    _create_folder,
+    _delete_folder,

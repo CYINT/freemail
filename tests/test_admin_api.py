@@ -513,6 +513,128 @@ def test_mailbox_contacts_returns_imap_contacts(tmp_path, monkeypatch):
     assert response.json()["contacts"][0]["messageCount"] == 3
 
 
+def test_mailbox_folder_create_requires_mailbox_credentials(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.post("/api/v1/mailbox/folder", json={"folder": "Clients"})
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Mailbox credentials required"
+
+
+def test_mailbox_folder_create_returns_adapter_payload(tmp_path, monkeypatch):
+    class Created:
+        def as_dict(self):
+            return {"folder": "Clients", "target_folder": None, "action": "create", "success": True}
+
+    def fake_create(**kwargs):
+        assert kwargs["email"] == "admin@example.com"
+        assert kwargs["password"] == "secret"
+        assert kwargs["folder"] == "Clients"
+        return Created()
+
+    monkeypatch.setattr("freemail_api.main.create_mailbox_folder", fake_create)
+
+    with make_client(tmp_path) as client:
+        response = client.post(
+            "/api/v1/mailbox/folder",
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+            json={"folder": "Clients"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"folder": "Clients", "targetFolder": None, "action": "create", "success": True}
+
+
+def test_mailbox_folder_rename_rejects_core_folders(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.patch(
+            "/api/v1/mailbox/folder",
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+            json={"folder": "INBOX", "targetFolder": "Inbox old"},
+        )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Core mailbox folders cannot be renamed"
+
+
+def test_mailbox_folder_rename_returns_adapter_payload(tmp_path, monkeypatch):
+    class Renamed:
+        def as_dict(self):
+            return {"folder": "Clients", "target_folder": "Customers", "action": "rename", "success": True}
+
+    def fake_rename(**kwargs):
+        assert kwargs["email"] == "admin@example.com"
+        assert kwargs["password"] == "secret"
+        assert kwargs["folder"] == "Clients"
+        assert kwargs["target_folder"] == "Customers"
+        return Renamed()
+
+    monkeypatch.setattr("freemail_api.main.rename_mailbox_folder", fake_rename)
+
+    with make_client(tmp_path) as client:
+        response = client.patch(
+            "/api/v1/mailbox/folder",
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+            json={"folder": "Clients", "targetFolder": "Customers"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["targetFolder"] == "Customers"
+
+
+def test_mailbox_folder_delete_rejects_core_folders(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.request(
+            "DELETE",
+            "/api/v1/mailbox/folder",
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+            json={"folder": "INBOX"},
+        )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Core mailbox folders cannot be deleted"
+
+
+def test_mailbox_folder_delete_returns_adapter_payload(tmp_path, monkeypatch):
+    class Deleted:
+        def as_dict(self):
+            return {"folder": "Customers", "target_folder": None, "action": "delete", "success": True}
+
+    def fake_delete(**kwargs):
+        assert kwargs["email"] == "admin@example.com"
+        assert kwargs["password"] == "secret"
+        assert kwargs["folder"] == "Customers"
+        return Deleted()
+
+    monkeypatch.setattr("freemail_api.main.delete_mailbox_folder", fake_delete)
+
+    with make_client(tmp_path) as client:
+        response = client.request(
+            "DELETE",
+            "/api/v1/mailbox/folder",
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+            json={"folder": "Customers"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"folder": "Customers", "targetFolder": None, "action": "delete", "success": True}
+
+
 def test_mailbox_move_requires_mailbox_credentials(tmp_path):
     with make_client(tmp_path) as client:
         response = client.post(

@@ -130,6 +130,17 @@ class MovedMailboxMessage:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class MutatedMailboxFolder:
+    folder: str
+    action: str
+    success: bool
+    target_folder: str | None = None
+
+    def as_dict(self) -> dict[str, object]:
+        return asdict(self)
+
+
 def list_mailbox_snapshot(
     *,
     email: str,
@@ -264,6 +275,58 @@ def get_mailbox_attachment(
         return _get_attachment(imap, folder=folder, message_id=message_id, attachment_id=attachment_id)
 
 
+def create_mailbox_folder(
+    *,
+    email: str,
+    password: str,
+    host: str,
+    port: int,
+    folder: str,
+    timeout_seconds: float = 10.0,
+    verify_tls: bool = False,
+) -> MutatedMailboxFolder:
+    tls_context = _tls_context(verify_tls=verify_tls)
+    with imaplib.IMAP4_SSL(host, port, ssl_context=tls_context, timeout=timeout_seconds) as imap:
+        imap.login(email, password)
+        _create_folder(imap, folder)
+    return MutatedMailboxFolder(folder=folder, action="create", success=True)
+
+
+def rename_mailbox_folder(
+    *,
+    email: str,
+    password: str,
+    host: str,
+    port: int,
+    folder: str,
+    target_folder: str,
+    timeout_seconds: float = 10.0,
+    verify_tls: bool = False,
+) -> MutatedMailboxFolder:
+    tls_context = _tls_context(verify_tls=verify_tls)
+    with imaplib.IMAP4_SSL(host, port, ssl_context=tls_context, timeout=timeout_seconds) as imap:
+        imap.login(email, password)
+        _rename_folder(imap, folder=folder, target_folder=target_folder)
+    return MutatedMailboxFolder(folder=folder, target_folder=target_folder, action="rename", success=True)
+
+
+def delete_mailbox_folder(
+    *,
+    email: str,
+    password: str,
+    host: str,
+    port: int,
+    folder: str,
+    timeout_seconds: float = 10.0,
+    verify_tls: bool = False,
+) -> MutatedMailboxFolder:
+    tls_context = _tls_context(verify_tls=verify_tls)
+    with imaplib.IMAP4_SSL(host, port, ssl_context=tls_context, timeout=timeout_seconds) as imap:
+        imap.login(email, password)
+        _delete_folder(imap, folder)
+    return MutatedMailboxFolder(folder=folder, action="delete", success=True)
+
+
 def _archive_message(imap: imaplib.IMAP4_SSL, *, folder: str, message_id: str, archive_folder: str) -> None:
     _move_message(imap, folder=folder, message_id=message_id, target_folder=archive_folder)
 
@@ -291,9 +354,25 @@ def _ensure_folder(imap: imaplib.IMAP4_SSL, folder: str) -> None:
     select_status, _data = imap.select(f'"{folder}"', readonly=True)
     if select_status == "OK":
         return
+    _create_folder(imap, folder)
+
+
+def _create_folder(imap: imaplib.IMAP4_SSL, folder: str) -> None:
     create_status, _create_data = imap.create(f'"{folder}"')
     if create_status != "OK":
         raise imaplib.IMAP4.error(f"Mailbox folder could not be created: {folder}")
+
+
+def _rename_folder(imap: imaplib.IMAP4_SSL, *, folder: str, target_folder: str) -> None:
+    rename_status, _rename_data = imap.rename(f'"{folder}"', f'"{target_folder}"')
+    if rename_status != "OK":
+        raise imaplib.IMAP4.error(f"Mailbox folder could not be renamed: {folder}")
+
+
+def _delete_folder(imap: imaplib.IMAP4_SSL, folder: str) -> None:
+    delete_status, _delete_data = imap.delete(f'"{folder}"')
+    if delete_status != "OK":
+        raise imaplib.IMAP4.error(f"Mailbox folder could not be deleted: {folder}")
 
 
 def _list_folders(imap: imaplib.IMAP4_SSL) -> list[MailboxFolder]:
