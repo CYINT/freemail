@@ -51,6 +51,14 @@ class MailboxMessageDetail(MailboxMessage):
 
 
 @dataclass(frozen=True)
+class MailboxMessageSource:
+    folder: str
+    message_id: str
+    filename: str
+    content: bytes
+
+
+@dataclass(frozen=True)
 class MailboxFolder:
     name: str
     message_count: int
@@ -487,6 +495,23 @@ def get_mailbox_attachment(
     with imaplib.IMAP4_SSL(host, port, ssl_context=tls_context, timeout=timeout_seconds) as imap:
         imap.login(email, password)
         return _get_attachment(imap, folder=folder, message_id=message_id, attachment_id=attachment_id)
+
+
+def get_mailbox_message_source(
+    *,
+    email: str,
+    password: str,
+    host: str,
+    port: int,
+    folder: str,
+    message_id: str,
+    timeout_seconds: float = 10.0,
+    verify_tls: bool = False,
+) -> MailboxMessageSource:
+    tls_context = _tls_context(verify_tls=verify_tls)
+    with imaplib.IMAP4_SSL(host, port, ssl_context=tls_context, timeout=timeout_seconds) as imap:
+        imap.login(email, password)
+        return _get_message_source(imap, folder=folder, message_id=message_id)
 
 
 def create_mailbox_folder(
@@ -979,6 +1004,21 @@ def _get_attachment(
         if attachment.attachment_id == attachment_id:
             return attachment
     raise imaplib.IMAP4.error("Mailbox attachment not found")
+
+
+def _get_message_source(imap: imaplib.IMAP4_SSL, *, folder: str, message_id: str) -> MailboxMessageSource:
+    status, _data = imap.select(f'"{folder}"', readonly=True)
+    if status != "OK":
+        raise imaplib.IMAP4.error(f"Mailbox folder not found: {folder}")
+    fetch_status, fetch_data = imap.fetch(message_id.encode("ascii"), "(BODY.PEEK[])")
+    if fetch_status != "OK" or not fetch_data or not isinstance(fetch_data[0], tuple):
+        raise imaplib.IMAP4.error("Mailbox message not found")
+    filename = f"freemail-{_source_filename_part(folder)}-{_source_filename_part(message_id)}.eml"
+    return MailboxMessageSource(folder=folder, message_id=message_id, filename=filename, content=fetch_data[0][1])
+
+
+def _source_filename_part(value: str) -> str:
+    return re.sub(r"[^A-Za-z0-9._-]", "_", value).strip("._-")[:64] or "message"
 
 
 def _body_from_message(message) -> str:

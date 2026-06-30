@@ -31,6 +31,7 @@ import {
   loadMailboxAttachment,
   loadMailboxContacts,
   loadMailboxMessage,
+  loadMailboxMessageSource,
   loadMailboxPreferences,
   loadMailboxPushDevices,
   loadMailboxPushNotifications,
@@ -685,6 +686,31 @@ export default function App() {
     }
   }
 
+  async function downloadAndShareMessageSource() {
+    if (!session || !selectedMessage) {
+      return;
+    }
+    setLoading(true);
+    setStatus("Exporting message source...");
+    try {
+      const blob = await loadMailboxMessageSource(session, selectedMessage.folder, selectedMessage.messageId);
+      const localUri = await writeMessageSourceToCache(selectedMessage, blob);
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(localUri, {
+          dialogTitle: "Save message.eml",
+          mimeType: "message/rfc822",
+        });
+        setStatus("Message EML ready to save.");
+      } else {
+        setStatus(`Message EML exported to app cache (${formatBytes(blob.size)}).`);
+      }
+    } catch (error) {
+      setStatus(readableError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function archiveSelectedMessage() {
     if (!session || !selectedMessage) {
       return;
@@ -954,6 +980,9 @@ export default function App() {
                       <Text>Edit draft</Text>
                     </Pressable>
                   ) : null}
+                  <Pressable style={styles.secondaryButton} onPress={downloadAndShareMessageSource}>
+                    <Text>Export EML</Text>
+                  </Pressable>
                   <Pressable style={styles.secondaryButton} onPress={() => setSelectedMessageReadState(true)}>
                     <Text>Mark read</Text>
                   </Pressable>
@@ -1195,6 +1224,19 @@ async function writeAttachmentToCache(attachment: MailAttachment, blob: Blob): P
   const attachmentId = safeCacheFilename(attachment.attachmentId);
   const filename = safeCacheFilename(attachment.filename || attachment.attachmentId);
   const localUri = `${FileSystem.cacheDirectory}freemail-${attachmentId}-${filename}`;
+  await FileSystem.writeAsStringAsync(localUri, await blobToBase64(blob), {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+  return localUri;
+}
+
+async function writeMessageSourceToCache(message: MailMessageDetail, blob: Blob): Promise<string> {
+  if (!FileSystem.cacheDirectory) {
+    throw new Error("Message cache is unavailable on this device.");
+  }
+  const folder = safeCacheFilename(message.folder);
+  const messageId = safeCacheFilename(message.messageId);
+  const localUri = `${FileSystem.cacheDirectory}freemail-${folder}-${messageId}.eml`;
   await FileSystem.writeAsStringAsync(localUri, await blobToBase64(blob), {
     encoding: FileSystem.EncodingType.Base64,
   });

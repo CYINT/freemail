@@ -22,6 +22,7 @@ const replyAction = document.querySelector("#reply-action");
 const forwardAction = document.querySelector("#forward-action");
 const loadThreadAction = document.querySelector("#load-thread-action");
 const editDraftAction = document.querySelector("#edit-draft-action");
+const downloadSourceAction = document.querySelector("#download-source-action");
 const starAction = document.querySelector("#star-action");
 const unstarAction = document.querySelector("#unstar-action");
 const markReadAction = document.querySelector("#mark-read-action");
@@ -184,6 +185,14 @@ editDraftAction?.addEventListener("click", () => {
     return;
   }
   prefillSavedDraft(selectedMessageDetail);
+});
+
+downloadSourceAction?.addEventListener("click", async () => {
+  if (!selectedMessageDetail) {
+    setStatus("Select a message before downloading EML.", "error");
+    return;
+  }
+  await downloadMailboxMessageSource(selectedMessageDetail);
 });
 
 starAction?.addEventListener("click", async () => {
@@ -1430,6 +1439,35 @@ async function downloadMailboxAttachment(message, attachment) {
   }
 }
 
+async function downloadMailboxMessageSource(message) {
+  if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
+    setStatus("Load a mailbox before downloading EML.", "error");
+    return;
+  }
+  setStatus("Downloading message EML...", "loading");
+  try {
+    const url = new URL("/api/v1/mailbox/message/source", mailboxSession.apiBaseUrl);
+    url.searchParams.set("folder", message.folder);
+    url.searchParams.set("message_id", message.messageId);
+    const response = await fetch(url, {
+      headers: mailboxHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const blob = await response.blob();
+    const href = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = href;
+    link.download = `freemail-${safeDownloadName(message.folder)}-${safeDownloadName(message.messageId)}.eml`;
+    link.click();
+    URL.revokeObjectURL(href);
+    setStatus("Downloaded message EML.", "ready");
+  } catch (error) {
+    setStatus(`EML download failed: ${readableError(error)}`, "error");
+  }
+}
+
 function renderMessageBody(body) {
   if (!messageBody) {
     return;
@@ -1472,6 +1510,10 @@ function renderMessageAttachments(message) {
 
 function mailboxHeaders() {
   return mailboxSession.token ? { Authorization: `Bearer ${mailboxSession.token}` } : {};
+}
+
+function safeDownloadName(value) {
+  return String(value || "message").replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 96) || "message";
 }
 
 function restoreMailboxSession() {

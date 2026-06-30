@@ -26,6 +26,7 @@ from .mailbox_imap import delete_mailbox_folder
 from .mailbox_imap import empty_mailbox_folder
 from .mailbox_imap import get_mailbox_attachment
 from .mailbox_imap import get_mailbox_message
+from .mailbox_imap import get_mailbox_message_source
 from .mailbox_imap import list_mailbox_contacts
 from .mailbox_imap import list_mailbox_snapshot
 from .mailbox_imap import list_mailbox_thread
@@ -175,7 +176,7 @@ COMPONENT_READINESS = {
     "webmail": {
         "status": "beta-ready",
         "evidence": [
-            "mailbox session login, paginated and thread-aware folder navigation and search, conversation lookup, contacts, message read, read/unread state, star state, compose, attachments, archive, move, delete, and empty-folder controls",
+            "mailbox session login, paginated and thread-aware folder navigation and search, conversation lookup, contacts, message read, EML export, read/unread state, star state, compose, attachments, archive, move, delete, and empty-folder controls",
             "bulk message actions for read/unread, star/unstar, archive, spam, delete, and move",
             "persistent mailbox preferences with default compose signatures and saved address-book contacts",
             "server-side Drafts persistence and compose reopen support for saved drafts",
@@ -190,7 +191,7 @@ COMPONENT_READINESS = {
     "mobile": {
         "status": "source-ready",
         "evidence": [
-            "Expo/React Native client with VPN API target, mailbox sessions, paginated and thread-aware message workflows, conversation lookup, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder and empty-folder controls, extracted and saved contacts, attachments, offline metadata cache, and push-device flows",
+            "Expo/React Native client with VPN API target, mailbox sessions, paginated and thread-aware message workflows, conversation lookup, EML export/share, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder and empty-folder controls, extracted and saved contacts, attachments, offline metadata cache, and push-device flows",
             "bulk read/star/archive/spam/delete/move client controls over the shared mailbox API",
             "mobile preference controls for default compose signatures",
             "compose/send path uses the shared mailbox API contract with Sent Items persistence status",
@@ -1032,6 +1033,45 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "Content-Disposition": (
                     f"attachment; filename=\"{quote(attachment.filename)}\"; "
                     f"filename*=UTF-8''{quote(attachment.filename)}"
+                )
+            },
+        )
+
+    @app.get("/api/v1/mailbox/message/source")
+    def mailbox_message_source(
+        folder: str,
+        message_id: str,
+        authorization: str | None = Header(default=None),
+        x_freemail_mailbox_email: str | None = Header(default=None),
+        x_freemail_mailbox_password: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> Response:
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=x_freemail_mailbox_email,
+            x_freemail_mailbox_password=x_freemail_mailbox_password,
+            connection=connection,
+        )
+        try:
+            source = get_mailbox_message_source(
+                email=credentials.email,
+                password=credentials.password,
+                host=active_settings.mail_core_host,
+                port=active_settings.imap_port,
+                folder=folder,
+                message_id=message_id,
+            )
+        except OSError as error:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+        except imaplib.IMAP4.error as error:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mailbox message not found") from error
+        quoted_filename = quote(source.filename)
+        return Response(
+            content=source.content,
+            media_type="message/rfc822",
+            headers={
+                "Content-Disposition": (
+                    f'attachment; filename="{quoted_filename}"; filename*=UTF-8\'\'{quoted_filename}'
                 )
             },
         )

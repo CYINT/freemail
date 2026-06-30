@@ -10,6 +10,7 @@ from freemail_api.mailbox_imap import (
     MailboxMessage,
     MailboxMessageDetail,
     MailboxMessagePage,
+    MailboxMessageSource,
     MailboxSearchResult,
     MovedMailboxMessage,
     MailboxSnapshot,
@@ -34,6 +35,7 @@ from freemail_api.mailbox_imap import (
     _flags_from_fetch,
     _get_attachment,
     _get_message,
+    _get_message_source,
     _list_contacts,
     _list_folders,
     _list_messages,
@@ -192,6 +194,18 @@ def test_message_detail_serializes_body():
 
     assert detail.as_dict()["body"] == "Body text"
     assert detail.as_dict()["attachments"][0]["filename"] == "report.txt"
+
+
+def test_message_source_carries_raw_content_and_filename():
+    source = MailboxMessageSource(
+        folder="INBOX",
+        message_id="3",
+        filename="freemail-INBOX-3.eml",
+        content=b"Subject: Hello\r\n\r\nBody text",
+    )
+
+    assert source.filename == "freemail-INBOX-3.eml"
+    assert b"Subject: Hello" in source.content
 
 
 def test_search_result_serializes_messages():
@@ -463,6 +477,16 @@ def test_get_message_parses_body_and_headers():
     assert message.thread_subject == "Hello"
     assert message.in_reply_to == "<message-1@example.com>"
     assert message.attachments == []
+
+
+def test_get_message_source_returns_raw_eml_content_and_filename():
+    source = _get_message_source(FakeImap(), folder="INBOX", message_id="3")
+
+    assert source.folder == "INBOX"
+    assert source.message_id == "3"
+    assert source.filename == "freemail-INBOX-3.eml"
+    assert b"Subject: Hello" in source.content
+    assert b"Body text" in source.content
 
 
 def test_thread_metadata_prefers_reference_root_and_normalizes_subject():

@@ -279,6 +279,18 @@ export async function loadMailboxAttachment(
   return response.blob();
 }
 
+export async function loadMailboxMessageSource(
+  session: MailboxSession,
+  folder: string,
+  messageId: string,
+): Promise<Blob> {
+  const path =
+    `/api/v1/mailbox/message/source?folder=${encodeURIComponent(folder)}` +
+    `&message_id=${encodeURIComponent(messageId)}`;
+  const response = await request(session.apiBaseUrl, path, { headers: mailboxHeaders(session) });
+  return response.blob();
+}
+
 export async function archiveMailboxMessage(
   session: MailboxSession,
   folder: string,
