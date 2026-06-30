@@ -52,6 +52,7 @@ def _dkim_values(connection: sqlite3.Connection) -> dict[str, dict[str, object]]
         FROM dkim_keys
         JOIN domains ON domains.id = dkim_keys.domain_id
         WHERE dkim_keys.status = 'active'
+          AND domains.status = 'active'
         ORDER BY dkim_keys.id
         """
     )

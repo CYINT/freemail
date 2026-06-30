@@ -141,6 +141,8 @@ STATUS_TABLES = {
     "domains": {"target_type": "domain", "allowed": {"active", "suspended"}},
     "users": {"target_type": "user", "allowed": {"invited", "suspended"}},
     "mailboxes": {"target_type": "mailbox", "allowed": {"active", "suspended"}},
+    "aliases": {"target_type": "alias", "allowed": {"active", "suspended"}},
+    "dkim_keys": {"target_type": "dkim_key", "allowed": {"active", "suspended"}},
 }
 
 
@@ -294,7 +296,12 @@ def get_domain(connection: sqlite3.Connection, domain_id: int) -> sqlite3.Row:
 
 def list_dkim_keys_for_domain(connection: sqlite3.Connection, domain_id: int) -> list[sqlite3.Row]:
     _get_row(connection, "domains", domain_id)
-    return list(connection.execute("SELECT * FROM dkim_keys WHERE domain_id = ? ORDER BY id", [domain_id]))
+    return list(
+        connection.execute(
+            "SELECT * FROM dkim_keys WHERE domain_id = ? AND status = 'active' ORDER BY id",
+            [domain_id],
+        )
+    )
 
 
 def create_mailbox_session(

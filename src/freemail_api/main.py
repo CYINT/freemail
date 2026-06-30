@@ -903,6 +903,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     ) -> dict[str, object]:
         return _row_to_dict(_create_or_raise(lambda: database.create_alias(connection, payload, actor)))
 
+    @app.patch("/api/v1/admin/aliases/{alias_id}/status", response_model=AliasRecord)
+    def update_alias_status(
+        alias_id: int,
+        payload: AdminStatusUpdate,
+        actor: str = Depends(require_admin),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        return _row_to_dict(
+            _create_or_raise(lambda: database.update_status(connection, "aliases", alias_id, payload.status, actor))
+        )
+
     @app.get("/api/v1/admin/dkim-keys", response_model=list[DkimKeyRecord])
     def list_dkim_keys(
         _actor: str = Depends(require_admin),
@@ -921,6 +932,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             lambda: database.create_dkim_key(connection, payload, public_txt, private_key_pem, actor)
         )
         return _row_to_dict(row)
+
+    @app.patch("/api/v1/admin/dkim-keys/{dkim_key_id}/status", response_model=DkimKeyRecord)
+    def update_dkim_key_status(
+        dkim_key_id: int,
+        payload: AdminStatusUpdate,
+        actor: str = Depends(require_admin),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        return _row_to_dict(
+            _create_or_raise(
+                lambda: database.update_status(connection, "dkim_keys", dkim_key_id, payload.status, actor)
+            )
+        )
 
     @app.get("/api/v1/admin/domains/{domain_id}/dns", response_model=DomainDnsGuidance)
     def domain_dns_guidance(

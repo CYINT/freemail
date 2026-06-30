@@ -72,8 +72,10 @@ Initial endpoints:
 - `PATCH /api/v1/admin/mailboxes/{mailboxId}/status`
 - `POST /api/v1/admin/aliases`
 - `GET /api/v1/admin/aliases`
+- `PATCH /api/v1/admin/aliases/{aliasId}/status`
 - `POST /api/v1/admin/dkim-keys`
 - `GET /api/v1/admin/dkim-keys`
+- `PATCH /api/v1/admin/dkim-keys/{dkimKeyId}/status`
 - `GET /api/v1/admin/domains/{domainId}/dns`
 - `POST /api/v1/admin/domains/{domainId}/dns/verify`
 - `GET /api/v1/admin/audit-log`
@@ -84,7 +86,7 @@ The bootstrap endpoint requires `X-FreeMail-Bootstrap-Token`, refuses to run unl
 
 DNS guidance returns the MX, SPF, DMARC, and DKIM records expected for a domain. The DNS verification endpoint accepts observed DNS values and returns a check list plus a `ready` boolean; it is intended as the repeatable gate before controlled-domain mail-flow tests.
 
-Admin status endpoints support abuse response for private beta. Domains and mailboxes accept `active` or `suspended`; users accept `invited` or `suspended`. Status changes are audit logged, suspended metadata blocks mailbox API access for managed mailboxes, and suspended domains/mailboxes are excluded from Stalwart apply-plan exports.
+Admin status endpoints support abuse response for private beta. Domains, mailboxes, aliases, and DKIM keys accept `active` or `suspended`; users accept `invited` or `suspended`. Status changes are audit logged, suspended metadata blocks mailbox API access for managed mailboxes, and suspended domains, mailboxes, aliases, and DKIM keys are excluded from DNS guidance and Stalwart apply-plan exports where applicable.
 
 ## Docker
 

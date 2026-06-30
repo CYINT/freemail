@@ -167,3 +167,40 @@ def test_build_apply_plan_excludes_suspended_domain_and_mailbox(tmp_path):
     assert [operation["object"] for operation in plan] == ["Domain", "Account"]
     assert set(plan[0]["value"]) == {"domain-active-example"}
     assert set(plan[1]["value"]) == {"account-active-active-example"}
+
+
+def test_build_apply_plan_excludes_suspended_alias_and_dkim_key(tmp_path):
+    db_path = tmp_path / "freemail.sqlite"
+    initialize(str(db_path))
+    with sqlite3.connect(db_path) as connection:
+        connection.row_factory = sqlite3.Row
+        domain = create_domain(connection, DomainCreate(name="example.com"), "test")
+        user = create_user(
+            connection,
+            UserCreate(email="admin@example.com", displayName="Admin User", passwordHash="argon2id-placeholder"),
+            "test",
+        )
+        create_mailbox(
+            connection,
+            MailboxCreate(userId=int(user["id"]), localPart="admin", domainId=int(domain["id"])),
+            "test",
+        )
+        alias = create_alias(
+            connection,
+            AliasCreate(source="hello@example.com", destination="admin@example.com"),
+            "test",
+        )
+        dkim_key = create_dkim_key(
+            connection,
+            DkimKeyCreate(domainId=int(domain["id"]), selector="mail"),
+            "v=DKIM1; k=rsa; p=public",
+            "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----\n",
+            "test",
+        )
+        update_status(connection, "aliases", int(alias["id"]), "suspended", "test")
+        update_status(connection, "dkim_keys", int(dkim_key["id"]), "suspended", "test")
+
+        plan = build_apply_plan(connection, PlanOptions(user_secrets={"admin@example.com": "mail-secret"}))
+
+    assert [operation["object"] for operation in plan] == ["Domain", "Account"]
+    assert plan[1]["value"]["account-admin-example-com"]["aliases"] == {}

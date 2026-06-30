@@ -191,6 +191,55 @@ def test_admin_can_suspend_and_reactivate_domain_user_and_mailbox(tmp_path):
     ]
 
 
+def test_admin_can_suspend_alias_and_dkim_key(tmp_path):
+    with make_client(tmp_path) as client:
+        domain = client.post("/api/v1/admin/domains", headers=admin_headers(), json={"name": "example.com"}).json()
+        user = client.post(
+            "/api/v1/admin/users",
+            headers=admin_headers(),
+            json={
+                "email": "admin@example.com",
+                "displayName": "Admin User",
+                "passwordHash": "argon2id-placeholder-hash",
+            },
+        ).json()
+        client.post(
+            "/api/v1/admin/mailboxes",
+            headers=admin_headers(),
+            json={"userId": user["id"], "localPart": "admin", "domainId": domain["id"]},
+        )
+        alias = client.post(
+            "/api/v1/admin/aliases",
+            headers=admin_headers(),
+            json={"source": "hello@example.com", "destination": "admin@example.com"},
+        ).json()
+        dkim_key = client.post(
+            "/api/v1/admin/dkim-keys",
+            headers=admin_headers(),
+            json={"domainId": domain["id"], "selector": "mail"},
+        ).json()
+
+        suspended_alias = client.patch(
+            f"/api/v1/admin/aliases/{alias['id']}/status",
+            headers=admin_headers(),
+            json={"status": "suspended"},
+        )
+        suspended_dkim = client.patch(
+            f"/api/v1/admin/dkim-keys/{dkim_key['id']}/status",
+            headers=admin_headers(),
+            json={"status": "suspended"},
+        )
+        dns_guidance = client.get(f"/api/v1/admin/domains/{domain['id']}/dns", headers=admin_headers())
+        audit_log = client.get("/api/v1/admin/audit-log", headers=admin_headers())
+
+    assert suspended_alias.status_code == 200
+    assert suspended_alias.json()["status"] == "suspended"
+    assert suspended_dkim.status_code == 200
+    assert suspended_dkim.json()["status"] == "suspended"
+    assert not any(record["name"] == "mail._domainkey.example.com" for record in dns_guidance.json()["records"])
+    assert [entry["action"] for entry in audit_log.json()][-2:] == ["alias.suspend", "dkim_key.suspend"]
+
+
 def test_admin_status_update_rejects_invalid_resource_status(tmp_path):
     with make_client(tmp_path) as client:
         domain = client.post("/api/v1/admin/domains", headers=admin_headers(), json={"name": "example.com"}).json()
