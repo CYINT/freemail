@@ -41,7 +41,7 @@ Current progress: static webmail preview shell exists with inbox, message reader
 - Outbound throttles.
 - Abuse controls.
 
-Current progress: DKIM signing is locally verified in the mail-flow smoke for the provisioned mailbox domain, Stalwart queue inspection exists through a local-only CLI gate, and the mailbox send API now enforces configurable per-mailbox outbound message and recipient caps before SMTP submission. Accepted sends are recorded in the API database after SMTP accepts the message. Remaining work is controlled production-domain SPF/DMARC verification, explicit spam/abuse policy, bounce/reputation handling, and private-beta deliverability evidence.
+Current progress: DKIM signing is locally verified in the mail-flow smoke for the provisioned mailbox domain, Stalwart queue inspection exists through a local-only CLI gate, the admin API can verify observed MX/SPF/DMARC/DKIM records against generated DNS guidance, `docs/deliverability-abuse-policy.md` captures the private-beta baseline policy, and the mailbox send API now enforces configurable per-mailbox outbound message and recipient caps before SMTP submission. Accepted sends are recorded in the API database after SMTP accepts the message. Remaining work is controlled production-domain SPF/DMARC verification against real DNS, bounce/reputation handling, and private-beta deliverability evidence.
 
 ## M5 - Backup, Restore, Upgrade, And Release Gates
 

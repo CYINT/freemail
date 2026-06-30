@@ -72,11 +72,14 @@ Initial endpoints:
 - `POST /api/v1/admin/dkim-keys`
 - `GET /api/v1/admin/dkim-keys`
 - `GET /api/v1/admin/domains/{domainId}/dns`
+- `POST /api/v1/admin/domains/{domainId}/dns/verify`
 - `GET /api/v1/admin/audit-log`
 
 The current metadata store is SQLite at `FREEMAIL_DB_PATH`, defaulting to `data/freemail.sqlite` locally and a Docker volume path in Compose. Mail-store persistence remains part of the Stalwart mail-core spike.
 
 The bootstrap endpoint requires `X-FreeMail-Bootstrap-Token`, refuses to run unless `FREEMAIL_BOOTSTRAP_TOKEN` is configured, and refuses to create a second administrator after the first admin exists.
+
+DNS guidance returns the MX, SPF, DMARC, and DKIM records expected for a domain. The DNS verification endpoint accepts observed DNS values and returns a check list plus a `ready` boolean; it is intended as the repeatable gate before controlled-domain mail-flow tests.
 
 ## Docker
 

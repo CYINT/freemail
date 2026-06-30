@@ -15,6 +15,8 @@ from .attachment_policy import AttachmentPolicy
 from .attachment_policy import AttachmentPolicyError
 from .attachment_policy import parse_allowed_content_types
 from .attachment_policy import validate_attachments
+from .dns_policy import domain_dns_records
+from .dns_policy import verify_dns_posture
 from .mail_core import probe_mail_core
 from .mailbox_imap import archive_mailbox_message
 from .mailbox_imap import create_mailbox_folder
@@ -41,8 +43,9 @@ from .schemas import (
     DkimKeyCreate,
     DkimKeyCreated,
     DkimKeyRecord,
-    DnsRecord,
     DomainDnsGuidance,
+    DomainDnsPostureCreate,
+    DomainDnsPostureRecord,
     DomainCreate,
     DomainRecord,
     MailboxArchiveCreate,
@@ -749,36 +752,35 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             dkim_keys = database.list_dkim_keys_for_domain(connection, domain_id)
         except database.MissingRecordError as error:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
-        records = [
-            DnsRecord(
-                type="MX",
-                name=str(domain["name"]),
-                value=f"10 {active_settings.hostname}.",
-                purpose="Route inbound mail to the FreeMail host.",
-            ),
-            DnsRecord(
-                type="TXT",
-                name=str(domain["name"]),
-                value="v=spf1 mx -all",
-                purpose="Authorize MX hosts for outbound mail during the controlled deployment phase.",
-            ),
-            DnsRecord(
-                type="TXT",
-                name=f"_dmarc.{domain['name']}",
-                value="v=DMARC1; p=quarantine; rua=mailto:postmaster@{domain}".format(domain=domain["name"]),
-                purpose="Enable DMARC reporting and quarantine policy for spoofing protection.",
-            ),
-        ]
-        records.extend(
-            DnsRecord(
-                type="TXT",
-                name=str(row["dns_name"]),
-                value=str(row["public_txt"]),
-                purpose="Publish DKIM public key for message signature verification.",
-            )
-            for row in dkim_keys
+        records = domain_dns_records(
+            domain=str(domain["name"]),
+            hostname=active_settings.hostname,
+            dkim_keys=dkim_keys,
         )
         return DomainDnsGuidance(domain=str(domain["name"]), records=records)
+
+    @app.post("/api/v1/admin/domains/{domain_id}/dns/verify", response_model=DomainDnsPostureRecord)
+    def domain_dns_verify(
+        domain_id: int,
+        payload: DomainDnsPostureCreate,
+        _actor: str = Depends(require_admin),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        try:
+            domain = database.get_domain(connection, domain_id)
+            dkim_keys = database.list_dkim_keys_for_domain(connection, domain_id)
+        except database.MissingRecordError as error:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+        records = domain_dns_records(
+            domain=str(domain["name"]),
+            hostname=active_settings.hostname,
+            dkim_keys=dkim_keys,
+        )
+        return verify_dns_posture(
+            domain=str(domain["name"]),
+            expected_records=records,
+            observed_records=[record.model_dump() for record in payload.observed_records],
+        ).as_dict()
 
     @app.get("/api/v1/admin/audit-log", response_model=list[AuditRecord])
     def audit_log(

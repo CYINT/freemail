@@ -115,6 +115,30 @@ class DomainDnsGuidance(ApiModel):
     records: list[DnsRecord]
 
 
+class ObservedDnsRecord(ApiModel):
+    type: str = Field(min_length=1, max_length=16)
+    name: str = Field(min_length=1, max_length=253)
+    values: list[str] = Field(min_length=1)
+
+
+class DomainDnsPostureCreate(ApiModel):
+    observed_records: list[ObservedDnsRecord]
+
+
+class DnsCheckRecord(ApiModel):
+    type: str
+    name: str
+    expected: str
+    found: bool
+    observed: list[str]
+
+
+class DomainDnsPostureRecord(ApiModel):
+    domain: str
+    ready: bool
+    checks: list[DnsCheckRecord]
+
+
 class AuditRecord(ApiModel):
     id: int
     actor: str

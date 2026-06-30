@@ -212,6 +212,57 @@ def test_admin_can_generate_dkim_key_and_dns_guidance(tmp_path):
         assert any(record["name"] == "mail._domainkey.example.com" for record in records)
 
 
+def test_admin_can_verify_dns_guidance_posture(tmp_path):
+    with make_client(tmp_path) as client:
+        domain = client.post(
+            "/api/v1/admin/domains",
+            headers=admin_headers(),
+            json={"name": "example.com"},
+        )
+        dkim_key = client.post(
+            "/api/v1/admin/dkim-keys",
+            headers=admin_headers(),
+            json={"domainId": domain.json()["id"], "selector": "mail"},
+        )
+        guidance = client.get(f"/api/v1/admin/domains/{domain.json()['id']}/dns", headers=admin_headers()).json()
+        observed = [
+            {"type": record["type"], "name": record["name"], "values": [record["value"]]}
+            for record in guidance["records"]
+        ]
+        response = client.post(
+            f"/api/v1/admin/domains/{domain.json()['id']}/dns/verify",
+            headers=admin_headers(),
+            json={"observedRecords": observed},
+        )
+
+    assert dkim_key.status_code == 201
+    assert response.status_code == 200
+    assert response.json()["ready"] is True
+    assert all(check["found"] for check in response.json()["checks"])
+
+
+def test_admin_dns_verify_reports_missing_records(tmp_path):
+    with make_client(tmp_path) as client:
+        domain = client.post(
+            "/api/v1/admin/domains",
+            headers=admin_headers(),
+            json={"name": "example.com"},
+        )
+        response = client.post(
+            f"/api/v1/admin/domains/{domain.json()['id']}/dns/verify",
+            headers=admin_headers(),
+            json={
+                "observedRecords": [
+                    {"type": "MX", "name": "example.com", "values": ["10 freemail.kuzuryu.ai."]}
+                ]
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["ready"] is False
+    assert [check["found"] for check in response.json()["checks"]] == [True, False, False]
+
+
 def test_mailbox_snapshot_requires_mailbox_credentials(tmp_path):
     with make_client(tmp_path) as client:
         response = client.get("/api/v1/mailbox/snapshot")

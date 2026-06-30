@@ -58,7 +58,7 @@ Current spike evidence:
 Remaining spike work:
 
 - configure one controlled production domain and mailbox
-- decide and document the production spam/deliverability policy before private beta
+- finish the production spam/deliverability policy beyond the baseline in `docs/deliverability-abuse-policy.md` before private beta
 - move from disposable `example.com` smoke metadata to a controlled production test domain
 - exercise outbound retry and bounce behavior against a controlled external target and record queue evidence with `scripts/qa_stalwart_queue.py`
 
