@@ -967,6 +967,40 @@ export default function App() {
     }
   }
 
+  async function saveSelectedSenderRule(action: "allow" | "block") {
+    if (!session || !selectedMessage) {
+      return;
+    }
+    const senderEmail = senderEmailFromText(selectedMessage.sender);
+    if (!senderEmail) {
+      setStatus("Selected message does not expose a sender email.");
+      return;
+    }
+    setLoading(true);
+    setStatus(`${action === "allow" ? "Allowing" : "Blocking"} sender...`);
+    try {
+      await saveMailboxSenderRule(
+        session,
+        senderEmail,
+        action,
+        action === "block" ? "Blocked from message action" : "Allowed from message action",
+      );
+      await refreshSenderRules(session);
+      if (action === "block") {
+        await moveMailboxMessage(session, selectedMessage.folder, selectedMessage.messageId, "Junk Mail");
+        setSelectedMessage(null);
+        await refreshMailbox(session, folder);
+        setStatus(`Blocked ${senderEmail} and moved message to spam.`);
+        return;
+      }
+      setStatus(`Allowed ${senderEmail}.`);
+    } catch (error) {
+      setStatus(readableError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function bulkAction(
     action: "read" | "unread" | "star" | "unstar" | "archive" | "spam" | "delete",
     successMessage: string,
@@ -1220,6 +1254,12 @@ export default function App() {
                   </Pressable>
                   <Pressable style={styles.secondaryButton} onPress={() => setSelectedMessageStarState(false)}>
                     <Text>Unstar</Text>
+                  </Pressable>
+                  <Pressable style={styles.secondaryButton} onPress={() => saveSelectedSenderRule("allow")}>
+                    <Text>Allow sender</Text>
+                  </Pressable>
+                  <Pressable style={styles.secondaryButton} onPress={() => saveSelectedSenderRule("block")}>
+                    <Text>Block sender</Text>
                   </Pressable>
                   <Pressable style={styles.secondaryButton} onPress={archiveSelectedMessage}>
                     <Text>Archive</Text>
@@ -1618,6 +1658,16 @@ function readerMetadata(message: MailMessage): string {
   const base = `From ${message.sender || "Unknown sender"}`;
   const threadSubject = message.threadSubject || message.subject || "(no subject)";
   return message.threadId ? `${base} | Thread ${threadSubject}` : base;
+}
+
+function senderEmailFromText(value: string): string {
+  const text = String(value || "").trim();
+  const bracketMatch = text.match(/<([^<>@\s]+@[^<>@\s]+)>/);
+  if (bracketMatch) {
+    return bracketMatch[1].toLowerCase();
+  }
+  const emailMatch = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  return emailMatch ? emailMatch[0].toLowerCase() : "";
 }
 
 const styles = StyleSheet.create({

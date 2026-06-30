@@ -252,7 +252,7 @@ PUT /api/v1/mailbox/saved-contacts
 DELETE /api/v1/mailbox/saved-contacts/{contactId}
 ```
 
-Mailbox sender rules are durable mailbox metadata for allow/block abuse triage and are included in metadata backups:
+Mailbox sender rules are durable mailbox metadata for allow/block abuse triage and are included in metadata backups. Webmail and mobile can save allow/block rules from the selected message; the block-sender action also moves the selected message to `Junk Mail`.
 
 ```text
 GET /api/v1/mailbox/sender-rules

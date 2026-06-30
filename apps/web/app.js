@@ -31,6 +31,8 @@ const starAction = document.querySelector("#star-action");
 const unstarAction = document.querySelector("#unstar-action");
 const markReadAction = document.querySelector("#mark-read-action");
 const markUnreadAction = document.querySelector("#mark-unread-action");
+const allowSenderAction = document.querySelector("#allow-sender-action");
+const blockSenderAction = document.querySelector("#block-sender-action");
 const archiveAction = document.querySelector("#archive-action");
 const spamAction = document.querySelector("#spam-action");
 const deleteAction = document.querySelector("#delete-action");
@@ -284,6 +286,14 @@ markUnreadAction?.addEventListener("click", async () => {
     return;
   }
   await setMailboxMessageReadState(selectedMessageDetail, false);
+});
+
+allowSenderAction?.addEventListener("click", async () => {
+  await saveSelectedSenderRule("allow");
+});
+
+blockSenderAction?.addEventListener("click", async () => {
+  await saveSelectedSenderRule("block");
 });
 
 archiveAction?.addEventListener("click", async () => {
@@ -1220,6 +1230,36 @@ async function deleteMailboxSenderRule(ruleId) {
   } catch (error) {
     setStatus(`Delete sender rule failed: ${readableError(error)}`, "error");
   }
+}
+
+async function saveSelectedSenderRule(action) {
+  if (!selectedMessageDetail) {
+    setStatus("Select a message before saving a sender rule.", "error");
+    return;
+  }
+  const senderEmail = senderEmailFromText(selectedMessageDetail.sender);
+  if (!senderEmail) {
+    setStatus("Selected message does not expose a sender email.", "error");
+    return;
+  }
+  await saveMailboxSenderRule({
+    senderEmail,
+    action,
+    notes: action === "block" ? "Blocked from message action" : "Allowed from message action",
+  });
+  if (action === "block" && selectedMessageDetail) {
+    await moveMailboxMessage(selectedMessageDetail, "Junk Mail", `Blocked ${senderEmail} and moved message to spam.`);
+  }
+}
+
+function senderEmailFromText(value) {
+  const text = String(value || "").trim();
+  const bracketMatch = text.match(/<([^<>@\s]+@[^<>@\s]+)>/);
+  if (bracketMatch) {
+    return bracketMatch[1].toLowerCase();
+  }
+  const emailMatch = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  return emailMatch ? emailMatch[0].toLowerCase() : "";
 }
 
 async function createMailboxFolder(folder) {
