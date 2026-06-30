@@ -484,6 +484,19 @@ For a real beta domain, pass admin DNS guidance plus observed DNS evidence, mail
   --restore-drill-evidence .freemail-qa\backups\restore-drill-evidence.json
 ```
 
+Generate a credential-free runbook for the controlled-domain packet before running the lower-level commands:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\create_controlled_domain_runbook.py `
+  --domain example.com `
+  --output .freemail-qa\private-beta\controlled-domain-runbook.example.com.json `
+  --evidence-dir .freemail-qa\private-beta `
+  --write-markdown `
+  --force
+```
+
+The runbook lists exact PowerShell commands, expected artifact paths, remaining manual inputs, and the VPN-only boundary. It does not collect evidence or bypass `scripts\private_beta_gate.py` or `scripts\release_gate.py`.
+
 To avoid hand-authoring the JSON packet, create draft evidence templates first:
 
 ```powershell

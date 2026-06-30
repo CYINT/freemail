@@ -159,6 +159,19 @@ For a controlled domain, first export DNS guidance from the admin API, capture o
   --restore-drill-evidence .freemail-qa\backups\restore-drill-evidence.json
 ```
 
+Generate a credential-free controlled-domain runbook before collecting artifacts:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\create_controlled_domain_runbook.py `
+  --domain example.com `
+  --output .freemail-qa\private-beta\controlled-domain-runbook.example.com.json `
+  --evidence-dir .freemail-qa\private-beta `
+  --write-markdown `
+  --force
+```
+
+The runbook records exact command lines, expected artifact paths, remaining manual inputs, and the VPN-only release boundary. It is planning evidence only; it does not replace the private-beta packet status, private-beta gate, release packet status, or hard release gate.
+
 Operators can generate a credential-free draft packet with:
 
 ```powershell
