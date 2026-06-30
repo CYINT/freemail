@@ -1,4 +1,5 @@
 import hashlib
+import json
 from pathlib import Path
 
 import pytest
@@ -10,9 +11,13 @@ from freemail_api.release_gate import assert_release_gate, ReleaseGateError, Rel
 def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monkeypatch):
     metadata = tmp_path / "metadata.json"
     mail_store = tmp_path / "mail-store.tar.gz"
+    mobile_evidence = tmp_path / "mobile-release-evidence.json"
+    mobile_app_config = tmp_path / "app.json"
     release_notes = tmp_path / "release-notes.md"
     metadata.write_text("{}", encoding="utf-8")
     mail_store.write_bytes(b"archive")
+    write_json(mobile_app_config, valid_mobile_app_config())
+    write_json(mobile_evidence, valid_mobile_release_evidence())
     release_notes.write_text(
         "# FreeMail v0.1.0-private-beta\n\n"
         "Verification: CI, release gates, and backup evidence passed.\n\n"
@@ -54,6 +59,9 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
         ReleaseGateOptions(
             metadata_backup=metadata,
             mail_store_backup=mail_store,
+            mobile_release_evidence=mobile_evidence,
+            mobile_app_config=mobile_app_config,
+            require_mobile_store_submission=True,
             release_notes=release_notes,
             release_version="v0.1.0-private-beta",
         )
@@ -63,6 +71,9 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
     checks_by_name = {check["name"]: check for check in result["checks"]}
     assert checks_by_name["metadata-backup"]["details"]["sha256"] == hashlib.sha256(b"{}").hexdigest()
     assert checks_by_name["mail-store-backup"]["details"]["sha256"] == hashlib.sha256(b"archive").hexdigest()
+    assert checks_by_name["mobile-release-evidence"]["details"]["evidenceDetails"]["sha256"] == hashlib.sha256(
+        mobile_evidence.read_bytes()
+    ).hexdigest()
     assert checks_by_name["release-notes"]["details"]["sha256"] == hashlib.sha256(
         release_notes.read_bytes()
     ).hexdigest()
@@ -73,6 +84,7 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
         "github-ci",
         "metadata-backup",
         "mail-store-backup",
+        "mobile-release-evidence",
         "release-notes",
         "runtime-health",
         "deployment-boundary",
@@ -90,12 +102,62 @@ def test_release_gate_fails_without_backup_evidence(tmp_path, monkeypatch):
             mail_store_backup=None,
             skip_github_ci=True,
             skip_release_notes=True,
+            skip_mobile_evidence=True,
             skip_runtime=True,
         )
     )
 
     assert result["passed"] is False
     assert result["checks"][-1]["name"] == "backup-evidence"
+
+
+def test_release_gate_fails_without_mobile_release_evidence(tmp_path, monkeypatch):
+    metadata = tmp_path / "metadata.json"
+    mail_store = tmp_path / "mail-store.tar.gz"
+    metadata.write_text("{}", encoding="utf-8")
+    mail_store.write_bytes(b"archive")
+    monkeypatch.setattr(release_gate, "_command", lambda command: "abc123" if command[-1] == "HEAD" else "")
+
+    result = run_release_gate(
+        ReleaseGateOptions(
+            metadata_backup=metadata,
+            mail_store_backup=mail_store,
+            skip_github_ci=True,
+            skip_release_notes=True,
+            skip_runtime=True,
+        )
+    )
+
+    checks_by_name = {check["name"]: check for check in result["checks"]}
+    assert result["passed"] is False
+    assert checks_by_name["mobile-release-evidence"]["status"] == "fail"
+    assert "required" in checks_by_name["mobile-release-evidence"]["details"]["error"]
+
+
+def test_release_gate_reports_failed_mobile_release_evidence(tmp_path, monkeypatch):
+    mobile_evidence = tmp_path / "mobile-release-evidence.json"
+    mobile_app_config = tmp_path / "app.json"
+    write_json(mobile_app_config, valid_mobile_app_config())
+    payload = valid_mobile_release_evidence()
+    payload["builds"]["ios"]["signed"] = False
+    write_json(mobile_evidence, payload)
+    monkeypatch.setattr(release_gate, "_command", lambda command: "abc123" if command[-1] == "HEAD" else "")
+
+    result = run_release_gate(
+        ReleaseGateOptions(
+            mobile_release_evidence=mobile_evidence,
+            mobile_app_config=mobile_app_config,
+            skip_github_ci=True,
+            skip_backup_evidence=True,
+            skip_release_notes=True,
+            skip_runtime=True,
+        )
+    )
+
+    check = next(check for check in result["checks"] if check["name"] == "mobile-release-evidence")
+    assert result["passed"] is False
+    assert check["status"] == "fail"
+    assert check["details"]["failedChecks"] == ["ios-signed-build"]
 
 
 def test_assert_release_gate_raises_for_failed_checks(tmp_path, monkeypatch):
@@ -106,6 +168,7 @@ def test_assert_release_gate_raises_for_failed_checks(tmp_path, monkeypatch):
             ReleaseGateOptions(
                 skip_github_ci=True,
                 skip_backup_evidence=True,
+                skip_mobile_evidence=True,
                 skip_release_notes=True,
                 skip_runtime=True,
             )
@@ -222,3 +285,71 @@ def test_release_notes_check_rejects_missing_version(tmp_path):
 
     assert check["status"] == "fail"
     assert check["details"]["versionPresent"] is False
+
+
+def valid_mobile_app_config():
+    return {
+        "expo": {
+            "name": "FreeMail",
+            "version": "0.1.0-dev",
+            "ios": {"bundleIdentifier": "technology.cyint.freemail"},
+            "android": {"package": "technology.cyint.freemail"},
+            "extra": {"apiBaseUrl": "https://freemail.kuzuryu.ai"},
+        }
+    }
+
+
+def valid_mobile_release_evidence():
+    return {
+        "app": {
+            "name": "FreeMail",
+            "version": "0.1.0-dev",
+            "apiBaseUrl": "https://freemail.kuzuryu.ai",
+        },
+        "builds": {
+            "ios": {
+                "identifier": "technology.cyint.freemail",
+                "signed": True,
+                "distribution": "private-beta",
+                "buildUrl": "https://example.invalid/ios-build",
+                "artifact": {"type": "ipa", "bytes": 123, "sha256": "a" * 64},
+            },
+            "android": {
+                "identifier": "technology.cyint.freemail",
+                "signed": True,
+                "distribution": "private-beta",
+                "buildUrl": "https://example.invalid/android-build",
+                "artifact": {"type": "aab", "bytes": 456, "sha256": "b" * 64},
+            },
+        },
+        "storeSubmissions": {
+            "ios": {
+                "store": "app-store-connect",
+                "identifier": "technology.cyint.freemail",
+                "track": "testflight",
+                "submitted": True,
+                "submissionUrl": "https://example.invalid/testflight",
+                "submittedAt": "2026-06-30T00:00:00Z",
+                "reviewState": "processing",
+            },
+            "android": {
+                "store": "play-console",
+                "identifier": "technology.cyint.freemail",
+                "track": "internal-testing",
+                "submitted": True,
+                "submissionUrl": "https://example.invalid/play-internal",
+                "submittedAt": "2026-06-30T00:00:00Z",
+                "reviewState": "draft-release-created",
+            },
+        },
+        "privateBetaBoundary": {
+            "hostname": "freemail.kuzuryu.ai",
+            "vpnOnly": True,
+            "publicInternet": False,
+            "requiredBoundary": "Dragonscale/VPN clients only",
+        },
+    }
+
+
+def write_json(path, payload):
+    path.write_text(json.dumps(payload), encoding="utf-8")

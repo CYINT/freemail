@@ -51,6 +51,8 @@ Invoke-RestMethod https://freemail.kuzuryu.ai/api/v1/mail-core/readiness
 .\.venv\Scripts\python.exe scripts\release_gate.py `
   --metadata-backup .freemail-qa\backups\metadata.json `
   --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
+  --mobile-release-evidence .freemail-qa\mobile-release-evidence.json `
+  --require-mobile-store-submission `
   --release-notes docs\release-notes\v0.1.0-private-beta.md `
   --release-version v0.1.0-private-beta
 ```

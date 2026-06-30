@@ -24,10 +24,14 @@ class ReleaseGateOptions:
     readiness_url: str | None = "https://freemail.kuzuryu.ai/api/v1/mail-core/readiness"
     metadata_backup: Path | None = None
     mail_store_backup: Path | None = None
+    mobile_release_evidence: Path | None = None
+    mobile_app_config: Path = Path("apps/mobile/app.json")
     release_notes: Path | None = None
     release_version: str | None = None
     skip_github_ci: bool = False
     skip_backup_evidence: bool = False
+    skip_mobile_evidence: bool = False
+    require_mobile_store_submission: bool = False
     skip_release_notes: bool = False
     skip_runtime: bool = False
 
@@ -43,6 +47,14 @@ def run_release_gate(options: ReleaseGateOptions) -> dict[str, Any]:
         checks.append(_check_github_ci(options.repo, commit))
     if not options.skip_backup_evidence:
         checks.extend(_check_backup_evidence(options.metadata_backup, options.mail_store_backup))
+    if not options.skip_mobile_evidence:
+        checks.append(
+            _check_mobile_release_evidence(
+                options.mobile_release_evidence,
+                options.mobile_app_config,
+                require_store_submission=options.require_mobile_store_submission,
+            )
+        )
     if not options.skip_release_notes:
         checks.append(_check_release_notes(options.release_notes, options.release_version))
     if not options.skip_runtime:
@@ -133,6 +145,36 @@ def _check_backup_file(name: str, path: Path) -> dict[str, Any]:
     exists = path.is_file()
     size = path.stat().st_size if exists else 0
     return _check(name, exists and size > 0, _file_evidence_details(path, exists, size))
+
+
+def _check_mobile_release_evidence(
+    path: Path | None,
+    app_config: Path,
+    *,
+    require_store_submission: bool,
+) -> dict[str, Any]:
+    if path is None:
+        return _check("mobile-release-evidence", False, {"error": "mobile release evidence path is required"})
+    from .mobile_release_gate import MobileReleaseGateOptions, run_mobile_release_gate
+
+    result = run_mobile_release_gate(
+        MobileReleaseGateOptions(
+            evidence=path,
+            app_config=app_config,
+            require_store_submission=require_store_submission,
+        )
+    )
+    failed = [check["name"] for check in result["checks"] if check["status"] != "pass"]
+    return _check(
+        "mobile-release-evidence",
+        bool(result["passed"]),
+        {
+            "path": str(path),
+            "requireStoreSubmission": require_store_submission,
+            "failedChecks": failed,
+            "evidenceDetails": result["evidenceDetails"],
+        },
+    )
 
 
 def _check_release_notes(path: Path | None, release_version: str | None) -> dict[str, Any]:

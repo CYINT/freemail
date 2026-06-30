@@ -349,11 +349,13 @@ Run the local release gate only after the candidate commit has been pushed and G
 .\.venv\Scripts\python.exe scripts\release_gate.py `
   --metadata-backup .freemail-qa\backups\metadata.json `
   --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
+  --mobile-release-evidence .freemail-qa\mobile-release-evidence.json `
+  --require-mobile-store-submission `
   --release-notes docs\release-notes\v0.1.0-private-beta.md `
   --release-version v0.1.0-private-beta
 ```
 
-The release gate checks clean Git state, remote SHA, GitHub Actions CI, Compose config, backup evidence, release-notes evidence, VPN-only health/deployment metadata, metadata-store readiness, and mail-core protocol readiness.
+The release gate checks clean Git state, remote SHA, GitHub Actions CI, Compose config, backup evidence, mobile signed-build/store-submission evidence, release-notes evidence, VPN-only health/deployment metadata, metadata-store readiness, and mail-core protocol readiness.
 
 Run the private-beta runtime gate during development:
 
