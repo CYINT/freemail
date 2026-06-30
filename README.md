@@ -240,6 +240,24 @@ docker run --rm -i -e STALWART_URL -e STALWART_USER -e STALWART_PASSWORD ghcr.io
 
 The exporter matches DKIM signatures by selector to avoid duplicate Stalwart signatures on repeated local applies. Use unique selectors per hosted domain until the Stalwart CLI supports reliable reference-based matching for `DkimSignature` domain IDs.
 
+## Backup And Restore
+
+Read `docs/backup-restore.md` before relying on backups. The metadata backup tools export API metadata, audit logs, and DKIM key material; they intentionally exclude mailbox sessions, outbound rate-limit counters, and Stalwart mail-store data.
+
+Export metadata:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\backup_metadata.py --database data\freemail.sqlite --output .freemail-qa\backups\metadata.json
+```
+
+Restore metadata into a new database:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\restore_metadata.py --database data\freemail-restored.sqlite --input .freemail-qa\backups\metadata.json
+```
+
+Metadata backups include DKIM private keys and password hashes. Store them encrypted and outside the repository.
+
 ## VPN-Only Deployment
 
 Read `docs/deployment-vpn.md`. The intended local hostname is:
