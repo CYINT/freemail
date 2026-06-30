@@ -173,6 +173,21 @@ class MailboxSnapshotRecord(ApiModel):
     messages: list[MailboxMessageSummary]
 
 
+class MailboxSessionCreate(ApiModel):
+    email: EmailStr
+    password: str = Field(min_length=1, max_length=512)
+
+
+class MailboxSessionRecord(ApiModel):
+    token: str
+    email: EmailStr
+    expires_at: int
+
+
+class MailboxSessionDeleteRecord(ApiModel):
+    revoked: bool
+
+
 class MailboxSendCreate(ApiModel):
     recipients: list[EmailStr] = Field(min_length=1, max_length=50)
     subject: str = Field(min_length=1, max_length=255)

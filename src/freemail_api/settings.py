@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     database_path: str = Field(default="data/freemail.sqlite", validation_alias="FREEMAIL_DB_PATH")
     admin_api_token: str | None = Field(default=None, validation_alias="FREEMAIL_ADMIN_API_TOKEN")
     bootstrap_token: str | None = Field(default=None, validation_alias="FREEMAIL_BOOTSTRAP_TOKEN")
+    session_secret: str | None = Field(default=None, validation_alias="FREEMAIL_SESSION_SECRET")
+    session_ttl_seconds: int = Field(default=43200, validation_alias="FREEMAIL_SESSION_TTL_SECONDS")
     mail_core_host: str = Field(default="127.0.0.1", validation_alias="FREEMAIL_MAIL_CORE_HOST")
     smtp_port: int = Field(default=2525, validation_alias="FREEMAIL_SMTP_PORT")
     submission_port: int = Field(default=2465, validation_alias="FREEMAIL_SUBMISSION_PORT")

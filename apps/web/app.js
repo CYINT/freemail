@@ -7,6 +7,7 @@ const readerMeta = document.querySelector("#reader-meta");
 const messageBody = document.querySelector("#message-body");
 const messageAttachments = document.querySelector("#message-attachments");
 const composeForm = document.querySelector("#compose-form");
+const logoutAction = document.querySelector("#mailbox-logout");
 const replyAction = document.querySelector("#reply-action");
 const forwardAction = document.querySelector("#forward-action");
 const archiveAction = document.querySelector("#archive-action");
@@ -15,24 +16,26 @@ const composeSubject = document.querySelector("#compose-subject");
 const composeBody = document.querySelector("#compose-body");
 const composeAttachments = document.querySelector("#compose-attachments");
 
+const mailboxSessionStorageKey = "freemail.mailboxSession";
+
 let mailboxSession = {
   email: "",
-  password: "",
+  token: "",
   apiBaseUrl: "",
   folder: "INBOX",
 };
 let selectedMessageDetail = null;
 
+restoreMailboxSession();
+
 loginForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = new FormData(loginForm);
-  mailboxSession = {
+  await createMailboxSession({
     email: String(form.get("email") || "").trim(),
     password: String(form.get("password") || ""),
     apiBaseUrl: String(form.get("apiBaseUrl") || "").trim().replace(/\/+$/, ""),
-    folder: mailboxSession.folder || "INBOX",
-  };
-  await loadMailboxSnapshot(mailboxSession.folder);
+  });
 });
 
 composeForm?.addEventListener("submit", async (event) => {
@@ -73,9 +76,63 @@ archiveAction?.addEventListener("click", async () => {
   await archiveMailboxMessage(selectedMessageDetail);
 });
 
+logoutAction?.addEventListener("click", async () => {
+  await revokeMailboxSession();
+});
+
+async function createMailboxSession({ email, password, apiBaseUrl }) {
+  if (!email || !password || !apiBaseUrl) {
+    setStatus("Enter mailbox credentials to start a session.", "error");
+    return;
+  }
+  setStatus("Starting mailbox session...", "loading");
+  try {
+    const url = new URL("/api/v1/mailbox/session", apiBaseUrl);
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const session = await response.json();
+    mailboxSession = {
+      email: session.email || email,
+      token: session.token,
+      apiBaseUrl,
+      folder: mailboxSession.folder || "INBOX",
+    };
+    persistMailboxSession(mailboxSession);
+    await loadMailboxSnapshot(mailboxSession.folder);
+  } catch (error) {
+    forgetMailboxSession();
+    setStatus(`Session start failed: ${readableError(error)}`, "error");
+  }
+}
+
+async function revokeMailboxSession() {
+  const token = mailboxSession.token;
+  const apiBaseUrl = mailboxSession.apiBaseUrl;
+  forgetMailboxSession();
+  if (token && apiBaseUrl) {
+    try {
+      await fetch(new URL("/api/v1/mailbox/session", apiBaseUrl), {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch (_error) {
+      // Local cleanup is authoritative for the browser; server expiry will clean stale sessions.
+    }
+  }
+  renderFolders([], "INBOX");
+  renderMessages([]);
+  setStatus("Signed out.", "idle");
+}
+
 async function loadMailboxSnapshot(folder) {
-  if (!mailboxSession.email || !mailboxSession.password || !mailboxSession.apiBaseUrl) {
-    setStatus("Enter mailbox credentials to load live mail.", "idle");
+  if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
+    setStatus("Sign in to load live mail.", "idle");
     return;
   }
   setStatus(`Loading ${folder}...`, "loading");
@@ -84,16 +141,14 @@ async function loadMailboxSnapshot(folder) {
     url.searchParams.set("folder", folder);
     url.searchParams.set("limit", "25");
     const response = await fetch(url, {
-      headers: {
-        "X-FreeMail-Mailbox-Email": mailboxSession.email,
-        "X-FreeMail-Mailbox-Password": mailboxSession.password,
-      },
+      headers: mailboxHeaders(),
     });
     if (!response.ok) {
       throw new Error(await response.text());
     }
     const snapshot = await response.json();
     mailboxSession.folder = folder;
+    persistMailboxSession(mailboxSession);
     renderFolders(snapshot.folders || [], folder);
     renderMessages(snapshot.messages || []);
     setStatus(`Loaded ${snapshot.messages?.length || 0} messages from ${folder}.`, "ready");
@@ -103,7 +158,7 @@ async function loadMailboxSnapshot(folder) {
 }
 
 async function archiveMailboxMessage(message) {
-  if (!mailboxSession.email || !mailboxSession.password || !mailboxSession.apiBaseUrl) {
+  if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
     setStatus("Load a mailbox before archiving.", "error");
     return;
   }
@@ -113,9 +168,8 @@ async function archiveMailboxMessage(message) {
     const response = await fetch(url, {
       method: "POST",
       headers: {
+        ...mailboxHeaders(),
         "Content-Type": "application/json",
-        "X-FreeMail-Mailbox-Email": mailboxSession.email,
-        "X-FreeMail-Mailbox-Password": mailboxSession.password,
       },
       body: JSON.stringify({
         folder: message.folder,
@@ -135,7 +189,7 @@ async function archiveMailboxMessage(message) {
 }
 
 async function sendMailboxMessage(message) {
-  if (!mailboxSession.email || !mailboxSession.password || !mailboxSession.apiBaseUrl) {
+  if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
     setStatus("Load a mailbox before sending.", "error");
     return;
   }
@@ -145,9 +199,8 @@ async function sendMailboxMessage(message) {
     const response = await fetch(url, {
       method: "POST",
       headers: {
+        ...mailboxHeaders(),
         "Content-Type": "application/json",
-        "X-FreeMail-Mailbox-Email": mailboxSession.email,
-        "X-FreeMail-Mailbox-Password": mailboxSession.password,
       },
       body: JSON.stringify(message),
     });
@@ -306,10 +359,7 @@ async function loadMailboxMessage(folder, messageId) {
   url.searchParams.set("folder", folder);
   url.searchParams.set("message_id", messageId);
   const response = await fetch(url, {
-    headers: {
-      "X-FreeMail-Mailbox-Email": mailboxSession.email,
-      "X-FreeMail-Mailbox-Password": mailboxSession.password,
-    },
+    headers: mailboxHeaders(),
   });
   if (!response.ok) {
     throw new Error(await response.text());
@@ -318,7 +368,7 @@ async function loadMailboxMessage(folder, messageId) {
 }
 
 async function downloadMailboxAttachment(message, attachment) {
-  if (!mailboxSession.email || !mailboxSession.password || !mailboxSession.apiBaseUrl) {
+  if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
     setStatus("Load a mailbox before downloading attachments.", "error");
     return;
   }
@@ -329,10 +379,7 @@ async function downloadMailboxAttachment(message, attachment) {
     url.searchParams.set("message_id", message.messageId);
     url.searchParams.set("attachment_id", attachment.attachmentId);
     const response = await fetch(url, {
-      headers: {
-        "X-FreeMail-Mailbox-Email": mailboxSession.email,
-        "X-FreeMail-Mailbox-Password": mailboxSession.password,
-      },
+      headers: mailboxHeaders(),
     });
     if (!response.ok) {
       throw new Error(await response.text());
@@ -388,6 +435,54 @@ function renderMessageAttachments(message) {
     return button;
   });
   messageAttachments.replaceChildren(heading, ...buttons);
+}
+
+function mailboxHeaders() {
+  return mailboxSession.token ? { Authorization: `Bearer ${mailboxSession.token}` } : {};
+}
+
+function restoreMailboxSession() {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(mailboxSessionStorageKey) || "null");
+    if (!stored?.token || !stored?.apiBaseUrl) {
+      return;
+    }
+    mailboxSession = {
+      email: String(stored.email || ""),
+      token: String(stored.token),
+      apiBaseUrl: String(stored.apiBaseUrl).replace(/\/+$/, ""),
+      folder: String(stored.folder || "INBOX"),
+    };
+    const apiInput = document.querySelector("#api-base-url");
+    const emailInput = document.querySelector("#mailbox-email");
+    if (apiInput) {
+      apiInput.value = mailboxSession.apiBaseUrl;
+    }
+    if (emailInput) {
+      emailInput.value = mailboxSession.email;
+    }
+    loadMailboxSnapshot(mailboxSession.folder);
+  } catch (_error) {
+    forgetMailboxSession();
+  }
+}
+
+function persistMailboxSession(session) {
+  window.localStorage.setItem(
+    mailboxSessionStorageKey,
+    JSON.stringify({
+      email: session.email,
+      token: session.token,
+      apiBaseUrl: session.apiBaseUrl,
+      folder: session.folder,
+    }),
+  );
+}
+
+function forgetMailboxSession() {
+  window.localStorage.removeItem(mailboxSessionStorageKey);
+  mailboxSession = { email: "", token: "", apiBaseUrl: "", folder: "INBOX" };
+  selectedMessageDetail = null;
 }
 
 async function filesToAttachments(files) {

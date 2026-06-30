@@ -103,14 +103,17 @@ Run browser screenshot QA for the webmail shell with:
 
 Screenshots are written under the ignored `.freemail-qa\web-screenshots` directory. The browser QA checks desktop, tablet, and mobile viewports for the inbox, reader, compose, and message-action surfaces, and fails on horizontal overflow.
 
-The webmail preview can load live mailbox folders and message headers from the API. Start `admin-api`, `mail-core`, and `web`, open `http://127.0.0.1:18091`, enter a mailbox address/password, and keep the API field pointed at `http://127.0.0.1:18090`. The browser client sends credentials only with the snapshot request and does not use `localStorage`, `sessionStorage`, or cookies for mailbox passwords. For a different local web origin, set `FREEMAIL_WEB_CORS_ORIGINS`.
+The webmail preview can load live mailbox folders and message headers from the API. Start `admin-api`, `mail-core`, and `web`, open `http://127.0.0.1:18091`, enter a mailbox address/password, and keep the API field pointed at `http://127.0.0.1:18090`. The browser client exchanges the mailbox password for a bearer session at `POST /api/v1/mailbox/session`, stores only the bearer token in `localStorage`, and revokes it with `DELETE /api/v1/mailbox/session` on sign out. The API stores mailbox passwords only as encrypted session material using `FREEMAIL_SESSION_SECRET`. For a different local web origin, set `FREEMAIL_WEB_CORS_ORIGINS`.
 
 The first read-only mailbox API uses per-request IMAP credentials and does not store mailbox passwords:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\qa_mailbox_snapshot_api.py --email admin@example.com --secrets-json secrets\mail-core-users.json
 .\.venv\Scripts\python.exe scripts\qa_mailbox_message_api.py --email admin@example.com --secrets-json secrets\mail-core-users.json
+.\.venv\Scripts\python.exe scripts\qa_mailbox_session_api.py --email admin@example.com --secrets-json secrets\mail-core-users.json
 ```
+
+`FREEMAIL_SESSION_SECRET` must be set for browser mailbox sessions. Use a long random value and keep it out of source control. Existing per-request mailbox credential QA scripts remain available for API smoke coverage.
 
 The first mailbox send API uses the same per-request credential posture and submits through authenticated implicit-TLS SMTP:
 

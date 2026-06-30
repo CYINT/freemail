@@ -38,10 +38,20 @@ from .schemas import (
     MailboxRecord,
     MailboxSendCreate,
     MailboxSendRecord,
+    MailboxSessionCreate,
+    MailboxSessionDeleteRecord,
+    MailboxSessionRecord,
     MailboxSnapshotRecord,
     UserCreate,
     UserRecord,
 )
+from .sessions import bearer_token
+from .sessions import create_mailbox_session
+from .sessions import InvalidSessionError
+from .sessions import MailboxCredentials
+from .sessions import resolve_mailbox_session
+from .sessions import revoke_mailbox_session
+from .sessions import SessionConfigurationError
 from .settings import get_settings
 from .settings import Settings
 
@@ -65,8 +75,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.add_middleware(
             CORSMiddleware,
             allow_origins=cors_origins,
-            allow_methods=["GET", "POST", "OPTIONS"],
-            allow_headers=["Content-Type", "X-FreeMail-Mailbox-Email", "X-FreeMail-Mailbox-Password"],
+            allow_methods=["DELETE", "GET", "POST", "OPTIONS"],
+            allow_headers=[
+                "Authorization",
+                "Content-Type",
+                "X-FreeMail-Mailbox-Email",
+                "X-FreeMail-Mailbox-Password",
+            ],
         )
 
     def require_admin(x_freemail_admin_token: str | None = Header(default=None)) -> str:
@@ -92,6 +107,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def get_connection() -> Iterator[sqlite3.Connection]:
         with database.connect(active_settings.database_path) as connection:
             yield connection
+
+    def mailbox_credentials(
+        *,
+        authorization: str | None,
+        x_freemail_mailbox_email: str | None,
+        x_freemail_mailbox_password: str | None,
+        connection: sqlite3.Connection,
+    ) -> MailboxCredentials:
+        token = bearer_token(authorization)
+        if token:
+            try:
+                return resolve_mailbox_session(
+                    connection,
+                    token=token,
+                    secret=active_settings.session_secret,
+                )
+            except SessionConfigurationError as error:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Mailbox sessions are not configured",
+                ) from error
+            except InvalidSessionError as error:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid mailbox session") from error
+        if not x_freemail_mailbox_email or not x_freemail_mailbox_password:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Mailbox credentials required")
+        return MailboxCredentials(email=x_freemail_mailbox_email, password=x_freemail_mailbox_password)
 
     @app.get("/health")
     def health() -> dict[str, object]:
@@ -146,21 +187,69 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             jmap_port=active_settings.jmap_port,
         )
 
+    @app.post("/api/v1/mailbox/session", response_model=MailboxSessionRecord)
+    def mailbox_session_create(
+        payload: MailboxSessionCreate,
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        try:
+            list_mailbox_snapshot(
+                email=str(payload.email),
+                password=payload.password,
+                host=active_settings.mail_core_host,
+                port=active_settings.imap_port,
+                folder="INBOX",
+                limit=1,
+            )
+            created = create_mailbox_session(
+                connection,
+                email=str(payload.email),
+                password=payload.password,
+                secret=active_settings.session_secret,
+                ttl_seconds=active_settings.session_ttl_seconds,
+            )
+        except SessionConfigurationError as error:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Mailbox sessions are not configured",
+            ) from error
+        except OSError as error:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+        except imaplib.IMAP4.error as error:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Mailbox authentication failed") from error
+        return {"token": created.token, "email": created.email, "expires_at": created.expires_at}
+
+    @app.delete("/api/v1/mailbox/session", response_model=MailboxSessionDeleteRecord)
+    def mailbox_session_delete(
+        authorization: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, bool]:
+        token = bearer_token(authorization)
+        if token:
+            revoke_mailbox_session(connection, token)
+        return {"revoked": True}
+
     @app.get("/api/v1/mailbox/snapshot", response_model=MailboxSnapshotRecord)
     def mailbox_snapshot(
         folder: str = "INBOX",
         limit: int = 25,
+        authorization: str | None = Header(default=None),
         x_freemail_mailbox_email: str | None = Header(default=None),
         x_freemail_mailbox_password: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
     ) -> dict[str, object]:
-        if not x_freemail_mailbox_email or not x_freemail_mailbox_password:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Mailbox credentials required")
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=x_freemail_mailbox_email,
+            x_freemail_mailbox_password=x_freemail_mailbox_password,
+            connection=connection,
+        )
         if limit < 1 or limit > 100:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="limit must be between 1 and 100")
         try:
             snapshot = list_mailbox_snapshot(
-                email=x_freemail_mailbox_email,
-                password=x_freemail_mailbox_password,
+                email=credentials.email,
+                password=credentials.password,
                 host=active_settings.mail_core_host,
                 port=active_settings.imap_port,
                 folder=folder,
@@ -176,15 +265,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def mailbox_message(
         folder: str,
         message_id: str,
+        authorization: str | None = Header(default=None),
         x_freemail_mailbox_email: str | None = Header(default=None),
         x_freemail_mailbox_password: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
     ) -> dict[str, object]:
-        if not x_freemail_mailbox_email or not x_freemail_mailbox_password:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Mailbox credentials required")
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=x_freemail_mailbox_email,
+            x_freemail_mailbox_password=x_freemail_mailbox_password,
+            connection=connection,
+        )
         try:
             message = get_mailbox_message(
-                email=x_freemail_mailbox_email,
-                password=x_freemail_mailbox_password,
+                email=credentials.email,
+                password=credentials.password,
                 host=active_settings.mail_core_host,
                 port=active_settings.imap_port,
                 folder=folder,
@@ -201,15 +296,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         folder: str,
         message_id: str,
         attachment_id: str,
+        authorization: str | None = Header(default=None),
         x_freemail_mailbox_email: str | None = Header(default=None),
         x_freemail_mailbox_password: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
     ) -> Response:
-        if not x_freemail_mailbox_email or not x_freemail_mailbox_password:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Mailbox credentials required")
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=x_freemail_mailbox_email,
+            x_freemail_mailbox_password=x_freemail_mailbox_password,
+            connection=connection,
+        )
         try:
             attachment = get_mailbox_attachment(
-                email=x_freemail_mailbox_email,
-                password=x_freemail_mailbox_password,
+                email=credentials.email,
+                password=credentials.password,
                 host=active_settings.mail_core_host,
                 port=active_settings.imap_port,
                 folder=folder,
@@ -234,15 +335,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.post("/api/v1/mailbox/message/archive", response_model=MailboxArchiveRecord)
     def mailbox_archive(
         payload: MailboxArchiveCreate,
+        authorization: str | None = Header(default=None),
         x_freemail_mailbox_email: str | None = Header(default=None),
         x_freemail_mailbox_password: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
     ) -> dict[str, object]:
-        if not x_freemail_mailbox_email or not x_freemail_mailbox_password:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Mailbox credentials required")
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=x_freemail_mailbox_email,
+            x_freemail_mailbox_password=x_freemail_mailbox_password,
+            connection=connection,
+        )
         try:
             archived = archive_mailbox_message(
-                email=x_freemail_mailbox_email,
-                password=x_freemail_mailbox_password,
+                email=credentials.email,
+                password=credentials.password,
                 host=active_settings.mail_core_host,
                 port=active_settings.imap_port,
                 folder=payload.folder,
@@ -258,15 +365,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.post("/api/v1/mailbox/send", response_model=MailboxSendRecord)
     def mailbox_send(
         payload: MailboxSendCreate,
+        authorization: str | None = Header(default=None),
         x_freemail_mailbox_email: str | None = Header(default=None),
         x_freemail_mailbox_password: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
     ) -> dict[str, object]:
-        if not x_freemail_mailbox_email or not x_freemail_mailbox_password:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Mailbox credentials required")
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=x_freemail_mailbox_email,
+            x_freemail_mailbox_password=x_freemail_mailbox_password,
+            connection=connection,
+        )
         try:
             sent = send_mailbox_message(
-                email=x_freemail_mailbox_email,
-                password=x_freemail_mailbox_password,
+                email=credentials.email,
+                password=credentials.password,
                 host=active_settings.mail_core_host,
                 port=active_settings.submission_port,
                 recipients=[str(recipient) for recipient in payload.recipients],

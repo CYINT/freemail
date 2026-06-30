@@ -1,5 +1,6 @@
 from html.parser import HTMLParser
 from pathlib import Path
+import re
 import sys
 
 
@@ -88,6 +89,7 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         failures.append("missing webmail client script")
     for marker in [
         "mailbox-login",
+        "mailbox-logout",
         "api-base-url",
         "mailbox-status",
         "message-body",
@@ -102,6 +104,7 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
             failures.append(f"missing live mailbox UI marker: {marker}")
     for marker in [
         "fetch(",
+        "/api/v1/mailbox/session",
         "/api/v1/mailbox/snapshot",
         "/api/v1/mailbox/message",
         "/api/v1/mailbox/message/attachment",
@@ -118,14 +121,21 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         "quoteMessage",
         'method: "POST"',
         '"Content-Type": "application/json"',
-        "X-FreeMail-Mailbox-Email",
-        "X-FreeMail-Mailbox-Password",
+        "Authorization",
+        "Bearer",
+        "restoreMailboxSession",
+        "persistMailboxSession",
+        "forgetMailboxSession",
     ]:
         if marker not in js_text:
             failures.append(f"missing live mailbox client marker: {marker}")
-    for forbidden in ["localStorage", "sessionStorage", "document.cookie"]:
+    for forbidden in ["sessionStorage", "document.cookie"]:
         if forbidden in js_text:
             failures.append(f"mailbox client must not store credentials with {forbidden}")
+    if re.search(r"localStorage\.(setItem|getItem)\([^)]*password", js_text, flags=re.IGNORECASE):
+        failures.append("mailbox client must not store mailbox passwords in localStorage")
+    if re.search(r"password[^;\n]{0,120}localStorage\.(setItem|getItem)", js_text, flags=re.IGNORECASE):
+        failures.append("mailbox client must not store mailbox passwords in localStorage")
     return failures
 
 

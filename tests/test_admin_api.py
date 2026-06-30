@@ -15,6 +15,7 @@ def make_client(tmp_path: Path) -> TestClient:
         database_path=str(tmp_path / "freemail.sqlite"),
         admin_api_token=ADMIN_TOKEN,
         bootstrap_token=BOOTSTRAP_TOKEN,
+        session_secret="test-session-secret",
         release_commit="test",
     )
     return TestClient(create_app(settings))
@@ -29,7 +30,7 @@ def bootstrap_headers() -> dict[str, str]:
 
 
 def test_admin_api_requires_configured_token(tmp_path):
-    settings = Settings(database_path=str(tmp_path / "freemail.sqlite"), release_commit="test")
+    settings = Settings(database_path=str(tmp_path / "freemail.sqlite"), release_commit="test", session_secret=None)
 
     with TestClient(create_app(settings)) as client:
         response = client.get("/api/v1/admin/domains")
@@ -39,7 +40,7 @@ def test_admin_api_requires_configured_token(tmp_path):
 
 
 def test_bootstrap_requires_configured_token(tmp_path):
-    settings = Settings(database_path=str(tmp_path / "freemail.sqlite"), release_commit="test")
+    settings = Settings(database_path=str(tmp_path / "freemail.sqlite"), release_commit="test", session_secret=None)
 
     with TestClient(create_app(settings)) as client:
         response = client.post(
@@ -308,6 +309,82 @@ def test_mailbox_snapshot_returns_imap_adapter_payload(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert response.json()["folders"][0]["name"] == "INBOX"
     assert response.json()["messages"][0]["subject"] == "Hello"
+
+
+def test_mailbox_session_create_and_bearer_snapshot(tmp_path, monkeypatch):
+    class Snapshot:
+        def as_dict(self):
+            return {
+                "email": "admin@example.com",
+                "folders": [{"name": "INBOX", "messageCount": 1, "unreadCount": 0}],
+                "messages": [],
+            }
+
+    calls = []
+
+    def fake_snapshot(**kwargs):
+        calls.append(kwargs)
+        assert kwargs["email"] == "admin@example.com"
+        assert kwargs["password"] == "secret"
+        return Snapshot()
+
+    monkeypatch.setattr("freemail_api.main.list_mailbox_snapshot", fake_snapshot)
+
+    with make_client(tmp_path) as client:
+        session_response = client.post(
+            "/api/v1/mailbox/session",
+            json={"email": "admin@example.com", "password": "secret"},
+        )
+        assert session_response.status_code == 200
+        token = session_response.json()["token"]
+
+        snapshot_response = client.get(
+            "/api/v1/mailbox/snapshot",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert snapshot_response.status_code == 200
+    assert snapshot_response.json()["email"] == "admin@example.com"
+    assert len(calls) == 2
+
+
+def test_mailbox_session_requires_configured_secret(tmp_path, monkeypatch):
+    class Snapshot:
+        def as_dict(self):
+            return {"email": "admin@example.com", "folders": [], "messages": []}
+
+    monkeypatch.setattr("freemail_api.main.list_mailbox_snapshot", lambda **_kwargs: Snapshot())
+    settings = Settings(database_path=str(tmp_path / "freemail.sqlite"), release_commit="test", session_secret=None)
+
+    with TestClient(create_app(settings)) as client:
+        response = client.post(
+            "/api/v1/mailbox/session",
+            json={"email": "admin@example.com", "password": "secret"},
+        )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Mailbox sessions are not configured"
+
+
+def test_mailbox_session_delete_revokes_token(tmp_path, monkeypatch):
+    class Snapshot:
+        def as_dict(self):
+            return {"email": "admin@example.com", "folders": [], "messages": []}
+
+    monkeypatch.setattr("freemail_api.main.list_mailbox_snapshot", lambda **_kwargs: Snapshot())
+
+    with make_client(tmp_path) as client:
+        session_response = client.post(
+            "/api/v1/mailbox/session",
+            json={"email": "admin@example.com", "password": "secret"},
+        )
+        token = session_response.json()["token"]
+        delete_response = client.delete("/api/v1/mailbox/session", headers={"Authorization": f"Bearer {token}"})
+        snapshot_response = client.get("/api/v1/mailbox/snapshot", headers={"Authorization": f"Bearer {token}"})
+
+    assert delete_response.status_code == 200
+    assert delete_response.json()["revoked"] is True
+    assert snapshot_response.status_code == 401
 
 
 def test_mailbox_message_requires_mailbox_credentials(tmp_path):

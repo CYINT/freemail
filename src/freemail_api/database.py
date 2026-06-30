@@ -66,6 +66,17 @@ CREATE TABLE IF NOT EXISTS dkim_keys (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(domain_id, selector)
 );
+
+CREATE TABLE IF NOT EXISTS mailbox_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token_hash TEXT NOT NULL UNIQUE,
+    email TEXT NOT NULL,
+    encrypted_password TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_mailbox_sessions_expires_at ON mailbox_sessions(expires_at);
 """
 
 
@@ -210,6 +221,48 @@ def get_domain(connection: sqlite3.Connection, domain_id: int) -> sqlite3.Row:
 def list_dkim_keys_for_domain(connection: sqlite3.Connection, domain_id: int) -> list[sqlite3.Row]:
     _get_row(connection, "domains", domain_id)
     return list(connection.execute("SELECT * FROM dkim_keys WHERE domain_id = ? ORDER BY id", [domain_id]))
+
+
+def create_mailbox_session(
+    connection: sqlite3.Connection,
+    *,
+    token_hash: str,
+    email: str,
+    encrypted_password: str,
+    expires_at: int,
+) -> sqlite3.Row:
+    row_id = _execute_insert(
+        connection,
+        """
+        INSERT INTO mailbox_sessions (token_hash, email, encrypted_password, expires_at)
+        VALUES (?, ?, ?, ?)
+        """,
+        [token_hash, email.lower(), encrypted_password, expires_at],
+    )
+    connection.commit()
+    return _get_row(connection, "mailbox_sessions", row_id)
+
+
+def get_mailbox_session(connection: sqlite3.Connection, token_hash: str, now: int) -> sqlite3.Row | None:
+    delete_expired_mailbox_sessions(connection, now)
+    row = connection.execute(
+        """
+        SELECT * FROM mailbox_sessions
+        WHERE token_hash = ? AND expires_at > ?
+        """,
+        [token_hash, now],
+    ).fetchone()
+    return row
+
+
+def revoke_mailbox_session(connection: sqlite3.Connection, token_hash: str) -> None:
+    connection.execute("DELETE FROM mailbox_sessions WHERE token_hash = ?", [token_hash])
+    connection.commit()
+
+
+def delete_expired_mailbox_sessions(connection: sqlite3.Connection, now: int) -> None:
+    connection.execute("DELETE FROM mailbox_sessions WHERE expires_at <= ?", [now])
+    connection.commit()
 
 
 def _execute_insert(connection: sqlite3.Connection, statement: str, values: Iterable[object]) -> int:
