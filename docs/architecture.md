@@ -52,7 +52,7 @@ Current spike evidence:
 - Stalwart reports healthy after first boot.
 - The configured Stalwart profile starts protocol listeners for SMTP, implicit-TLS submission, implicit-TLS IMAP, and JMAP/admin.
 - `scripts/qa_mail_core.py --strict` distinguishes TCP reachability from protocol readiness and passes only when all expected protocol surfaces respond.
-- `scripts/qa_mail_flow.py` proves actual SMTP receive, authenticated submission, and IMAP message access for a provisioned mailbox. Stalwart's default spam posture can file unauthenticated inbound mail into `Junk Mail`, so the smoke searches all selectable IMAP folders.
+- `scripts/qa_mail_flow.py` proves actual SMTP receive, authenticated submission, DKIM signing for the mailbox domain, and IMAP message access for a provisioned mailbox. Stalwart's default spam posture can file unauthenticated inbound mail into `Junk Mail`, so the smoke searches all selectable IMAP folders.
 
 Remaining spike work:
 
@@ -67,3 +67,5 @@ FreeMail exports Stalwart `apply` NDJSON through `scripts/export_stalwart_apply_
 The exporter intentionally requires a separate ignored secrets JSON file for account secrets. FreeMail stores password hashes only, so it cannot derive plaintext mail-core credentials from the admin database.
 
 The exported plan uses Stalwart CLI upsert operations grouped by object type. It is intended to run after Stalwart's initial `Bootstrap` singleton has been completed; while the server remains in bootstrap mode, Stalwart rejects all object access except `Bootstrap`.
+
+The exporter currently matches DKIM signatures by selector to avoid duplicate signatures on repeated `apply` runs with the current Stalwart CLI. Operators should use unique selectors per hosted domain until reference-based matching on `DkimSignature.domainId` is proven reliable across supported Stalwart versions.

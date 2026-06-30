@@ -106,7 +106,7 @@ After a domain and mailbox are provisioned into Stalwart, run an end-to-end mess
 .\.venv\Scripts\python.exe scripts\qa_mail_flow.py --email admin@example.com --secrets-json secrets\mail-core-users.json --inbound-recipient hello@example.com
 ```
 
-The smoke sends unauthenticated inbound SMTP, sends authenticated submission over implicit TLS, and verifies both messages through implicit-TLS IMAP. Stalwart's default spam posture may place unauthenticated inbound mail in `Junk Mail`; the smoke searches every selectable IMAP folder and treats that as delivered.
+The smoke sends unauthenticated inbound SMTP, sends authenticated submission over implicit TLS, verifies both messages through implicit-TLS IMAP, and requires the submitted message to include a DKIM signature for the mailbox domain. Stalwart's default spam posture may place unauthenticated inbound mail in `Junk Mail`; the smoke searches every selectable IMAP folder and treats that as delivered.
 
 FreeMail can export a Stalwart `apply` plan from admin metadata:
 
@@ -121,6 +121,8 @@ The plan is newline-delimited JSON for `stalwart-cli apply`. Stalwart must be ta
 ```powershell
 docker run --rm -i -e STALWART_URL -e STALWART_USER -e STALWART_PASSWORD ghcr.io/stalwartlabs/cli apply --stdin < .freemail-qa\stalwart-plan.ndjson
 ```
+
+The exporter matches DKIM signatures by selector to avoid duplicate Stalwart signatures on repeated local applies. Use unique selectors per hosted domain until the Stalwart CLI supports reliable reference-based matching for `DkimSignature` domain IDs.
 
 ## VPN-Only Deployment
 

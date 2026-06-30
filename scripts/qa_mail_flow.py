@@ -17,6 +17,7 @@ def main() -> int:
     parser.add_argument("--inbound-recipient", help="SMTP recipient to test inbound delivery.")
     parser.add_argument("--inbound-sender", default="sender@example.net", help="SMTP sender for inbound delivery.")
     parser.add_argument("--submission-recipient", help="Recipient for authenticated submission smoke.")
+    parser.add_argument("--require-dkim-domain", help="Require a DKIM signature for this domain. Defaults to email domain.")
     parser.add_argument("--poll-attempts", type=int, default=10)
     parser.add_argument("--poll-interval-seconds", type=float, default=1.0)
     parser.add_argument("--verify-tls", action="store_true", help="Verify TLS certificates.")
@@ -34,6 +35,7 @@ def main() -> int:
         inbound_recipient=args.inbound_recipient or args.email,
         inbound_sender=args.inbound_sender,
         submission_recipient=args.submission_recipient or args.email,
+        required_dkim_domain=args.require_dkim_domain,
         poll_attempts=args.poll_attempts,
         poll_interval_seconds=args.poll_interval_seconds,
         verify_tls=args.verify_tls,

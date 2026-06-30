@@ -54,7 +54,7 @@ def test_build_apply_plan_exports_domains_dkim_accounts_and_aliases(tmp_path):
     assert [operation["object"] for operation in plan] == ["Domain", "DkimSignature", "Account"]
     assert plan[0]["matchOn"] == ["name"]
     assert plan[0]["value"]["domain-example-com"]["name"] == "example.com"
-    assert plan[1]["matchOn"] == ["selector", "domainId"]
+    assert plan[1]["matchOn"] == ["selector"]
     assert plan[1]["value"]["dkim-mail-example-com"]["@type"] == "Dkim1RsaSha256"
     assert plan[1]["value"]["dkim-mail-example-com"]["selector"] == "mail"
     assert plan[1]["value"]["dkim-mail-example-com"]["privateKey"] == {

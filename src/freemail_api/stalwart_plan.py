@@ -18,7 +18,7 @@ def build_apply_plan(connection: sqlite3.Connection, options: PlanOptions) -> li
     connection.row_factory = sqlite3.Row
     operations: list[dict[str, object]] = []
     _append_upsert(operations, "Domain", ["name"], _domain_values(connection))
-    _append_upsert(operations, "DkimSignature", ["selector", "domainId"], _dkim_values(connection))
+    _append_upsert(operations, "DkimSignature", ["selector"], _dkim_values(connection))
     _append_upsert(operations, "Account", ["emailAddress"], _account_values(connection, options))
     return operations
 

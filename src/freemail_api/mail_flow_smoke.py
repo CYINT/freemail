@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import imaplib
+import re
 import smtplib
 import ssl
 import time
@@ -20,6 +21,8 @@ class MailFlowResult:
     inbound_found: LocatedMessage | None
     submission_accepted: bool
     submission_found: LocatedMessage | None
+    submission_dkim_domains: list[str]
+    required_dkim_domain: str
     marker: str
 
     @property
@@ -29,6 +32,7 @@ class MailFlowResult:
             and self.inbound_found
             and self.submission_accepted
             and self.submission_found
+            and self.required_dkim_domain in self.submission_dkim_domains
         )
 
     def as_dict(self) -> dict[str, object]:
@@ -39,6 +43,8 @@ class MailFlowResult:
             "inboundFound": asdict(self.inbound_found) if self.inbound_found else None,
             "submissionAccepted": self.submission_accepted,
             "submissionFound": asdict(self.submission_found) if self.submission_found else None,
+            "submissionDkimDomains": self.submission_dkim_domains,
+            "requiredDkimDomain": self.required_dkim_domain,
         }
 
 
@@ -53,6 +59,7 @@ def run_mail_flow_smoke(
     inbound_recipient: str,
     inbound_sender: str,
     submission_recipient: str,
+    required_dkim_domain: str | None = None,
     timeout_seconds: float = 10.0,
     poll_attempts: int = 10,
     poll_interval_seconds: float = 1.0,
@@ -62,6 +69,7 @@ def run_mail_flow_smoke(
     tls_context = _tls_context(verify_tls=verify_tls)
     inbound_subject = f"FreeMail inbound smoke {marker}"
     submission_subject = f"FreeMail submission smoke {marker}"
+    required_dkim_domain = (required_dkim_domain or email.partition("@")[2]).lower()
 
     inbound_accepted = _send_inbound_message(
         host=host,
@@ -86,6 +94,7 @@ def run_mail_flow_smoke(
 
     inbound_found = None
     submission_found = None
+    submission_dkim_domains: list[str] = []
     for _attempt in range(poll_attempts):
         folders = _list_folders(
             host=host,
@@ -115,7 +124,17 @@ def run_mail_flow_smoke(
             timeout_seconds=timeout_seconds,
             tls_context=tls_context,
         )
-        if inbound_found and submission_found:
+        if submission_found and not submission_dkim_domains:
+            submission_dkim_domains = _fetch_dkim_domains(
+                host=host,
+                port=imap_port,
+                email=email,
+                password=password,
+                located_message=submission_found,
+                timeout_seconds=timeout_seconds,
+                tls_context=tls_context,
+            )
+        if inbound_found and submission_found and submission_dkim_domains:
             break
         time.sleep(poll_interval_seconds)
 
@@ -124,6 +143,8 @@ def run_mail_flow_smoke(
         inbound_found=inbound_found,
         submission_accepted=submission_accepted,
         submission_found=submission_found,
+        submission_dkim_domains=submission_dkim_domains,
+        required_dkim_domain=required_dkim_domain,
         marker=marker,
     )
 
@@ -215,6 +236,39 @@ def _find_subject(
                 if ids:
                     return LocatedMessage(folder=folder, message_ids=ids)
     return None
+
+
+def _fetch_dkim_domains(
+    *,
+    host: str,
+    port: int,
+    email: str,
+    password: str,
+    located_message: LocatedMessage,
+    timeout_seconds: float,
+    tls_context: ssl.SSLContext,
+) -> list[str]:
+    message_id = located_message.message_ids[-1]
+    with imaplib.IMAP4_SSL(host, port, ssl_context=tls_context, timeout=timeout_seconds) as imap:
+        imap.login(email, password)
+        status, _data = imap.select(f'"{located_message.folder}"', readonly=True)
+        if status != "OK":
+            return []
+        fetch_status, fetch_data = imap.fetch(message_id, "(BODY.PEEK[HEADER])")
+    if fetch_status != "OK" or not fetch_data or not isinstance(fetch_data[0], tuple):
+        return []
+    header = fetch_data[0][1].decode("utf-8", errors="replace")
+    return _dkim_domains_from_header(header)
+
+
+def _dkim_domains_from_header(header: str) -> list[str]:
+    domains = []
+    for line in header.splitlines():
+        if line.lower().startswith("dkim-signature:"):
+            match = re.search(r"(?:^|;)\s*d=([^;\s]+)", line, flags=re.IGNORECASE)
+            if match and match.group(1).lower() not in domains:
+                domains.append(match.group(1).lower())
+    return domains
 
 
 def _parse_folder(row: str) -> str:
