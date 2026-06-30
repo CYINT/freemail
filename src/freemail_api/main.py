@@ -11,6 +11,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import database
 from . import dkim
+from .attachment_policy import AttachmentPolicy
+from .attachment_policy import AttachmentPolicyError
+from .attachment_policy import parse_allowed_content_types
+from .attachment_policy import validate_attachments
 from .mail_core import probe_mail_core
 from .mailbox_imap import archive_mailbox_message
 from .mailbox_imap import get_mailbox_attachment
@@ -112,6 +116,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def get_connection() -> Iterator[sqlite3.Connection]:
         with database.connect(active_settings.database_path) as connection:
             yield connection
+
+    def attachment_policy() -> AttachmentPolicy:
+        return AttachmentPolicy(
+            max_bytes=active_settings.max_attachment_bytes,
+            allowed_content_types=parse_allowed_content_types(active_settings.allowed_attachment_content_types),
+        )
 
     def mailbox_credentials(
         *,
@@ -449,6 +459,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             connection=connection,
         )
         try:
+            validate_attachments(payload.attachments, attachment_policy())
             sent = send_mailbox_message(
                 email=credentials.email,
                 password=credentials.password,
@@ -466,6 +477,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     for attachment in payload.attachments
                 ],
             )
+        except AttachmentPolicyError as error:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)) from error
         except (ValueError, binascii.Error) as error:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Invalid attachment payload") from error
         except smtplib.SMTPAuthenticationError as error:

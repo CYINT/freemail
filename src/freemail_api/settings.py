@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     bootstrap_token: str | None = Field(default=None, validation_alias="FREEMAIL_BOOTSTRAP_TOKEN")
     session_secret: str | None = Field(default=None, validation_alias="FREEMAIL_SESSION_SECRET")
     session_ttl_seconds: int = Field(default=43200, validation_alias="FREEMAIL_SESSION_TTL_SECONDS")
+    max_attachment_bytes: int = Field(default=1_048_576, validation_alias="FREEMAIL_MAX_ATTACHMENT_BYTES")
+    allowed_attachment_content_types: str = Field(
+        default="text/plain,text/csv,application/pdf,image/png,image/jpeg",
+        validation_alias="FREEMAIL_ALLOWED_ATTACHMENT_CONTENT_TYPES",
+    )
     mail_core_host: str = Field(default="127.0.0.1", validation_alias="FREEMAIL_MAIL_CORE_HOST")
     smtp_port: int = Field(default=2525, validation_alias="FREEMAIL_SMTP_PORT")
     submission_port: int = Field(default=2465, validation_alias="FREEMAIL_SUBMISSION_PORT")

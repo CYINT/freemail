@@ -694,3 +694,73 @@ def test_mailbox_send_returns_submission_payload(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert response.json()["accepted"] is True
     assert response.json()["messageId"] == "<message@example.com>"
+
+
+def test_mailbox_send_rejects_unsupported_attachment_content_type(tmp_path, monkeypatch):
+    def fake_send(**_kwargs):
+        raise AssertionError("SMTP send should not run for rejected attachments")
+
+    monkeypatch.setattr("freemail_api.main.send_mailbox_message", fake_send)
+
+    with make_client(tmp_path) as client:
+        response = client.post(
+            "/api/v1/mailbox/send",
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+            json={
+                "recipients": ["hello@example.com"],
+                "subject": "Hello",
+                "body": "Body",
+                "attachments": [
+                    {
+                        "filename": "data.bin",
+                        "contentType": "application/octet-stream",
+                        "contentBase64": "AA==",
+                    }
+                ],
+            },
+        )
+
+    assert response.status_code == 422
+    assert "Unsupported attachment content type" in response.json()["detail"]
+
+
+def test_mailbox_send_rejects_oversized_attachment(tmp_path, monkeypatch):
+    def fake_send(**_kwargs):
+        raise AssertionError("SMTP send should not run for rejected attachments")
+
+    monkeypatch.setattr("freemail_api.main.send_mailbox_message", fake_send)
+    settings = Settings(
+        database_path=str(tmp_path / "freemail.sqlite"),
+        admin_api_token=ADMIN_TOKEN,
+        bootstrap_token=BOOTSTRAP_TOKEN,
+        session_secret="test-session-secret",
+        max_attachment_bytes=3,
+        release_commit="test",
+    )
+
+    with TestClient(create_app(settings)) as client:
+        response = client.post(
+            "/api/v1/mailbox/send",
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+            json={
+                "recipients": ["hello@example.com"],
+                "subject": "Hello",
+                "body": "Body",
+                "attachments": [
+                    {
+                        "filename": "report.txt",
+                        "contentType": "text/plain",
+                        "contentBase64": "cmVwb3J0",
+                    }
+                ],
+            },
+        )
+
+    assert response.status_code == 422
+    assert "exceeds 3 bytes" in response.json()["detail"]

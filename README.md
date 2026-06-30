@@ -154,6 +154,13 @@ Attachment send/read/download is covered by a generated self-addressed smoke:
 
 The attachment smoke sends a small text attachment, waits for the generated message, verifies attachment metadata on the message detail API, downloads the attachment through the API, and compares the bytes without printing mailbox secrets.
 
+Outbound attachment submission is bounded by:
+
+- `FREEMAIL_MAX_ATTACHMENT_BYTES`, default `1048576` decoded bytes per attachment.
+- `FREEMAIL_ALLOWED_ATTACHMENT_CONTENT_TYPES`, default `text/plain,text/csv,application/pdf,image/png,image/jpeg`.
+
+The API rejects unsupported content types, invalid base64 payloads, and decoded attachments above the configured per-attachment limit before SMTP submission.
+
 The mail-core spike profile starts the Stalwart candidate with ports still bound to loopback:
 
 ```powershell
