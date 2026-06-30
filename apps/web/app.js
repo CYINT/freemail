@@ -5,6 +5,7 @@ const statusNode = document.querySelector("#mailbox-status");
 const readerSubject = document.querySelector("#reader-subject");
 const readerMeta = document.querySelector("#reader-meta");
 const messageBody = document.querySelector("#message-body");
+const messageAttachments = document.querySelector("#message-attachments");
 const composeForm = document.querySelector("#compose-form");
 const replyAction = document.querySelector("#reply-action");
 const forwardAction = document.querySelector("#forward-action");
@@ -12,6 +13,7 @@ const archiveAction = document.querySelector("#archive-action");
 const composeTo = document.querySelector("#compose-to");
 const composeSubject = document.querySelector("#compose-subject");
 const composeBody = document.querySelector("#compose-body");
+const composeAttachments = document.querySelector("#compose-attachments");
 
 let mailboxSession = {
   email: "",
@@ -43,6 +45,7 @@ composeForm?.addEventListener("submit", async (event) => {
       .filter(Boolean),
     subject: String(form.get("subject") || "").trim(),
     body: String(form.get("body") || ""),
+    attachments: await filesToAttachments(composeAttachments?.files || []),
   });
 });
 
@@ -153,6 +156,9 @@ async function sendMailboxMessage(message) {
     }
     const result = await response.json();
     setStatus(`Sent ${result.messageId || "message"}.`, "ready");
+    if (composeAttachments) {
+      composeAttachments.value = "";
+    }
     await loadMailboxSnapshot(mailboxSession.folder);
   } catch (error) {
     setStatus(`Send failed: ${readableError(error)}`, "error");
@@ -189,6 +195,7 @@ function renderMessages(messages) {
     readerSubject.textContent = "No messages";
     readerMeta.textContent = "Select another folder or refresh the mailbox.";
     renderMessageBody("This folder is empty.");
+    renderMessageAttachments(null);
     return;
   }
   const rows = messages.map((message, index) => messageRow(message, index === 0));
@@ -230,9 +237,11 @@ async function selectMessage(message, row) {
     readerSubject.textContent = detail.subject || "(no subject)";
     readerMeta.textContent = `From ${detail.sender || "Unknown sender"} to ${detail.recipients || mailboxSession.email}`;
     renderMessageBody(detail.body || "(No plain text body)");
+    renderMessageAttachments(detail);
   } catch (error) {
     selectedMessageDetail = null;
     renderMessageBody(`Message load failed: ${readableError(error)}`);
+    renderMessageAttachments(null);
   }
 }
 
@@ -308,6 +317,39 @@ async function loadMailboxMessage(folder, messageId) {
   return response.json();
 }
 
+async function downloadMailboxAttachment(message, attachment) {
+  if (!mailboxSession.email || !mailboxSession.password || !mailboxSession.apiBaseUrl) {
+    setStatus("Load a mailbox before downloading attachments.", "error");
+    return;
+  }
+  setStatus(`Downloading ${attachment.filename || "attachment"}...`, "loading");
+  try {
+    const url = new URL("/api/v1/mailbox/message/attachment", mailboxSession.apiBaseUrl);
+    url.searchParams.set("folder", message.folder);
+    url.searchParams.set("message_id", message.messageId);
+    url.searchParams.set("attachment_id", attachment.attachmentId);
+    const response = await fetch(url, {
+      headers: {
+        "X-FreeMail-Mailbox-Email": mailboxSession.email,
+        "X-FreeMail-Mailbox-Password": mailboxSession.password,
+      },
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const blob = await response.blob();
+    const href = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = href;
+    link.download = attachment.filename || "attachment";
+    link.click();
+    URL.revokeObjectURL(href);
+    setStatus(`Downloaded ${attachment.filename || "attachment"}.`, "ready");
+  } catch (error) {
+    setStatus(`Attachment download failed: ${readableError(error)}`, "error");
+  }
+}
+
 function renderMessageBody(body) {
   if (!messageBody) {
     return;
@@ -324,6 +366,60 @@ function renderMessageBody(body) {
         return node;
       }),
   );
+}
+
+function renderMessageAttachments(message) {
+  if (!messageAttachments) {
+    return;
+  }
+  const attachments = message?.attachments || [];
+  if (!attachments.length) {
+    messageAttachments.replaceChildren();
+    return;
+  }
+  const heading = document.createElement("h3");
+  heading.textContent = "Attachments";
+  const buttons = attachments.map((attachment) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "attachment-download";
+    button.textContent = `${attachment.filename || "attachment"} (${formatBytes(attachment.size || 0)})`;
+    button.addEventListener("click", () => downloadMailboxAttachment(message, attachment));
+    return button;
+  });
+  messageAttachments.replaceChildren(heading, ...buttons);
+}
+
+async function filesToAttachments(files) {
+  return Promise.all(
+    Array.from(files).map(async (file) => ({
+      filename: file.name,
+      contentType: file.type || "application/octet-stream",
+      contentBase64: await fileToBase64(file),
+    })),
+  );
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      const value = String(reader.result || "");
+      resolve(value.includes(",") ? value.split(",", 2)[1] : value);
+    });
+    reader.addEventListener("error", () => reject(reader.error || new Error("file read failed")));
+    reader.readAsDataURL(file);
+  });
+}
+
+function formatBytes(value) {
+  if (value < 1024) {
+    return `${value} B`;
+  }
+  if (value < 1024 * 1024) {
+    return `${(value / 1024).toFixed(1)} KB`;
+  }
+  return `${(value / 1024 / 1024).toFixed(1)} MB`;
 }
 
 function emptyMessage() {

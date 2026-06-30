@@ -1,6 +1,6 @@
 import smtplib
 
-from freemail_api.mailbox_smtp import SentMessage, _message, send_mailbox_message
+from freemail_api.mailbox_smtp import OutboundAttachment, SentMessage, _message, send_mailbox_message
 
 
 class FakeSmtp:
@@ -55,6 +55,23 @@ def test_message_builds_submission_headers():
     assert message["To"] == "hello@example.com, ops@example.com"
     assert message["Message-ID"] == "<message@example.com>"
     assert message.get_content().strip() == "Body"
+
+
+def test_message_builds_attachment_part():
+    message = _message(
+        sender="admin@example.com",
+        recipients=["hello@example.com"],
+        subject="Hello",
+        body="Body",
+        attachments=[OutboundAttachment("report.txt", "text/plain", "cmVwb3J0")],
+        message_id="<message@example.com>",
+    )
+
+    attachments = [part for part in message.walk() if part.get_content_disposition() == "attachment"]
+
+    assert len(attachments) == 1
+    assert attachments[0].get_filename() == "report.txt"
+    assert attachments[0].get_payload(decode=True) == b"report"
 
 
 def test_send_mailbox_message_uses_authenticated_submission(monkeypatch):

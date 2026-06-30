@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from dataclasses import asdict, dataclass
 from email.message import EmailMessage
 from email.utils import make_msgid
@@ -18,6 +19,13 @@ class SentMessage:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class OutboundAttachment:
+    filename: str
+    content_type: str
+    content_base64: str
+
+
 def send_mailbox_message(
     *,
     email: str,
@@ -27,6 +35,7 @@ def send_mailbox_message(
     recipients: list[str],
     subject: str,
     body: str,
+    attachments: list[OutboundAttachment] | None = None,
     timeout_seconds: float = 10.0,
     verify_tls: bool = False,
 ) -> SentMessage:
@@ -37,6 +46,7 @@ def send_mailbox_message(
         recipients=normalized_recipients,
         subject=subject,
         body=body,
+        attachments=attachments or [],
         message_id=message_id,
     )
     tls_context = _tls_context(verify_tls=verify_tls)
@@ -55,6 +65,7 @@ def _message(
     recipients: list[str],
     subject: str,
     body: str,
+    attachments: list[OutboundAttachment] | None = None,
     message_id: str,
 ) -> EmailMessage:
     message = EmailMessage()
@@ -63,6 +74,16 @@ def _message(
     message["Subject"] = subject
     message["Message-ID"] = message_id
     message.set_content(body)
+    for attachment in attachments or []:
+        maintype, _separator, subtype = attachment.content_type.partition("/")
+        if not maintype or not subtype:
+            maintype, subtype = "application", "octet-stream"
+        message.add_attachment(
+            base64.b64decode(attachment.content_base64, validate=True),
+            maintype=maintype,
+            subtype=subtype,
+            filename=attachment.filename,
+        )
     return message
 
 

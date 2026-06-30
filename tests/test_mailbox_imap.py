@@ -2,15 +2,19 @@ from email.message import EmailMessage
 
 from freemail_api.mailbox_imap import (
     ArchivedMailboxMessage,
+    MailboxAttachment,
     MailboxFolder,
     MailboxMessage,
     MailboxMessageDetail,
     MailboxSnapshot,
     _archive_message,
+    _attachment_contents_from_message,
+    _attachments_from_message,
     _body_from_message,
     _count_from_select,
     _ensure_folder,
     _flags_from_fetch,
+    _get_attachment,
     _get_message,
     _list_folders,
     _list_messages,
@@ -118,9 +122,11 @@ def test_message_detail_serializes_body():
         date="Mon, 01 Jan 2024 00:00:00 +0000",
         unread=False,
         body="Body text",
+        attachments=[MailboxAttachment("0", "report.txt", "text/plain", 6)],
     )
 
     assert detail.as_dict()["body"] == "Body text"
+    assert detail.as_dict()["attachments"][0]["filename"] == "report.txt"
 
 
 def test_archived_message_serializes_archive_result():
@@ -158,6 +164,45 @@ def test_get_message_parses_body_and_headers():
     assert message.subject == "Hello"
     assert message.body == "Body text"
     assert message.unread is False
+    assert message.attachments == []
+
+
+def test_attachment_summaries_extract_attachment_parts():
+    message = EmailMessage()
+    message.set_content("Plain body")
+    message.add_attachment(b"report", maintype="text", subtype="plain", filename="report.txt")
+
+    attachments = _attachments_from_message(message)
+
+    assert attachments == [MailboxAttachment("0", "report.txt", "text/plain", 6)]
+
+
+def test_attachment_contents_extract_download_bytes():
+    message = EmailMessage()
+    message.set_content("Plain body")
+    message.add_attachment(b"report", maintype="text", subtype="plain", filename="report.txt")
+
+    attachment = _attachment_contents_from_message(message)[0]
+
+    assert attachment.attachment_id == "0"
+    assert attachment.filename == "report.txt"
+    assert attachment.content == b"report"
+
+
+def test_get_attachment_returns_selected_attachment():
+    class AttachmentImap(FakeImap):
+        def fetch(self, message_id, query):
+            message = EmailMessage()
+            message.set_content("Plain body")
+            message.add_attachment(b"report", maintype="text", subtype="plain", filename="report.txt")
+            payload = message.as_bytes()
+            prefix = b"3 (BODY[] {%d}" % len(payload)
+            return "OK", [(prefix, payload)]
+
+    attachment = _get_attachment(AttachmentImap(), folder="INBOX", message_id="3", attachment_id="0")
+
+    assert attachment.filename == "report.txt"
+    assert attachment.content == b"report"
 
 
 def test_archive_message_copies_marks_deleted_and_expunges():

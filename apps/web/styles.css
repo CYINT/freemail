@@ -295,6 +295,33 @@ h2 {
   padding: 1.25rem 0;
 }
 
+.message-attachments {
+  max-width: 48rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  border-top: 1px solid #dbe3eb;
+  padding: 0 0 1.25rem;
+}
+
+.message-attachments:empty {
+  display: none;
+}
+
+.message-attachments h3 {
+  flex: 1 0 100%;
+  margin: 0;
+  color: #3a4856;
+  font-size: 0.9rem;
+}
+
+.attachment-download {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .compose-panel {
   max-width: 48rem;
   display: grid;
@@ -311,6 +338,10 @@ h2 {
   color: #3a4856;
   font-size: 0.9rem;
   font-weight: 700;
+}
+
+.attachment-field input {
+  padding: 0.45rem;
 }
 
 .compose-panel textarea {

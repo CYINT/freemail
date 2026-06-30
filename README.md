@@ -126,6 +126,14 @@ The current webmail preview supports reply and forward as live compose-prefill w
 
 The archive smoke creates and archives its own generated self-addressed message so it does not mutate arbitrary mailbox data.
 
+Attachment send/read/download is covered by a generated self-addressed smoke:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\qa_mailbox_attachment_api.py --email admin@example.com --secrets-json secrets\mail-core-users.json
+```
+
+The attachment smoke sends a small text attachment, waits for the generated message, verifies attachment metadata on the message detail API, downloads the attachment through the API, and compares the bytes without printing mailbox secrets.
+
 The mail-core spike profile starts the Stalwart candidate with ports still bound to loopback:
 
 ```powershell

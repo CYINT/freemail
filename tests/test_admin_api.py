@@ -330,6 +330,14 @@ def test_mailbox_message_returns_imap_detail_payload(tmp_path, monkeypatch):
                 "date": "",
                 "unread": False,
                 "body": "Body text",
+                "attachments": [
+                    {
+                        "attachment_id": "0",
+                        "filename": "report.txt",
+                        "content_type": "text/plain",
+                        "size": 6,
+                    }
+                ],
             }
 
     def fake_message(**kwargs):
@@ -353,6 +361,46 @@ def test_mailbox_message_returns_imap_detail_payload(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert response.json()["subject"] == "Hello"
     assert response.json()["body"] == "Body text"
+    assert response.json()["attachments"][0]["filename"] == "report.txt"
+
+
+def test_mailbox_attachment_requires_mailbox_credentials(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.get("/api/v1/mailbox/message/attachment?folder=INBOX&message_id=1&attachment_id=0")
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Mailbox credentials required"
+
+
+def test_mailbox_attachment_returns_download_payload(tmp_path, monkeypatch):
+    class Attachment:
+        filename = "report.txt"
+        content_type = "text/plain"
+        content = b"report"
+
+    def fake_attachment(**kwargs):
+        assert kwargs["email"] == "admin@example.com"
+        assert kwargs["password"] == "secret"
+        assert kwargs["folder"] == "INBOX"
+        assert kwargs["message_id"] == "1"
+        assert kwargs["attachment_id"] == "0"
+        return Attachment()
+
+    monkeypatch.setattr("freemail_api.main.get_mailbox_attachment", fake_attachment)
+
+    with make_client(tmp_path) as client:
+        response = client.get(
+            "/api/v1/mailbox/message/attachment?folder=INBOX&message_id=1&attachment_id=0",
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.content == b"report"
+    assert response.headers["content-type"].startswith("text/plain")
+    assert "report.txt" in response.headers["content-disposition"]
 
 
 def test_mailbox_send_requires_mailbox_credentials(tmp_path):
@@ -428,6 +476,7 @@ def test_mailbox_send_returns_submission_payload(tmp_path, monkeypatch):
         assert kwargs["recipients"] == ["hello@example.com"]
         assert kwargs["subject"] == "Hello"
         assert kwargs["body"] == "Body"
+        assert kwargs["attachments"][0].filename == "report.txt"
         return Sent()
 
     monkeypatch.setattr("freemail_api.main.send_mailbox_message", fake_send)
@@ -439,7 +488,18 @@ def test_mailbox_send_returns_submission_payload(tmp_path, monkeypatch):
                 "X-FreeMail-Mailbox-Email": "admin@example.com",
                 "X-FreeMail-Mailbox-Password": "secret",
             },
-            json={"recipients": ["hello@example.com"], "subject": "Hello", "body": "Body"},
+            json={
+                "recipients": ["hello@example.com"],
+                "subject": "Hello",
+                "body": "Body",
+                "attachments": [
+                    {
+                        "filename": "report.txt",
+                        "contentType": "text/plain",
+                        "contentBase64": "cmVwb3J0",
+                    }
+                ],
+            },
         )
 
     assert response.status_code == 200

@@ -142,8 +142,16 @@ class MailboxMessageSummary(ApiModel):
     unread: bool
 
 
+class MailboxAttachmentRecord(ApiModel):
+    attachment_id: str
+    filename: str
+    content_type: str
+    size: int
+
+
 class MailboxMessageDetailRecord(MailboxMessageSummary):
     body: str
+    attachments: list[MailboxAttachmentRecord] = []
 
 
 class MailboxArchiveCreate(ApiModel):
@@ -169,6 +177,13 @@ class MailboxSendCreate(ApiModel):
     recipients: list[EmailStr] = Field(min_length=1, max_length=50)
     subject: str = Field(min_length=1, max_length=255)
     body: str = Field(min_length=1, max_length=20000)
+    attachments: list["MailboxSendAttachmentCreate"] = Field(default_factory=list, max_length=5)
+
+
+class MailboxSendAttachmentCreate(ApiModel):
+    filename: str = Field(min_length=1, max_length=180)
+    content_type: str = Field(default="application/octet-stream", min_length=1, max_length=120)
+    content_base64: str = Field(min_length=1, max_length=2_800_000)
 
 
 class MailboxSendRecord(ApiModel):

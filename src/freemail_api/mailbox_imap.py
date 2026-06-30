@@ -22,8 +22,25 @@ class MailboxMessage:
 
 
 @dataclass(frozen=True)
+class MailboxAttachment:
+    attachment_id: str
+    filename: str
+    content_type: str
+    size: int
+
+    def as_dict(self) -> dict[str, object]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class MailboxAttachmentContent(MailboxAttachment):
+    content: bytes
+
+
+@dataclass(frozen=True)
 class MailboxMessageDetail(MailboxMessage):
     body: str
+    attachments: list[MailboxAttachment]
 
 
 @dataclass(frozen=True)
@@ -121,6 +138,24 @@ def get_mailbox_message(
         return _get_message(imap, folder=folder, message_id=message_id)
 
 
+def get_mailbox_attachment(
+    *,
+    email: str,
+    password: str,
+    host: str,
+    port: int,
+    folder: str,
+    message_id: str,
+    attachment_id: str,
+    timeout_seconds: float = 10.0,
+    verify_tls: bool = False,
+) -> MailboxAttachmentContent:
+    tls_context = _tls_context(verify_tls=verify_tls)
+    with imaplib.IMAP4_SSL(host, port, ssl_context=tls_context, timeout=timeout_seconds) as imap:
+        imap.login(email, password)
+        return _get_attachment(imap, folder=folder, message_id=message_id, attachment_id=attachment_id)
+
+
 def _archive_message(imap: imaplib.IMAP4_SSL, *, folder: str, message_id: str, archive_folder: str) -> None:
     status, _data = imap.select(f'"{folder}"', readonly=False)
     if status != "OK":
@@ -216,7 +251,28 @@ def _get_message(imap: imaplib.IMAP4_SSL, *, folder: str, message_id: str) -> Ma
         date=str(parsed.get("date", "")),
         unread="\\Seen" not in flags,
         body=_body_from_message(parsed),
+        attachments=_attachments_from_message(parsed),
     )
+
+
+def _get_attachment(
+    imap: imaplib.IMAP4_SSL,
+    *,
+    folder: str,
+    message_id: str,
+    attachment_id: str,
+) -> MailboxAttachmentContent:
+    status, _data = imap.select(f'"{folder}"', readonly=True)
+    if status != "OK":
+        raise imaplib.IMAP4.error(f"Mailbox folder not found: {folder}")
+    fetch_status, fetch_data = imap.fetch(message_id.encode("ascii"), "(BODY.PEEK[])")
+    if fetch_status != "OK" or not fetch_data or not isinstance(fetch_data[0], tuple):
+        raise imaplib.IMAP4.error("Mailbox message not found")
+    parsed = BytesParser(policy=default).parsebytes(fetch_data[0][1])
+    for attachment in _attachment_contents_from_message(parsed):
+        if attachment.attachment_id == attachment_id:
+            return attachment
+    raise imaplib.IMAP4.error("Mailbox attachment not found")
 
 
 def _body_from_message(message) -> str:
@@ -235,6 +291,44 @@ def _body_from_message(message) -> str:
         return ""
     content = message.get_content()
     return str(content).strip()
+
+
+def _attachments_from_message(message) -> list[MailboxAttachment]:
+    return [
+        MailboxAttachment(
+            attachment_id=attachment.attachment_id,
+            filename=attachment.filename,
+            content_type=attachment.content_type,
+            size=attachment.size,
+        )
+        for attachment in _attachment_contents_from_message(message)
+    ]
+
+
+def _attachment_contents_from_message(message) -> list[MailboxAttachmentContent]:
+    if not message.is_multipart():
+        return []
+    attachments = []
+    for part in message.walk():
+        if part.get_content_maintype() == "multipart":
+            continue
+        if not _is_attachment_part(part):
+            continue
+        content = part.get_payload(decode=True) or b""
+        attachments.append(
+            MailboxAttachmentContent(
+                attachment_id=str(len(attachments)),
+                filename=part.get_filename() or f"attachment-{len(attachments) + 1}",
+                content_type=part.get_content_type() or "application/octet-stream",
+                size=len(content),
+                content=content,
+            )
+        )
+    return attachments
+
+
+def _is_attachment_part(part) -> bool:
+    return part.get_content_disposition() == "attachment" or bool(part.get_filename())
 
 
 def _count_from_select(data: list[bytes] | None) -> int:
