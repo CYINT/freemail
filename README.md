@@ -201,7 +201,7 @@ docker compose --profile mail-core up --build -d
 
 Do not publish FreeMail directly to the public internet during the current phase. Local deployment target is `freemail.kuzuryu.ai` over the private Dragonscale/VPN path only.
 
-The Stalwart profile mounts `ops\stalwart\config.json` at `/etc/stalwart/config.json` and persists mail-core data in the `freemail_stalwart` Docker volume at `/var/lib/stalwart`. The default Stalwart listener set is exposed on loopback as SMTP `2525`, implicit-TLS submission `2465`, implicit-TLS IMAP `2993`, JMAP/admin `18092`, and HTTPS `18443`.
+The Stalwart profile mounts `ops\stalwart\config.json` at `/etc/stalwart/config.json` and persists mail-core data at `/var/lib/stalwart` in the Compose-managed Stalwart volume. With the default project name in this repo, Docker names that volume `freemail_freemail_stalwart`. The default Stalwart listener set is exposed on loopback as SMTP `2525`, implicit-TLS submission `2465`, implicit-TLS IMAP `2993`, JMAP/admin `18092`, and HTTPS `18443`.
 
 `scripts\qa_mail_core.py` exits successfully when the configured mail-core ports are reachable and reports whether each protocol is actually ready. Add `--strict` when the Stalwart setup is expected to pass SMTP, submission, IMAP, and JMAP checks.
 
@@ -257,6 +257,21 @@ Restore metadata into a new database:
 ```
 
 Metadata backups include DKIM private keys and password hashes. Store them encrypted and outside the repository.
+
+Mail-store messages, attachments, indexes, and queue state live in the Stalwart Docker volume. Archive that volume only after stopping writers:
+
+```powershell
+docker inspect freemail-mail-core-1 --format '{{json .Mounts}}'
+docker compose --profile mail-core stop mail-core
+.\.venv\Scripts\python.exe scripts\backup_mail_store.py --volume freemail_freemail_stalwart --output .freemail-qa\backups\stalwart-mail-store.tar.gz
+docker compose --profile mail-core up -d mail-core
+```
+
+Restore drills should target a separate volume before replacing the active Stalwart volume:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\restore_mail_store.py --volume freemail_stalwart_restore --input .freemail-qa\backups\stalwart-mail-store.tar.gz --force
+```
 
 ## VPN-Only Deployment
 
