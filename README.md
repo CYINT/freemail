@@ -121,7 +121,7 @@ Pop-Location
 
 The mobile scaffold lives in `apps\mobile`, uses Expo/React Native, defaults to `https://freemail.kuzuryu.ai`, and persists bearer sessions through `expo-secure-store` rather than browser-style storage. It currently covers sign-in, inbox/folder snapshots, message reading, compose/send with bounded document-picker attachments, reply/forward drafts, folder-scoped search, contacts, non-core folder management, attachment metadata plus authenticated download/share handling, secure offline metadata caching for the last loaded mailbox views, bearer-authenticated push-device registration, and provider-neutral push notification delivery status.
 
-Mobile native release posture is documented in `docs\mobile-release.md`. The open-source repo keeps signing credentials, provisioning profiles, keystores, store API keys, and generated native projects out of source control; CI validates the Expo config, Android native prebuild drill, and static release checklist instead.
+Mobile native release posture is documented in `docs\mobile-release.md`. The open-source repo keeps signing credentials, provisioning profiles, keystores, store API keys, and generated native projects out of source control; CI validates the Expo config, Android native prebuild drill, static release checklist, and macOS iOS native prebuild drill.
 
 The push contract stores hashed provider tokens for lookup and, when `FREEMAIL_PUSH_TOKEN_SECRET` is configured, stores encrypted provider tokens for runtime dispatch. Raw and encrypted provider tokens are never returned by the API and runtime push tables are excluded from metadata backups. Native clients use stable register/list/revoke plus provider-neutral notification status APIs:
 

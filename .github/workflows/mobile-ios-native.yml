@@ -1,0 +1,48 @@
+name: Mobile iOS Native Drill
+
+on:
+  push:
+    paths:
+      - ".github/workflows/mobile-ios-native.yml"
+      - "apps/mobile/**"
+      - "docs/mobile-release.md"
+      - "scripts/qa_mobile_native_prebuild.py"
+      - "scripts/qa_mobile_static.py"
+      - "tests/test_mobile_native_prebuild.py"
+      - "tests/test_mobile_static.py"
+  pull_request:
+    paths:
+      - ".github/workflows/mobile-ios-native.yml"
+      - "apps/mobile/**"
+      - "docs/mobile-release.md"
+      - "scripts/qa_mobile_native_prebuild.py"
+      - "scripts/qa_mobile_static.py"
+      - "tests/test_mobile_native_prebuild.py"
+      - "tests/test_mobile_static.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ios-native-prebuild:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - name: Mobile dependency install
+        run: npm ci --prefix apps/mobile
+      - name: Mobile static QA
+        run: python scripts/qa_mobile_static.py
+      - name: Mobile config validation
+        run: npm run --prefix apps/mobile config:check
+      - name: iOS native prebuild drill
+        run: python scripts/qa_mobile_native_prebuild.py --link-node-modules --platform ios

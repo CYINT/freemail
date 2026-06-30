@@ -46,7 +46,9 @@ Pop-Location
 
 After the drill, remove generated `ios/` and `android/` directories unless the project intentionally moves to checked-in native projects. Do not commit generated native files as incidental build output.
 
-Run the full iOS native drill on a macOS release runner:
+The repository includes `.github/workflows/mobile-ios-native.yml`, a macOS GitHub Actions workflow that runs the iOS native prebuild drill whenever mobile release surfaces change. Run it manually with `workflow_dispatch` when collecting release evidence for a candidate.
+
+Run the full iOS native drill locally only on a macOS release runner:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\qa_mobile_native_prebuild.py --platform ios

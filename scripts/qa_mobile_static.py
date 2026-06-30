@@ -25,6 +25,7 @@ def validate_mobile(root: Path) -> list[str]:
         "src/api.ts": mobile / "src" / "api.ts",
         "src/offlineCache.ts": mobile / "src" / "offlineCache.ts",
         "src/sessionStore.ts": mobile / "src" / "sessionStore.ts",
+        "iOS workflow": root / ".github" / "workflows" / "mobile-ios-native.yml",
     }
     failures = [f"missing mobile file: {name}" for name, path in files.items() if not path.is_file()]
     if failures:
@@ -116,6 +117,9 @@ def validate_mobile(root: Path) -> list[str]:
         "expo config --type public",
         "technology.cyint.freemail",
         "npx expo prebuild --clean --no-install --platform all",
+        "Mobile iOS Native Drill",
+        "macos-latest",
+        "scripts/qa_mobile_native_prebuild.py --link-node-modules --platform ios",
     ]:
         if marker not in combined:
             failures.append(f"missing mobile marker: {marker}")
