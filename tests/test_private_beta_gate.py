@@ -348,6 +348,80 @@ def test_private_beta_gate_rejects_timezone_free_acceptance_timestamp(tmp_path):
     assert check["details"]["acceptedAt"] == "2026-06-30T00:00:00"
 
 
+def test_private_beta_gate_rejects_mail_flow_without_checked_at(tmp_path):
+    mail_flow = tmp_path / "mail-flow.json"
+    mail_flow.write_text(
+        json.dumps(
+            {
+                "passed": True,
+                "inboundAccepted": True,
+                "inboundFound": {"folder": "INBOX", "message_ids": ["1"]},
+                "submissionAccepted": True,
+                "submissionFound": {"folder": "Sent", "message_ids": ["2"]},
+                "requiredDkimDomain": "example.com",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    check = private_beta_gate._check_mail_flow_evidence(
+        PrivateBetaGateOptions(domain="example.com", mail_flow_evidence=mail_flow)
+    )
+
+    assert check["status"] == "fail"
+    assert check["details"]["checkedAt"] is None
+
+
+def test_private_beta_gate_rejects_malformed_mail_flow_checked_at(tmp_path):
+    mail_flow = tmp_path / "mail-flow.json"
+    mail_flow.write_text(
+        json.dumps(
+            {
+                "passed": True,
+                "checkedAt": "after smoke",
+                "inboundAccepted": True,
+                "inboundFound": {"folder": "INBOX", "message_ids": ["1"]},
+                "submissionAccepted": True,
+                "submissionFound": {"folder": "Sent", "message_ids": ["2"]},
+                "requiredDkimDomain": "example.com",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    check = private_beta_gate._check_mail_flow_evidence(
+        PrivateBetaGateOptions(domain="example.com", mail_flow_evidence=mail_flow)
+    )
+
+    assert check["status"] == "fail"
+    assert check["details"]["checkedAt"] == "after smoke"
+
+
+def test_private_beta_gate_rejects_timezone_free_mail_flow_checked_at(tmp_path):
+    mail_flow = tmp_path / "mail-flow.json"
+    mail_flow.write_text(
+        json.dumps(
+            {
+                "passed": True,
+                "checkedAt": "2026-06-30T00:00:00",
+                "inboundAccepted": True,
+                "inboundFound": {"folder": "INBOX", "message_ids": ["1"]},
+                "submissionAccepted": True,
+                "submissionFound": {"folder": "Sent", "message_ids": ["2"]},
+                "requiredDkimDomain": "example.com",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    check = private_beta_gate._check_mail_flow_evidence(
+        PrivateBetaGateOptions(domain="example.com", mail_flow_evidence=mail_flow)
+    )
+
+    assert check["status"] == "fail"
+    assert check["details"]["checkedAt"] == "2026-06-30T00:00:00"
+
+
 def test_private_beta_gate_requires_beta_evidence_when_enabled():
     result = run_private_beta_gate(
         PrivateBetaGateOptions(
@@ -380,6 +454,7 @@ def test_private_beta_gate_accepts_complete_beta_evidence(tmp_path):
         json.dumps(
             {
                 "passed": True,
+                "checkedAt": "2026-06-30T00:00:00Z",
                 "inboundAccepted": True,
                 "inboundFound": {"folder": "INBOX", "message_ids": ["1"]},
                 "submissionAccepted": True,

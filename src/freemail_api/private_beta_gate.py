@@ -106,6 +106,7 @@ def _check_mail_flow_evidence(options: PrivateBetaGateOptions) -> dict[str, Any]
     submission_found = payload.get("submissionFound")
     passed = (
         payload.get("passed") is True
+        and _is_timezone_aware_iso8601(payload.get("checkedAt"))
         and payload.get("inboundAccepted") is True
         and isinstance(inbound_found, dict)
         and payload.get("submissionAccepted") is True
@@ -125,6 +126,7 @@ def _check_mail_flow_evidence(options: PrivateBetaGateOptions) -> dict[str, Any]
                 "submissionFound": bool(submission_found),
                 "requiredDkimDomain": payload.get("requiredDkimDomain"),
                 "expectedDomain": options.domain,
+                "checkedAt": payload.get("checkedAt"),
             },
         ),
     )

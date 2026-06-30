@@ -6,6 +6,7 @@ import smtplib
 import ssl
 import time
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from email.message import EmailMessage
 
 
@@ -24,6 +25,7 @@ class MailFlowResult:
     submission_dkim_domains: list[str]
     required_dkim_domain: str
     marker: str
+    checked_at: str
 
     @property
     def passed(self) -> bool:
@@ -45,6 +47,7 @@ class MailFlowResult:
             "submissionFound": asdict(self.submission_found) if self.submission_found else None,
             "submissionDkimDomains": self.submission_dkim_domains,
             "requiredDkimDomain": self.required_dkim_domain,
+            "checkedAt": self.checked_at,
         }
 
 
@@ -66,6 +69,7 @@ def run_mail_flow_smoke(
     verify_tls: bool = False,
 ) -> MailFlowResult:
     marker = str(int(time.time()))
+    checked_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     tls_context = _tls_context(verify_tls=verify_tls)
     inbound_subject = f"FreeMail inbound smoke {marker}"
     submission_subject = f"FreeMail submission smoke {marker}"
@@ -146,6 +150,7 @@ def run_mail_flow_smoke(
         submission_dkim_domains=submission_dkim_domains,
         required_dkim_domain=required_dkim_domain,
         marker=marker,
+        checked_at=checked_at,
     )
 
 

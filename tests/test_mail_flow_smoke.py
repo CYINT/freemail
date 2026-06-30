@@ -17,6 +17,7 @@ def test_mail_flow_result_passed_requires_all_message_flow_steps():
         submission_dkim_domains=[],
         required_dkim_domain="example.com",
         marker="123",
+        checked_at="2026-06-30T00:00:00Z",
     )
 
     assert result.passed is False
@@ -32,12 +33,14 @@ def test_mail_flow_result_serializes_successful_folder_locations():
         submission_dkim_domains=["example.com"],
         required_dkim_domain="example.com",
         marker="123",
+        checked_at="2026-06-30T00:00:00Z",
     )
 
     assert result.passed is True
     assert result.as_dict()["inboundFound"] == {"folder": "Junk Mail", "message_ids": ["5"]}
     assert result.as_dict()["submissionDkimDomains"] == ["example.com"]
     assert result.as_dict()["requiredDkimDomain"] == "example.com"
+    assert result.as_dict()["checkedAt"] == "2026-06-30T00:00:00Z"
 
 
 def test_message_builds_basic_rfc822_message():
