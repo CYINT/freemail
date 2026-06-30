@@ -1,58 +1,182 @@
-from fastapi import FastAPI
+from collections.abc import Iterator
+from contextlib import asynccontextmanager
+import sqlite3
 
-from .settings import get_settings
+from fastapi import Depends, FastAPI, Header, HTTPException, status
 
-
-settings = get_settings()
-
-app = FastAPI(
-    title="FreeMail API",
-    version=settings.release_version,
-    description="Admin and runtime API for the AGPL FreeMail mail platform.",
+from . import database
+from .schemas import (
+    AliasCreate,
+    AliasRecord,
+    AuditRecord,
+    DomainCreate,
+    DomainRecord,
+    MailboxCreate,
+    MailboxRecord,
+    UserCreate,
+    UserRecord,
 )
+from .settings import get_settings
+from .settings import Settings
 
 
-@app.get("/health")
-def health() -> dict[str, object]:
-    return {
-        "status": "ok",
-        "service": "freemail",
-        "hostname": settings.hostname,
-        "vpnOnly": settings.vpn_only,
-        "release": {
-            "version": settings.release_version,
-            "commit": settings.release_commit,
-        },
-        "components": {
-            "adminApi": "ready",
-            "mailCore": "candidate-spike",
-            "webmail": "scaffolded",
-            "mobile": "planned",
-        },
-    }
+def create_app(settings: Settings | None = None) -> FastAPI:
+    active_settings = settings or get_settings()
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        database.initialize(active_settings.database_path)
+        yield
+
+    app = FastAPI(
+        title="FreeMail API",
+        version=active_settings.release_version,
+        description="Admin and runtime API for the AGPL FreeMail mail platform.",
+        lifespan=lifespan,
+    )
+
+    def require_admin(x_freemail_admin_token: str | None = Header(default=None)) -> str:
+        if not active_settings.admin_api_token:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Admin API token is not configured",
+            )
+        if x_freemail_admin_token != active_settings.admin_api_token:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin API token")
+        return "admin-api"
+
+    def get_connection() -> Iterator[sqlite3.Connection]:
+        with database.connect(active_settings.database_path) as connection:
+            yield connection
+
+    @app.get("/health")
+    def health() -> dict[str, object]:
+        return {
+            "status": "ok",
+            "service": "freemail",
+            "hostname": active_settings.hostname,
+            "vpnOnly": active_settings.vpn_only,
+            "release": {
+                "version": active_settings.release_version,
+                "commit": active_settings.release_commit,
+            },
+            "components": {
+                "adminApi": "ready",
+                "mailCore": "candidate-spike",
+                "webmail": "scaffolded",
+                "mobile": "planned",
+            },
+        }
+
+    @app.get("/api/v1/product")
+    def product() -> dict[str, object]:
+        return {
+            "name": active_settings.app_name,
+            "license": "AGPL-3.0-or-later",
+            "scope": [
+                "mail-core",
+                "admin-api",
+                "webmail",
+                "mobile-client",
+                "deliverability-controls",
+                "backup-restore",
+            ],
+        }
+
+    @app.get("/api/v1/deployment")
+    def deployment() -> dict[str, object]:
+        return {
+            "hostname": active_settings.hostname,
+            "exposure": "vpn-only",
+            "publicInternet": False,
+            "requiredBoundary": "Dragonscale/VPN clients only",
+        }
+
+    @app.get("/api/v1/admin/domains", response_model=list[DomainRecord])
+    def list_domains(
+        _actor: str = Depends(require_admin),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> list[dict[str, object]]:
+        return _rows_to_dicts(database.list_rows(connection, "domains"))
+
+    @app.post("/api/v1/admin/domains", response_model=DomainRecord, status_code=status.HTTP_201_CREATED)
+    def add_domain(
+        payload: DomainCreate,
+        actor: str = Depends(require_admin),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        return _row_to_dict(_create_or_raise(lambda: database.create_domain(connection, payload, actor)))
+
+    @app.get("/api/v1/admin/users", response_model=list[UserRecord])
+    def list_users(
+        _actor: str = Depends(require_admin),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> list[dict[str, object]]:
+        return _rows_to_dicts(database.list_rows(connection, "users"))
+
+    @app.post("/api/v1/admin/users", response_model=UserRecord, status_code=status.HTTP_201_CREATED)
+    def add_user(
+        payload: UserCreate,
+        actor: str = Depends(require_admin),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        return _row_to_dict(_create_or_raise(lambda: database.create_user(connection, payload, actor)))
+
+    @app.get("/api/v1/admin/mailboxes", response_model=list[MailboxRecord])
+    def list_mailboxes(
+        _actor: str = Depends(require_admin),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> list[dict[str, object]]:
+        return _rows_to_dicts(database.list_rows(connection, "mailboxes"))
+
+    @app.post("/api/v1/admin/mailboxes", response_model=MailboxRecord, status_code=status.HTTP_201_CREATED)
+    def add_mailbox(
+        payload: MailboxCreate,
+        actor: str = Depends(require_admin),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        return _row_to_dict(_create_or_raise(lambda: database.create_mailbox(connection, payload, actor)))
+
+    @app.get("/api/v1/admin/aliases", response_model=list[AliasRecord])
+    def list_aliases(
+        _actor: str = Depends(require_admin),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> list[dict[str, object]]:
+        return _rows_to_dicts(database.list_rows(connection, "aliases"))
+
+    @app.post("/api/v1/admin/aliases", response_model=AliasRecord, status_code=status.HTTP_201_CREATED)
+    def add_alias(
+        payload: AliasCreate,
+        actor: str = Depends(require_admin),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        return _row_to_dict(_create_or_raise(lambda: database.create_alias(connection, payload, actor)))
+
+    @app.get("/api/v1/admin/audit-log", response_model=list[AuditRecord])
+    def audit_log(
+        _actor: str = Depends(require_admin),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> list[dict[str, object]]:
+        return _rows_to_dicts(database.list_rows(connection, "audit_log"))
+
+    return app
 
 
-@app.get("/api/v1/product")
-def product() -> dict[str, object]:
-    return {
-        "name": settings.app_name,
-        "license": "AGPL-3.0-or-later",
-        "scope": [
-            "mail-core",
-            "admin-api",
-            "webmail",
-            "mobile-client",
-            "deliverability-controls",
-            "backup-restore",
-        ],
-    }
+def _create_or_raise(create_record):
+    try:
+        return create_record()
+    except database.DuplicateRecordError as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
+    except database.MissingRecordError as error:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
 
 
-@app.get("/api/v1/deployment")
-def deployment() -> dict[str, object]:
-    return {
-        "hostname": settings.hostname,
-        "exposure": "vpn-only",
-        "publicInternet": False,
-        "requiredBoundary": "Dragonscale/VPN clients only",
-    }
+def _row_to_dict(row: sqlite3.Row) -> dict[str, object]:
+    return dict(row)
+
+
+def _rows_to_dicts(rows: list[sqlite3.Row]) -> list[dict[str, object]]:
+    return [_row_to_dict(row) for row in rows]
+
+
+app = create_app()

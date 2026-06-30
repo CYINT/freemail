@@ -3,6 +3,7 @@ FROM python:3.13-slim
 WORKDIR /app
 
 RUN adduser --disabled-password --gecos "" freemail
+RUN mkdir -p /app/data && chown -R freemail:freemail /app/data
 
 COPY requirements.txt /app/requirements.txt
 RUN python -m pip install --upgrade pip && python -m pip install -r /app/requirements.txt

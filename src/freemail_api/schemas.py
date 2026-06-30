@@ -1,0 +1,79 @@
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+
+def to_camel(value: str) -> str:
+    parts = value.split("_")
+    return parts[0] + "".join(part.capitalize() for part in parts[1:])
+
+
+class ApiModel(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+
+class DomainCreate(ApiModel):
+    name: str = Field(min_length=1, max_length=253, pattern=r"^[A-Za-z0-9.-]+$")
+
+
+class DomainRecord(ApiModel):
+    id: int
+    name: str
+    status: str
+
+    model_config = ConfigDict(alias_generator=to_camel, from_attributes=True, populate_by_name=True)
+
+
+class UserCreate(ApiModel):
+    email: EmailStr
+    display_name: str = Field(min_length=1, max_length=160)
+    password_hash: str = Field(min_length=20, max_length=512)
+    is_admin: bool = False
+
+
+class UserRecord(ApiModel):
+    id: int
+    email: EmailStr
+    display_name: str
+    is_admin: bool
+    status: str
+
+    model_config = ConfigDict(alias_generator=to_camel, from_attributes=True, populate_by_name=True)
+
+
+class MailboxCreate(ApiModel):
+    user_id: int = Field(gt=0)
+    local_part: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9._%+-]+$")
+    domain_id: int = Field(gt=0)
+
+
+class MailboxRecord(ApiModel):
+    id: int
+    user_id: int
+    address: EmailStr
+    status: str
+
+    model_config = ConfigDict(alias_generator=to_camel, from_attributes=True, populate_by_name=True)
+
+
+class AliasCreate(ApiModel):
+    source: EmailStr
+    destination: EmailStr
+
+
+class AliasRecord(ApiModel):
+    id: int
+    source: EmailStr
+    destination: EmailStr
+    status: str
+
+    model_config = ConfigDict(alias_generator=to_camel, from_attributes=True, populate_by_name=True)
+
+
+class AuditRecord(ApiModel):
+    id: int
+    actor: str
+    action: str
+    target_type: str
+    target_id: int
+    created_at: str
+
+    model_config = ConfigDict(alias_generator=to_camel, from_attributes=True, populate_by_name=True)

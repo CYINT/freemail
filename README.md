@@ -24,7 +24,7 @@ The FreeMail program includes:
 
 This repository is at the implementation baseline. It contains:
 
-- A FastAPI admin/runtime API skeleton.
+- A FastAPI admin/runtime API with persistent SQLite-backed domain, user, mailbox, alias, and audit-log surfaces.
 - A static web shell placeholder.
 - A mobile client lane placeholder.
 - A Docker Compose stack with VPN-only loopback bindings by default.
@@ -53,6 +53,24 @@ Copy-Item .env.example .env
 ```
 
 Then open `http://127.0.0.1:8080/health`.
+
+## Admin API
+
+Admin endpoints require `X-FreeMail-Admin-Token` and remain disabled until `FREEMAIL_ADMIN_API_TOKEN` is set. Do not commit a real token.
+
+Initial endpoints:
+
+- `POST /api/v1/admin/domains`
+- `GET /api/v1/admin/domains`
+- `POST /api/v1/admin/users`
+- `GET /api/v1/admin/users`
+- `POST /api/v1/admin/mailboxes`
+- `GET /api/v1/admin/mailboxes`
+- `POST /api/v1/admin/aliases`
+- `GET /api/v1/admin/aliases`
+- `GET /api/v1/admin/audit-log`
+
+The current metadata store is SQLite at `FREEMAIL_DB_PATH`, defaulting to `data/freemail.sqlite` locally and a Docker volume path in Compose. Mail-store persistence remains part of the Stalwart mail-core spike.
 
 ## Docker
 

@@ -7,6 +7,10 @@ services:
       FREEMAIL_HOSTNAME: ${FREEMAIL_HOSTNAME:-freemail.kuzuryu.ai}
       FREEMAIL_RELEASE_VERSION: ${FREEMAIL_RELEASE_VERSION:-0.1.0-dev}
       FREEMAIL_RELEASE_COMMIT: ${FREEMAIL_RELEASE_COMMIT:-unknown}
+      FREEMAIL_DB_PATH: ${FREEMAIL_DB_PATH:-/app/data/freemail.sqlite}
+      FREEMAIL_ADMIN_API_TOKEN: ${FREEMAIL_ADMIN_API_TOKEN:-}
+    volumes:
+      - freemail_data:/app/data
     ports:
       - "${FREEMAIL_BIND_ADDRESS:-127.0.0.1}:${FREEMAIL_API_PORT:-18090}:8080"
     restart: unless-stopped
@@ -23,6 +27,8 @@ services:
   mail-core:
     image: stalwartlabs/stalwart:latest
     profiles: ["mail-core"]
+    environment:
+      STALWART_RECOVERY_ADMIN: ${STALWART_RECOVERY_ADMIN:-}
     volumes:
       - freemail_stalwart:/opt/stalwart
     ports:
@@ -33,4 +39,5 @@ services:
     restart: unless-stopped
 
 volumes:
+  freemail_data:
   freemail_stalwart:

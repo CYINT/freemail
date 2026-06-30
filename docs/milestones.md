@@ -10,7 +10,7 @@
 ## M1 - Mail-Core Spike
 
 - Stalwart candidate starts locally.
-- One domain and one mailbox are configured.
+- One domain and one mailbox are configured through the persistent admin API.
 - Inbound SMTP receive works.
 - Authenticated submission works.
 - IMAP or JMAP access is proven.
@@ -21,6 +21,8 @@
 - Users, domains, mailboxes, aliases, and DKIM keys.
 - DNS guidance for MX, SPF, DKIM, and DMARC.
 - Audit logs.
+
+Current progress: persistent token-gated APIs exist for domains, invite-created users, mailboxes, aliases, and audit logs. DKIM and DNS guidance are still pending.
 
 ## M3 - Webmail MVP
 
