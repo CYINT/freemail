@@ -272,7 +272,7 @@ export default function App() {
     setLoading(true);
     setStatus("Sending message...");
     try {
-      await sendMailboxMessage(session, {
+      const sent = await sendMailboxMessage(session, {
         recipients: composeTo
           .split(",")
           .map((recipient) => recipient.trim())
@@ -289,7 +289,11 @@ export default function App() {
       setComposeSubject("");
       setComposeBody("");
       setComposeAttachments([]);
-      setStatus("Message sent.");
+      setStatus(
+        sent.sentFolderSaved
+          ? `Message sent and saved to ${sent.sentFolder || "Sent Items"}.`
+          : "Message sent, but Sent Items was not updated.",
+      );
       await refreshMailbox(session, folder);
     } catch (error) {
       setStatus(readableError(error));

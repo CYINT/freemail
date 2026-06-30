@@ -95,6 +95,16 @@ export type ComposeAttachment = {
   contentBase64: string;
 };
 
+export type SentMessage = {
+  accepted: boolean;
+  messageId: string;
+  sender: string;
+  recipients: string[];
+  subject: string;
+  sentFolder: string;
+  sentFolderSaved: boolean;
+};
+
 export async function createMailboxSession(apiBaseUrl: string, email: string, password: string): Promise<MailboxSession> {
   const response = await request(apiBaseUrl, "/api/v1/mailbox/session", {
     method: "POST",
@@ -260,8 +270,8 @@ export async function loadMailboxPushNotifications(session: MailboxSession): Pro
   return response.json();
 }
 
-export async function sendMailboxMessage(session: MailboxSession, message: ComposeMessage): Promise<void> {
-  await request(session.apiBaseUrl, "/api/v1/mailbox/send", {
+export async function sendMailboxMessage(session: MailboxSession, message: ComposeMessage): Promise<SentMessage> {
+  const response = await request(session.apiBaseUrl, "/api/v1/mailbox/send", {
     method: "POST",
     headers: {
       ...mailboxHeaders(session),
@@ -269,6 +279,7 @@ export async function sendMailboxMessage(session: MailboxSession, message: Compo
     },
     body: JSON.stringify(message),
   });
+  return response.json();
 }
 
 export async function createMailboxFolder(session: MailboxSession, folder: string): Promise<void> {

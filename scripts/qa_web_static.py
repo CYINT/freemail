@@ -164,6 +164,8 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         "/api/v1/mailbox/message/move",
         "/api/v1/mailbox/message/read-state",
         "/api/v1/mailbox/send",
+        "sentFolderSaved",
+        "Sent Items was not updated",
         "/api/v1/admin/session",
         "/api/v1/bootstrap/admin",
         "/api/v1/admin/domains",

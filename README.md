@@ -234,13 +234,13 @@ DELETE /api/v1/mailbox/folder
 
 Create accepts `{ "folder": "Clients" }`, rename accepts `{ "folder": "Clients", "targetFolder": "Customers" }`, and delete accepts `{ "folder": "Customers" }`. The webmail sidebar exposes create, rename-current-folder, and delete-current-folder controls while protecting core folders such as `INBOX`.
 
-The first mailbox send API uses the same per-request credential posture and submits through authenticated implicit-TLS SMTP:
+The mailbox send API uses the same per-request credential posture, submits through authenticated implicit-TLS SMTP, and appends accepted outbound messages to `Sent Items` through IMAP. The response includes `sentFolder` and `sentFolderSaved` so clients and operators can detect a mail-store persistence failure after SMTP acceptance:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\qa_mailbox_send_api.py --email admin@example.com --recipient admin@example.com --secrets-json secrets\mail-core-users.json
 ```
 
-The current webmail preview supports reply and forward as live compose-prefill workflows from the selected message body; sending those drafts uses the same mailbox send API. The Archive action uses IMAP copy/delete semantics, creates the `Archive` folder if it is missing, and refreshes the current folder after success:
+The current webmail preview supports reply and forward as live compose-prefill workflows from the selected message body; sending those drafts uses the same mailbox send API and server-side Sent Items persistence. The Archive action uses IMAP copy/delete semantics, creates the `Archive` folder if it is missing, and refreshes the current folder after success:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\qa_mailbox_archive_api.py --email admin@example.com --secrets-json secrets\mail-core-users.json

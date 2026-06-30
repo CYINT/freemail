@@ -52,9 +52,11 @@ def main() -> int:
         "recipientCount": len(data.get("recipients", [])),
         "subject": data.get("subject"),
         "hasMessageId": bool(data.get("messageId")),
+        "sentFolder": data.get("sentFolder"),
+        "sentFolderSaved": data.get("sentFolderSaved"),
     }
     print(json.dumps(redacted, indent=2, sort_keys=True))
-    return 0 if redacted["accepted"] and redacted["hasMessageId"] else 1
+    return 0 if redacted["accepted"] and redacted["hasMessageId"] and redacted["sentFolderSaved"] else 1
 
 
 def _load_password(path: str | None, email: str) -> str:

@@ -610,7 +610,12 @@ async function sendMailboxMessage(message) {
       throw new Error(await response.text());
     }
     const result = await response.json();
-    setStatus(`Sent ${result.messageId || "message"}.`, "ready");
+    setStatus(
+      result.sentFolderSaved
+        ? `Sent ${result.messageId || "message"} and saved to ${result.sentFolder || "Sent Items"}.`
+        : `Sent ${result.messageId || "message"}, but Sent Items was not updated.`,
+      result.sentFolderSaved ? "ready" : "error",
+    );
     if (composeAttachments) {
       composeAttachments.value = "";
     }

@@ -156,6 +156,7 @@ COMPONENT_READINESS = {
         "status": "beta-ready",
         "evidence": [
             "mailbox session login, folder navigation, search, contacts, message read, read/unread state, compose, attachments, archive, move, and delete controls",
+            "server-side Sent Items persistence for accepted outbound messages",
             "token-gated admin console for bootstrap, users, domains, mailboxes, aliases, DKIM, DNS guidance, status actions, sync status, and audit logs",
             "browser and static QA in CI",
         ],
@@ -167,6 +168,7 @@ COMPONENT_READINESS = {
         "status": "source-ready",
         "evidence": [
             "Expo/React Native client with VPN API target, mailbox sessions, message workflows, read/unread state, archive/spam/delete actions, folder controls, contacts, attachments, offline metadata cache, and push-device flows",
+            "compose/send path uses the shared mailbox API contract with Sent Items persistence status",
             "mobile static QA, config validation, native prebuild drill, typecheck, and dependency audit in CI",
         ],
         "remainingReleaseEvidence": [
@@ -944,6 +946,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 password=credentials.password,
                 host=active_settings.mail_core_host,
                 port=active_settings.submission_port,
+                imap_host=active_settings.mail_core_host,
+                imap_port=active_settings.imap_port,
                 recipients=[str(recipient) for recipient in payload.recipients],
                 subject=payload.subject,
                 body=payload.body,

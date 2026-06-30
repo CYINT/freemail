@@ -1750,6 +1750,8 @@ def test_mailbox_send_returns_submission_payload(tmp_path, monkeypatch):
                 "sender": "admin@example.com",
                 "recipients": ["hello@example.com"],
                 "subject": "Hello",
+                "sent_folder": "Sent Items",
+                "sent_folder_saved": True,
             }
 
     def fake_send(**kwargs):
@@ -1758,6 +1760,8 @@ def test_mailbox_send_returns_submission_payload(tmp_path, monkeypatch):
         assert kwargs["recipients"] == ["hello@example.com"]
         assert kwargs["subject"] == "Hello"
         assert kwargs["body"] == "Body"
+        assert kwargs["imap_host"] == "127.0.0.1"
+        assert kwargs["imap_port"] == 2993
         assert kwargs["attachments"][0].filename == "report.txt"
         return Sent()
 
@@ -1787,6 +1791,8 @@ def test_mailbox_send_returns_submission_payload(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert response.json()["accepted"] is True
     assert response.json()["messageId"] == "<message@example.com>"
+    assert response.json()["sentFolder"] == "Sent Items"
+    assert response.json()["sentFolderSaved"] is True
 
 
 def test_mailbox_send_rejects_message_rate_limit_before_smtp(tmp_path, monkeypatch):
@@ -1799,6 +1805,8 @@ def test_mailbox_send_rejects_message_rate_limit_before_smtp(tmp_path, monkeypat
                 "sender": "admin@example.com",
                 "recipients": ["hello@example.com"],
                 "subject": "Hello",
+                "sent_folder": "Sent Items",
+                "sent_folder_saved": True,
             }
 
     def fake_send(**_kwargs):

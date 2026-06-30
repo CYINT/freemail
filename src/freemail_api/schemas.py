@@ -385,3 +385,5 @@ class MailboxSendRecord(ApiModel):
     sender: EmailStr
     recipients: list[EmailStr]
     subject: str
+    sent_folder: str
+    sent_folder_saved: bool

@@ -9,7 +9,7 @@ The current mobile implementation is a source-level foundation, not a production
 - iOS and Android client.
 - VPN-only self-hosted API target.
 - Secure bearer-session persistence through `expo-secure-store`.
-- Inbox snapshot, message read, compose/send, reply, forward, mark read/unread, archive, spam, delete, and sign-out workflows.
+- Inbox snapshot, message read, compose/send with Sent Items persistence status, reply, forward, mark read/unread, archive, spam, delete, and sign-out workflows.
 - Folder navigation plus create, rename, and delete controls for non-core folders.
 - Folder-scoped search and contacts loaded from mailbox headers.
 - Attachment metadata display, authenticated download/share handling, and bounded document-picker compose attachments.
