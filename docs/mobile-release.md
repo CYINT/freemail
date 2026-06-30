@@ -73,6 +73,12 @@ After signed iOS and Android builds complete in the private signing environment,
 .\.venv\Scripts\python.exe scripts\mobile_release_gate.py --evidence .freemail-qa\mobile-release-evidence.json
 ```
 
+After TestFlight and Play internal-testing submission, require store submission evidence too:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\mobile_release_gate.py --evidence .freemail-qa\mobile-release-evidence.json --require-store-submission
+```
+
 The evidence must not include API keys, Apple certificates, provisioning profiles, keystores, passwords, private keys, service-account JSON, or raw tokens. It must include both signed build records and the VPN-only private-beta boundary:
 
 ```json
@@ -106,6 +112,26 @@ The evidence must not include API keys, Apple certificates, provisioning profile
       }
     }
   },
+  "storeSubmissions": {
+    "ios": {
+      "store": "app-store-connect",
+      "identifier": "technology.cyint.freemail",
+      "track": "testflight",
+      "submitted": true,
+      "submissionUrl": "https://example.invalid/testflight",
+      "submittedAt": "2026-06-30T00:00:00Z",
+      "reviewState": "processing"
+    },
+    "android": {
+      "store": "play-console",
+      "identifier": "technology.cyint.freemail",
+      "track": "internal-testing",
+      "submitted": true,
+      "submissionUrl": "https://example.invalid/play-internal",
+      "submittedAt": "2026-06-30T00:00:00Z",
+      "reviewState": "draft-release-created"
+    }
+  },
   "privateBetaBoundary": {
     "hostname": "freemail.kuzuryu.ai",
     "vpnOnly": true,
@@ -114,6 +140,8 @@ The evidence must not include API keys, Apple certificates, provisioning profile
   }
 }
 ```
+
+Store submission evidence must be credential-free. It records what was submitted, where, when, and its review state; it must not include App Store Connect API keys, Play service-account JSON, passwords, private keys, provisioning profiles, keystores, or raw tokens.
 
 ## Private Beta Boundary
 

@@ -25,6 +25,62 @@ def test_mobile_release_gate_accepts_signed_build_evidence(tmp_path):
     assert result["passed"] is True
 
 
+def test_mobile_release_gate_accepts_store_submission_evidence_when_required(tmp_path):
+    app_config = tmp_path / "app.json"
+    evidence = tmp_path / "mobile-release.json"
+    write_json(
+        app_config,
+        {
+            "expo": {
+                "name": "FreeMail",
+                "version": "0.1.0-dev",
+                "ios": {"bundleIdentifier": "technology.cyint.freemail"},
+                "android": {"package": "technology.cyint.freemail"},
+                "extra": {"apiBaseUrl": "https://freemail.kuzuryu.ai"},
+            }
+        },
+    )
+    payload = valid_evidence()
+    payload["storeSubmissions"] = valid_store_submissions()
+    write_json(evidence, payload)
+
+    result = run_mobile_release_gate(
+        MobileReleaseGateOptions(evidence=evidence, app_config=app_config, require_store_submission=True)
+    )
+
+    assert result["passed"] is True
+    assert result["checks"][-2]["name"] == "ios-store-submission"
+    assert result["checks"][-1]["name"] == "android-store-submission"
+
+
+def test_mobile_release_gate_requires_store_submission_evidence_when_enabled(tmp_path):
+    app_config = tmp_path / "app.json"
+    evidence = tmp_path / "mobile-release.json"
+    write_json(
+        app_config,
+        {
+            "expo": {
+                "name": "FreeMail",
+                "version": "0.1.0-dev",
+                "ios": {"bundleIdentifier": "technology.cyint.freemail"},
+                "android": {"package": "technology.cyint.freemail"},
+                "extra": {"apiBaseUrl": "https://freemail.kuzuryu.ai"},
+            }
+        },
+    )
+    write_json(evidence, valid_evidence())
+
+    result = run_mobile_release_gate(
+        MobileReleaseGateOptions(evidence=evidence, app_config=app_config, require_store_submission=True)
+    )
+
+    assert result["passed"] is False
+    assert result["checks"][-2]["name"] == "ios-store-submission"
+    assert result["checks"][-2]["status"] == "fail"
+    assert result["checks"][-1]["name"] == "android-store-submission"
+    assert result["checks"][-1]["status"] == "fail"
+
+
 def test_mobile_release_gate_rejects_secret_bearing_evidence(tmp_path):
     app_config = tmp_path / "app.json"
     evidence = tmp_path / "mobile-release.json"
@@ -105,6 +161,29 @@ def valid_evidence():
             "vpnOnly": True,
             "publicInternet": False,
             "requiredBoundary": "Dragonscale/VPN clients only",
+        },
+    }
+
+
+def valid_store_submissions():
+    return {
+        "ios": {
+            "store": "app-store-connect",
+            "identifier": "technology.cyint.freemail",
+            "track": "testflight",
+            "submitted": True,
+            "submissionUrl": "https://example.invalid/testflight",
+            "submittedAt": "2026-06-30T00:00:00Z",
+            "reviewState": "processing",
+        },
+        "android": {
+            "store": "play-console",
+            "identifier": "technology.cyint.freemail",
+            "track": "internal-testing",
+            "submitted": True,
+            "submissionUrl": "https://example.invalid/play-internal",
+            "submittedAt": "2026-06-30T00:00:00Z",
+            "reviewState": "draft-release-created",
         },
     }
 

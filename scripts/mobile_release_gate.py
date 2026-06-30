@@ -12,9 +12,16 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Validate FreeMail mobile signed-build release evidence.")
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--app-config", type=Path, default=Path("apps/mobile/app.json"))
+    parser.add_argument("--require-store-submission", action="store_true")
     args = parser.parse_args()
 
-    result = run_mobile_release_gate(MobileReleaseGateOptions(evidence=args.evidence, app_config=args.app_config))
+    result = run_mobile_release_gate(
+        MobileReleaseGateOptions(
+            evidence=args.evidence,
+            app_config=args.app_config,
+            require_store_submission=args.require_store_submission,
+        )
+    )
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0 if result["passed"] else 2
 

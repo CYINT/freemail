@@ -122,6 +122,8 @@ def validate_mobile(root: Path) -> list[str]:
         "scripts/qa_mobile_native_prebuild.py --link-node-modules --platform ios",
         "scripts/mobile_release_gate.py",
         "mobile signed-build release evidence",
+        "--require-store-submission",
+        "storeSubmissions",
         "privateBetaBoundary",
     ]:
         if marker not in combined:

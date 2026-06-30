@@ -32,6 +32,7 @@ FORBIDDEN_EVIDENCE_KEYS = {
 class MobileReleaseGateOptions:
     evidence: Path
     app_config: Path = Path("apps/mobile/app.json")
+    require_store_submission: bool = False
 
 
 def run_mobile_release_gate(options: MobileReleaseGateOptions) -> dict[str, Any]:
@@ -44,6 +45,13 @@ def run_mobile_release_gate(options: MobileReleaseGateOptions) -> dict[str, Any]
         _check_platform_build(evidence, platform="android"),
         _check_private_beta_boundary(evidence),
     ]
+    if options.require_store_submission:
+        checks.extend(
+            [
+                _check_store_submission(evidence, platform="ios"),
+                _check_store_submission(evidence, platform="android"),
+            ]
+        )
     passed = all(check["status"] == "pass" for check in checks)
     return {
         "passed": passed,
@@ -148,6 +156,35 @@ def _check_private_beta_boundary(evidence: dict[str, Any]) -> dict[str, Any]:
             "vpnOnly": boundary.get("vpnOnly"),
             "publicInternet": boundary.get("publicInternet"),
             "requiredBoundary": boundary.get("requiredBoundary"),
+        },
+    )
+
+
+def _check_store_submission(evidence: dict[str, Any], *, platform: str) -> dict[str, Any]:
+    submission = evidence.get("storeSubmissions", {}).get(platform, {})
+    expected_store = "app-store-connect" if platform == "ios" else "play-console"
+    expected_identifier = EXPECTED_IOS_BUNDLE_ID if platform == "ios" else EXPECTED_ANDROID_PACKAGE
+    allowed_tracks = {"internal", "testflight", "private-beta", "closed-testing", "internal-testing", "store-review"}
+    passed = (
+        submission.get("store") == expected_store
+        and submission.get("identifier") == expected_identifier
+        and submission.get("track") in allowed_tracks
+        and submission.get("submitted") is True
+        and bool(str(submission.get("submissionUrl", "")).strip())
+        and bool(str(submission.get("submittedAt", "")).strip())
+        and bool(str(submission.get("reviewState", "")).strip())
+    )
+    return _check(
+        f"{platform}-store-submission",
+        passed,
+        {
+            "store": submission.get("store"),
+            "identifier": submission.get("identifier"),
+            "track": submission.get("track"),
+            "submitted": submission.get("submitted"),
+            "submissionUrl": submission.get("submissionUrl"),
+            "submittedAt": submission.get("submittedAt"),
+            "reviewState": submission.get("reviewState"),
         },
     )
 
