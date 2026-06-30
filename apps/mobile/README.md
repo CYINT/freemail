@@ -54,3 +54,5 @@ Push-provider delivery is provider-neutral at this stage. The mobile client can 
 Native releases must follow `docs/mobile-release.md`. The repository intentionally does not contain Apple certificates, provisioning profiles, Android keystores, store API keys, or generated `ios/` and `android/` native projects. Generate native projects only for a release branch or local build drill, then keep signing material outside Git.
 
 `npm run native:prebuild:check` runs the Android native prebuild drill in a temporary copy and verifies generated identifiers without leaving generated native project files in the repository. The repository also includes `.github/workflows/mobile-ios-native.yml` for the macOS iOS native prebuild drill. Run `python ../../scripts/qa_mobile_native_prebuild.py --platform ios` from a macOS release runner for local iOS release evidence.
+
+Signed iOS and Android build artifacts are validated through the root `scripts/mobile_release_gate.py` evidence gate. Keep the evidence JSON and signed artifacts outside Git; the gate accepts only credential-free metadata, artifact hashes, and the VPN-only private beta boundary.

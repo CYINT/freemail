@@ -120,6 +120,9 @@ def validate_mobile(root: Path) -> list[str]:
         "Mobile iOS Native Drill",
         "macos-latest",
         "scripts/qa_mobile_native_prebuild.py --link-node-modules --platform ios",
+        "scripts/mobile_release_gate.py",
+        "mobile signed-build release evidence",
+        "privateBetaBoundary",
     ]:
         if marker not in combined:
             failures.append(f"missing mobile marker: {marker}")

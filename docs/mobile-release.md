@@ -63,6 +63,58 @@ Keep signing material outside Git:
 - Store Connect, Play Console, APNS, FCM, and Expo service tokens stay in repository or organization secrets, never in files.
 - Release notes and build provenance may be committed, but credential-bearing screenshots, profiles, and key files may not.
 
+## Signed Build Evidence
+
+This is the mobile signed-build release evidence gate for private beta and store-candidate builds.
+
+After signed iOS and Android builds complete in the private signing environment, capture a credential-free JSON evidence file outside Git and validate it with:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\mobile_release_gate.py --evidence .freemail-qa\mobile-release-evidence.json
+```
+
+The evidence must not include API keys, Apple certificates, provisioning profiles, keystores, passwords, private keys, service-account JSON, or raw tokens. It must include both signed build records and the VPN-only private-beta boundary:
+
+```json
+{
+  "app": {
+    "name": "FreeMail",
+    "version": "0.1.0-dev",
+    "apiBaseUrl": "https://freemail.kuzuryu.ai"
+  },
+  "builds": {
+    "ios": {
+      "identifier": "technology.cyint.freemail",
+      "signed": true,
+      "distribution": "private-beta",
+      "buildUrl": "https://example.invalid/ios-build",
+      "artifact": {
+        "type": "ipa",
+        "bytes": 123,
+        "sha256": "replace-with-artifact-sha256"
+      }
+    },
+    "android": {
+      "identifier": "technology.cyint.freemail",
+      "signed": true,
+      "distribution": "private-beta",
+      "buildUrl": "https://example.invalid/android-build",
+      "artifact": {
+        "type": "aab",
+        "bytes": 456,
+        "sha256": "replace-with-artifact-sha256"
+      }
+    }
+  },
+  "privateBetaBoundary": {
+    "hostname": "freemail.kuzuryu.ai",
+    "vpnOnly": true,
+    "publicInternet": false,
+    "requiredBoundary": "Dragonscale/VPN clients only"
+  }
+}
+```
+
 ## Private Beta Boundary
 
 Current FreeMail private beta builds must target the VPN hostname and must not expose the API over public internet ingress. Devices used for testing must be enrolled in the private network that can resolve and route `freemail.kuzuryu.ai`.
