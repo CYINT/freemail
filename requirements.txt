@@ -1,5 +1,6 @@
 cryptography>=48.0.1,<49
 fastapi>=0.124,<1
 email-validator>=2.3,<3
+httpx[http2]>=0.28,<1
 pydantic-settings>=2.14,<3
 uvicorn[standard]>=0.38,<1

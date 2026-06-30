@@ -37,6 +37,7 @@ def test_metadata_backup_round_trip_preserves_core_metadata_and_key_material(tmp
             device_id="device-123",
             platform="development",
             push_token_hash="hashed-push-token",
+            encrypted_push_token="encrypted-push-token",
             provider="contract-only",
         )
         database.create_mailbox_push_notifications(
@@ -73,6 +74,54 @@ def test_metadata_backup_round_trip_preserves_core_metadata_and_key_material(tmp
         assert connection.execute("SELECT COUNT(*) FROM outbound_send_events").fetchone()[0] == 0
         assert connection.execute("SELECT COUNT(*) FROM mailbox_push_devices").fetchone()[0] == 0
         assert connection.execute("SELECT COUNT(*) FROM mailbox_push_notifications").fetchone()[0] == 0
+
+
+def test_initialize_migrates_existing_push_tables_for_encrypted_tokens(tmp_path):
+    database_path = tmp_path / "existing.sqlite"
+    with sqlite3.connect(database_path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE mailbox_push_devices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                mailbox_email TEXT NOT NULL,
+                device_id TEXT NOT NULL,
+                platform TEXT NOT NULL,
+                push_token_hash TEXT NOT NULL,
+                provider TEXT NOT NULL DEFAULT 'contract-only',
+                enabled INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(mailbox_email, device_id)
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE mailbox_push_notifications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                mailbox_email TEXT NOT NULL,
+                device_id TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                title TEXT NOT NULL,
+                body TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'queued',
+                provider_message_id TEXT,
+                last_error TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                delivered_at TEXT
+            )
+            """
+        )
+
+    database.initialize(str(database_path))
+
+    with database.connect(str(database_path)) as connection:
+        device_columns = {row["name"] for row in connection.execute("PRAGMA table_info(mailbox_push_devices)")}
+        notification_columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(mailbox_push_notifications)")
+        }
+    assert "encrypted_push_token" in device_columns
+    assert "encrypted_push_token" in notification_columns
 
 
 def test_metadata_restore_refuses_non_empty_database_without_force(tmp_path):

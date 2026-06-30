@@ -36,6 +36,7 @@ from .outbound_policy import OutboundRateLimitExceeded
 from .outbound_policy import OutboundRatePolicy
 from .outbound_policy import record_outbound_send
 from .push_delivery import dispatch_push_notification
+from .push_delivery import PushDeliveryConfig
 from .schemas import (
     AliasCreate,
     AliasRecord,
@@ -84,6 +85,10 @@ from .sessions import MailboxCredentials
 from .sessions import resolve_mailbox_session
 from .sessions import revoke_mailbox_session
 from .sessions import SessionConfigurationError
+from .secret_box import decrypt_text
+from .secret_box import encrypt_text
+from .secret_box import SecretBoxConfigurationError
+from .secret_box import SecretBoxDecryptionError
 from .settings import get_settings
 from .settings import Settings
 
@@ -152,6 +157,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             window_seconds=active_settings.send_rate_window_seconds,
             max_messages=active_settings.send_rate_max_messages,
             max_recipients=active_settings.send_rate_max_recipients,
+        )
+
+    def push_delivery_config() -> PushDeliveryConfig:
+        return PushDeliveryConfig(
+            fcm_project_id=active_settings.fcm_project_id,
+            fcm_service_account_json=active_settings.fcm_service_account_json,
+            apns_team_id=active_settings.apns_team_id,
+            apns_key_id=active_settings.apns_key_id,
+            apns_private_key_pem=active_settings.apns_private_key_pem,
+            apns_bundle_id=active_settings.apns_bundle_id,
+            apns_use_sandbox=active_settings.apns_use_sandbox,
+            timeout_seconds=active_settings.push_delivery_timeout_seconds,
         )
 
     def mailbox_credentials(
@@ -300,6 +317,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             device_id=payload.device_id,
             platform=payload.platform,
             push_token_hash=sha256(payload.push_token.encode("utf-8")).hexdigest(),
+            encrypted_push_token=_encrypted_push_token(payload.push_token, active_settings.push_token_secret),
             provider=payload.provider,
         )
         return _row_to_dict(row)
@@ -359,6 +377,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 device_id=str(row["device_id"]),
                 title=str(row["title"]),
                 body=str(row["body"]),
+                push_token=_decrypted_push_token(row, active_settings.push_token_secret),
+                config=push_delivery_config(),
             )
             if result.delivered and result.provider_message_id:
                 dispatched.append(
@@ -926,6 +946,23 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, object]:
 
 def _rows_to_dicts(rows: list[sqlite3.Row]) -> list[dict[str, object]]:
     return [_row_to_dict(row) for row in rows]
+
+
+def _encrypted_push_token(push_token: str, secret: str | None) -> str | None:
+    try:
+        return encrypt_text(push_token, secret)
+    except SecretBoxConfigurationError:
+        return None
+
+
+def _decrypted_push_token(row: sqlite3.Row, secret: str | None) -> str | None:
+    encrypted = row["encrypted_push_token"]
+    if not encrypted:
+        return None
+    try:
+        return decrypt_text(str(encrypted), secret)
+    except (SecretBoxConfigurationError, SecretBoxDecryptionError):
+        return None
 
 
 app = create_app()

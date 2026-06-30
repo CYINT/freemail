@@ -15,6 +15,15 @@ class Settings(BaseSettings):
     bootstrap_token: str | None = Field(default=None, validation_alias="FREEMAIL_BOOTSTRAP_TOKEN")
     session_secret: str | None = Field(default=None, validation_alias="FREEMAIL_SESSION_SECRET")
     session_ttl_seconds: int = Field(default=43200, validation_alias="FREEMAIL_SESSION_TTL_SECONDS")
+    push_token_secret: str | None = Field(default=None, validation_alias="FREEMAIL_PUSH_TOKEN_SECRET")
+    fcm_project_id: str | None = Field(default=None, validation_alias="FREEMAIL_FCM_PROJECT_ID")
+    fcm_service_account_json: str | None = Field(default=None, validation_alias="FREEMAIL_FCM_SERVICE_ACCOUNT_JSON")
+    apns_team_id: str | None = Field(default=None, validation_alias="FREEMAIL_APNS_TEAM_ID")
+    apns_key_id: str | None = Field(default=None, validation_alias="FREEMAIL_APNS_KEY_ID")
+    apns_private_key_pem: str | None = Field(default=None, validation_alias="FREEMAIL_APNS_PRIVATE_KEY_PEM")
+    apns_bundle_id: str | None = Field(default=None, validation_alias="FREEMAIL_APNS_BUNDLE_ID")
+    apns_use_sandbox: bool = Field(default=False, validation_alias="FREEMAIL_APNS_USE_SANDBOX")
+    push_delivery_timeout_seconds: float = Field(default=10.0, validation_alias="FREEMAIL_PUSH_DELIVERY_TIMEOUT_SECONDS")
     max_attachment_bytes: int = Field(default=1_048_576, validation_alias="FREEMAIL_MAX_ATTACHMENT_BYTES")
     allowed_attachment_content_types: str = Field(
         default="text/plain,text/csv,application/pdf,image/png,image/jpeg",

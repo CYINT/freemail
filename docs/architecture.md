@@ -87,7 +87,9 @@ The current mobile foundation covers:
 - attachment metadata display and authenticated download/share handling
 - bounded document-picker compose attachments encoded for the mailbox send API
 - SecureStore-backed offline metadata cache for last loaded folder, message header, and contact snapshots
-- bearer-authenticated push-device registration, listing, revocation, notification queueing, and development-provider dispatch with hashed provider tokens
+- bearer-authenticated push-device registration, listing, revocation, notification queueing, deterministic development-provider dispatch, and credential-backed APNS/FCM adapters with hashed plus encrypted runtime token storage
 - static QA that forbids provider trade-dress references and insecure browser-style credential storage
 
-Native build, app-store signing, and credential-backed APNS/FCM adapters remain future mobile milestones.
+Raw and encrypted push-provider tokens are never returned by API responses and are excluded from metadata backups. APNS/FCM dispatch remains disabled until operators configure `FREEMAIL_PUSH_TOKEN_SECRET` plus the corresponding provider credentials in deployment secrets.
+
+Remaining mobile release work is macOS iOS native build-drill evidence, app-store signing, and private-beta device validation.

@@ -94,6 +94,7 @@ CREATE TABLE IF NOT EXISTS mailbox_push_devices (
     device_id TEXT NOT NULL,
     platform TEXT NOT NULL,
     push_token_hash TEXT NOT NULL,
+    encrypted_push_token TEXT,
     provider TEXT NOT NULL DEFAULT 'contract-only',
     enabled INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -109,6 +110,7 @@ CREATE TABLE IF NOT EXISTS mailbox_push_notifications (
     mailbox_email TEXT NOT NULL,
     device_id TEXT NOT NULL,
     provider TEXT NOT NULL,
+    encrypted_push_token TEXT,
     title TEXT NOT NULL,
     body TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'queued',
@@ -144,6 +146,7 @@ def connect(database_path: str) -> sqlite3.Connection:
 def initialize(database_path: str) -> None:
     with connect(database_path) as connection:
         connection.executescript(SCHEMA)
+        _migrate_schema(connection)
 
 
 def list_rows(connection: sqlite3.Connection, table: str) -> list[sqlite3.Row]:
@@ -354,6 +357,7 @@ def upsert_mailbox_push_device(
     device_id: str,
     platform: str,
     push_token_hash: str,
+    encrypted_push_token: str | None,
     provider: str,
 ) -> sqlite3.Row:
     normalized_email = email.lower()
@@ -361,17 +365,18 @@ def upsert_mailbox_push_device(
     connection.execute(
         """
         INSERT INTO mailbox_push_devices (
-            mailbox_email, device_id, platform, push_token_hash, provider, enabled, updated_at
+            mailbox_email, device_id, platform, push_token_hash, encrypted_push_token, provider, enabled, updated_at
         )
-        VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
+        VALUES (?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
         ON CONFLICT(mailbox_email, device_id) DO UPDATE SET
             platform = excluded.platform,
             push_token_hash = excluded.push_token_hash,
+            encrypted_push_token = excluded.encrypted_push_token,
             provider = excluded.provider,
             enabled = 1,
             updated_at = CURRENT_TIMESTAMP
         """,
-        [normalized_email, normalized_device_id, platform, push_token_hash, provider],
+        [normalized_email, normalized_device_id, platform, push_token_hash, encrypted_push_token, provider],
     )
     connection.commit()
     return _get_mailbox_push_device(connection, normalized_email, normalized_device_id)
@@ -413,7 +418,7 @@ def create_mailbox_push_notifications(
 ) -> list[sqlite3.Row]:
     rows = connection.execute(
         """
-        SELECT mailbox_email, device_id, provider
+        SELECT mailbox_email, device_id, provider, encrypted_push_token
         FROM mailbox_push_devices
         WHERE mailbox_email = ? AND enabled = 1
         ORDER BY updated_at DESC, id DESC
@@ -426,10 +431,12 @@ def create_mailbox_push_notifications(
             _execute_insert(
                 connection,
                 """
-                INSERT INTO mailbox_push_notifications (mailbox_email, device_id, provider, title, body)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO mailbox_push_notifications (
+                    mailbox_email, device_id, provider, encrypted_push_token, title, body
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                [row["mailbox_email"], row["device_id"], row["provider"], title, body],
+                [row["mailbox_email"], row["device_id"], row["provider"], row["encrypted_push_token"], title, body],
             )
         )
     connection.commit()
@@ -502,6 +509,19 @@ def _execute_insert(connection: sqlite3.Connection, statement: str, values: Iter
             raise MissingRecordError(message) from error
         raise DuplicateRecordError(message) from error
     return int(cursor.lastrowid)
+
+
+def _migrate_schema(connection: sqlite3.Connection) -> None:
+    columns = {row["name"] for row in connection.execute("PRAGMA table_info(mailbox_push_devices)")}
+    if "encrypted_push_token" not in columns:
+        connection.execute("ALTER TABLE mailbox_push_devices ADD COLUMN encrypted_push_token TEXT")
+        connection.commit()
+    notification_columns = {
+        row["name"] for row in connection.execute("PRAGMA table_info(mailbox_push_notifications)")
+    }
+    if "encrypted_push_token" not in notification_columns:
+        connection.execute("ALTER TABLE mailbox_push_notifications ADD COLUMN encrypted_push_token TEXT")
+        connection.commit()
 
 
 def _audit(connection: sqlite3.Connection, actor: str, action: str, target_type: str, target_id: int) -> None:

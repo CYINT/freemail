@@ -5,6 +5,7 @@ import sqlite3
 from fastapi.testclient import TestClient
 
 from freemail_api.main import create_app
+from freemail_api.push_delivery import PushDeliveryResult
 from freemail_api.settings import Settings
 
 
@@ -18,6 +19,7 @@ def make_client(tmp_path: Path) -> TestClient:
         admin_api_token=ADMIN_TOKEN,
         bootstrap_token=BOOTSTRAP_TOKEN,
         session_secret="test-session-secret",
+        push_token_secret="test-push-token-secret",
         release_commit="test",
     )
     return TestClient(create_app(settings))
@@ -498,9 +500,11 @@ def test_mailbox_push_device_register_list_and_revoke(tmp_path, monkeypatch):
     assert revoked_list_response.json()[0]["enabled"] is False
     with sqlite3.connect(tmp_path / "freemail.sqlite") as connection:
         connection.row_factory = sqlite3.Row
-        row = connection.execute("SELECT push_token_hash FROM mailbox_push_devices").fetchone()
+        row = connection.execute("SELECT push_token_hash, encrypted_push_token FROM mailbox_push_devices").fetchone()
     assert row["push_token_hash"] == sha256("provider-token-123".encode("utf-8")).hexdigest()
     assert row["push_token_hash"] != "provider-token-123"
+    assert row["encrypted_push_token"] is not None
+    assert row["encrypted_push_token"] != "provider-token-123"
 
 
 def test_mailbox_push_notifications_require_bearer_session(tmp_path):
@@ -596,7 +600,50 @@ def test_mailbox_push_notifications_mark_unconfigured_provider_pending(tmp_path,
     notification = response.json()[0]
     assert notification["status"] == "pending_provider"
     assert notification["providerMessageId"] is None
-    assert "fcm" in notification["lastError"]
+    assert "fcm" in notification["lastError"].lower()
+
+
+def test_mailbox_push_notifications_pass_decrypted_token_to_provider(tmp_path, monkeypatch):
+    class Snapshot:
+        def as_dict(self):
+            return {"email": "admin@example.com", "folders": [], "messages": []}
+
+    dispatch_calls = []
+
+    def fake_dispatch(**kwargs):
+        dispatch_calls.append(kwargs)
+        return PushDeliveryResult(delivered=True, provider_message_id="provider-message-id")
+
+    monkeypatch.setattr("freemail_api.main.list_mailbox_snapshot", lambda **_kwargs: Snapshot())
+    monkeypatch.setattr("freemail_api.main.dispatch_push_notification", fake_dispatch)
+
+    with make_client(tmp_path) as client:
+        session_response = client.post(
+            "/api/v1/mailbox/session",
+            json={"email": "admin@example.com", "password": "secret"},
+        )
+        token = session_response.json()["token"]
+        headers = {"Authorization": f"Bearer {token}"}
+        client.post(
+            "/api/v1/mailbox/push/devices",
+            headers=headers,
+            json={
+                "deviceId": "device-123",
+                "platform": "android",
+                "pushToken": "provider-token-123",
+                "provider": "fcm",
+            },
+        )
+        response = client.post(
+            "/api/v1/mailbox/push/notifications",
+            headers=headers,
+            json={"title": "FreeMail", "body": "New message"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()[0]["status"] == "delivered"
+    assert dispatch_calls[0]["provider"] == "fcm"
+    assert dispatch_calls[0]["push_token"] == "provider-token-123"
 
 
 def test_mailbox_search_requires_mailbox_credentials(tmp_path):

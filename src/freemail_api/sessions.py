@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-import base64
 from dataclasses import dataclass
 from hashlib import sha256
 import secrets
 import sqlite3
 import time
 
-from cryptography.fernet import Fernet, InvalidToken
-
 from . import database
+from .secret_box import decrypt_text
+from .secret_box import encrypt_text
+from .secret_box import SecretBoxConfigurationError
+from .secret_box import SecretBoxDecryptionError
 
 
 @dataclass(frozen=True)
@@ -45,11 +46,15 @@ def create_mailbox_session(
     active_now = int(time.time()) if now is None else now
     token = secrets.token_urlsafe(32)
     expires_at = active_now + max(300, ttl_seconds)
+    try:
+        encrypted_password = encrypt_text(password, secret)
+    except SecretBoxConfigurationError as error:
+        raise SessionConfigurationError("FREEMAIL_SESSION_SECRET is not configured") from error
     database.create_mailbox_session(
         connection,
         token_hash=hash_session_token(token),
         email=email,
-        encrypted_password=_fernet(secret).encrypt(password.encode("utf-8")).decode("ascii"),
+        encrypted_password=encrypted_password,
         expires_at=expires_at,
     )
     return CreatedMailboxSession(token=token, email=email.lower(), expires_at=expires_at)
@@ -67,8 +72,10 @@ def resolve_mailbox_session(
     if row is None:
         raise InvalidSessionError("Mailbox session not found")
     try:
-        password = _fernet(secret).decrypt(str(row["encrypted_password"]).encode("ascii")).decode("utf-8")
-    except InvalidToken as error:
+        password = decrypt_text(str(row["encrypted_password"]), secret)
+    except SecretBoxConfigurationError as error:
+        raise SessionConfigurationError("FREEMAIL_SESSION_SECRET is not configured") from error
+    except SecretBoxDecryptionError as error:
         raise InvalidSessionError("Mailbox session could not be decrypted") from error
     return MailboxCredentials(email=str(row["email"]), password=password)
 
@@ -88,10 +95,3 @@ def bearer_token(authorization: str | None) -> str | None:
     if scheme.lower() != "bearer" or not value.strip():
         return None
     return value.strip()
-
-
-def _fernet(secret: str | None) -> Fernet:
-    if not secret:
-        raise SessionConfigurationError("FREEMAIL_SESSION_SECRET is not configured")
-    key = base64.urlsafe_b64encode(sha256(secret.encode("utf-8")).digest())
-    return Fernet(key)

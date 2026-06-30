@@ -113,6 +113,7 @@ Run mobile static QA with:
 Push-Location apps\mobile
 npm ci
 npm run config:check
+npm run native:prebuild:check
 npm run typecheck
 npm audit --audit-level=moderate
 Pop-Location
@@ -120,9 +121,9 @@ Pop-Location
 
 The mobile scaffold lives in `apps\mobile`, uses Expo/React Native, defaults to `https://freemail.kuzuryu.ai`, and persists bearer sessions through `expo-secure-store` rather than browser-style storage. It currently covers sign-in, inbox/folder snapshots, message reading, compose/send with bounded document-picker attachments, reply/forward drafts, folder-scoped search, contacts, non-core folder management, attachment metadata plus authenticated download/share handling, secure offline metadata caching for the last loaded mailbox views, bearer-authenticated push-device registration, and provider-neutral push notification delivery status.
 
-Mobile native release posture is documented in `docs\mobile-release.md`. The open-source repo keeps signing credentials, provisioning profiles, keystores, store API keys, and generated native projects out of source control; CI validates the Expo config and static release checklist instead.
+Mobile native release posture is documented in `docs\mobile-release.md`. The open-source repo keeps signing credentials, provisioning profiles, keystores, store API keys, and generated native projects out of source control; CI validates the Expo config, Android native prebuild drill, and static release checklist instead.
 
-Credential-backed APNS/FCM delivery is intentionally not wired to a third-party service yet. The current contract stores only hashed provider tokens for mailbox/device registration and gives native clients stable register/list/revoke plus provider-neutral notification status APIs:
+The push contract stores hashed provider tokens for lookup and, when `FREEMAIL_PUSH_TOKEN_SECRET` is configured, stores encrypted provider tokens for runtime dispatch. Raw and encrypted provider tokens are never returned by the API and runtime push tables are excluded from metadata backups. Native clients use stable register/list/revoke plus provider-neutral notification status APIs:
 
 ```text
 POST /api/v1/mailbox/push/devices
@@ -132,7 +133,28 @@ POST /api/v1/mailbox/push/notifications
 GET /api/v1/mailbox/push/notifications
 ```
 
-Push notification dispatch has a deterministic development provider for `contract-only` and `development` registrations. APNS/FCM registrations are queued as `pending_provider` until an operator adds a credential-backed adapter; raw provider tokens are still not returned by the API and runtime push tables are excluded from metadata backups.
+Push notification dispatch has a deterministic development provider for `contract-only` and `development` registrations. Credential-backed `fcm` and `apns` adapters are available when the operator configures provider secrets through environment variables; otherwise those notifications are recorded as `pending_provider`.
+
+Required FCM settings:
+
+```text
+FREEMAIL_PUSH_TOKEN_SECRET=...
+FREEMAIL_FCM_PROJECT_ID=...
+FREEMAIL_FCM_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
+```
+
+Required APNS settings:
+
+```text
+FREEMAIL_PUSH_TOKEN_SECRET=...
+FREEMAIL_APNS_TEAM_ID=...
+FREEMAIL_APNS_KEY_ID=...
+FREEMAIL_APNS_PRIVATE_KEY_PEM=-----BEGIN PRIVATE KEY-----...
+FREEMAIL_APNS_BUNDLE_ID=technology.cyint.freemail
+FREEMAIL_APNS_USE_SANDBOX=false
+```
+
+Keep all provider credentials out of Git and configure them only through deployment secrets.
 
 The webmail preview can load live mailbox folders and message headers from the API. Start `admin-api`, `mail-core`, and `web`, open `http://127.0.0.1:18091`, enter a mailbox address/password, and keep the API field pointed at `http://127.0.0.1:18090`. The browser client exchanges the mailbox password for a bearer session at `POST /api/v1/mailbox/session`, stores only the bearer token in `localStorage`, and revokes it with `DELETE /api/v1/mailbox/session` on sign out. The API stores mailbox passwords only as encrypted session material using `FREEMAIL_SESSION_SECRET`. For a different local web origin, set `FREEMAIL_WEB_CORS_ORIGINS`.
 
