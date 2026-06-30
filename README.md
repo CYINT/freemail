@@ -318,11 +318,17 @@ POST /api/v1/admin/mail-core/sync-plan/status
 
 Pass `availableUserSecrets` as mailbox email addresses that are present in the ignored local secrets file. The response includes operation counts and missing account-secret emails, but it does not return DKIM private keys, account passwords, or provider credentials.
 
-The plan is newline-delimited JSON for `stalwart-cli apply`. Stalwart must be taken out of first-boot bootstrap mode before domain, account, or DKIM objects can be applied:
+The plan is newline-delimited JSON for `stalwart-cli apply`. Stalwart must be taken out of first-boot bootstrap mode before domain, account, or DKIM objects can be applied. For private-beta evidence, run the apply workflow through the collector instead of hand-authoring the evidence JSON:
 
 ```powershell
-docker run --rm -i -e STALWART_URL -e STALWART_USER -e STALWART_PASSWORD ghcr.io/stalwartlabs/cli apply --stdin < .freemail-qa\stalwart-plan.ndjson
+.\.venv\Scripts\python.exe scripts\collect_stalwart_apply_evidence.py `
+  --domain example.com `
+  --database data\freemail.sqlite `
+  --secrets-json secrets\mail-core-users.json `
+  --output .freemail-qa\mail-core-apply-example.com.json
 ```
+
+The collector sends the generated Stalwart plan to `stalwart-cli apply` through stdin, then writes only operation counts, apply exit code, output hashes, mail-core readiness, and queue-clear status. It does not persist the raw plan, raw CLI output, DKIM private keys, account secrets, or Stalwart administrator credentials.
 
 The exporter matches DKIM signatures by selector to avoid duplicate Stalwart signatures on repeated local applies. Use unique selectors per hosted domain until the Stalwart CLI supports reliable reference-based matching for `DkimSignature` domain IDs.
 

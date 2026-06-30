@@ -90,7 +90,7 @@ The exporter intentionally requires a separate ignored secrets JSON file for acc
 
 The admin API exposes `POST /api/v1/admin/mail-core/sync-plan/status` as a secret-free readiness surface for this exporter. It reports domain, DKIM, account, and alias counts plus missing account-secret email addresses based on operator-provided `availableUserSecrets` email names. It does not expose DKIM private keys or account password values.
 
-Private-beta gates require separate credential-free mail-core apply evidence after the Stalwart apply workflow runs. That evidence records only the controlled domain, operation counts, apply exit code, output hashes, post-apply readiness, and queue-clear status; it must not include raw Stalwart output, credentials, key material, bearer values, or passwords.
+Private-beta gates require separate credential-free mail-core apply evidence after the Stalwart apply workflow runs. `scripts/collect_stalwart_apply_evidence.py` runs `stalwart-cli apply --stdin`, then records only the controlled domain, operation counts, apply exit code, output hashes, post-apply readiness, and queue-clear status; it must not include raw Stalwart output, credentials, key material, bearer values, or passwords.
 
 The exported plan uses Stalwart CLI upsert operations grouped by object type. It is intended to run after Stalwart's initial `Bootstrap` singleton has been completed; while the server remains in bootstrap mode, Stalwart rejects all object access except `Bootstrap`.
 

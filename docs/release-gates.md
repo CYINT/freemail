@@ -87,6 +87,18 @@ Generate queue evidence with the Stalwart queue helper after controlled mail-flo
 
 The queue JSON must show a clear queue and a timezone-aware ISO-8601 `reviewedAt` timestamp. The private-beta gate accepts the helper output fields `passed`, `clear`, `pending`, `due`, `pendingCount`, `dueCount`, `reviewedAt`, and `messages`; nonzero pending or due counts fail the gate.
 
+Generate mail-core apply evidence with the Stalwart apply collector after the controlled-domain metadata and local secrets file are ready:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\collect_stalwart_apply_evidence.py `
+  --domain example.com `
+  --database data\freemail.sqlite `
+  --secrets-json secrets\mail-core-users.json `
+  --output .freemail-qa\mail-core-apply-example.com.json
+```
+
+The collector runs `stalwart-cli apply --stdin`, probes mail-core readiness, checks queue state, and writes only credential-free hashes, counts, and readiness booleans. Store the JSON output outside Git with the rest of the private-beta evidence packet.
+
 The mail-core apply evidence JSON must be credential-free and include:
 
 ```json
