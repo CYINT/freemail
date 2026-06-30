@@ -69,7 +69,7 @@ Explicit artifact flags override manifest values when an artifact has been reloc
   --release-version v0.1.0-private-beta
 ```
 
-The packet status command is read-only. It reports missing, empty, and invalid artifacts, runs the local mobile, private-beta, and release-notes evidence checks, and records SHA-256 checksums for present artifacts. Passing packet status does not replace the full release gate because it intentionally excludes Git, GitHub Actions, Docker Compose, runtime health, deployment-boundary, metadata-readiness, and mail-core-readiness checks.
+The packet status command is read-only. It reports missing, empty, and invalid artifacts, runs the local restore-drill, mobile, private-beta, and release-notes evidence checks, and records SHA-256 checksums for present artifacts. Passing packet status does not replace the full release gate because it intentionally excludes Git, GitHub Actions, Docker Compose, runtime health, deployment-boundary, metadata-readiness, and mail-core-readiness checks.
 
 Mobile release evidence can also be inspected directly before adding it to the release packet:
 

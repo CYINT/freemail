@@ -29,8 +29,50 @@ def test_release_packet_status_reports_missing_artifacts(tmp_path):
         "--private-beta-evidence",
         "--release-notes",
     ]
-    assert result["failedChecks"] == ["mobile-release-evidence", "private-beta-evidence", "release-notes"]
+    assert result["failedChecks"] == [
+        "restore-drill-evidence",
+        "mobile-release-evidence",
+        "private-beta-evidence",
+        "release-notes",
+    ]
     assert result["runtimeChecksExcluded"] is True
+
+
+def test_release_packet_status_reports_restore_drill_failures(tmp_path):
+    metadata = tmp_path / "metadata.json"
+    mail_store = tmp_path / "mail-store.tar.gz"
+    mobile_evidence = tmp_path / "mobile-release-evidence.json"
+    restore_drill = tmp_path / "restore-drill-evidence.json"
+    mobile_app_config = tmp_path / "app.json"
+    private_beta_evidence = tmp_path / "private-beta-gate.json"
+    release_notes = tmp_path / "release-notes.md"
+    metadata.write_text("{}", encoding="utf-8")
+    mail_store.write_bytes(b"archive")
+    restore_payload = valid_restore_drill_evidence()
+    restore_payload["mailStoreRestore"]["restored"] = False
+    write_json(restore_drill, restore_payload)
+    write_json(mobile_app_config, valid_mobile_app_config())
+    write_json(mobile_evidence, valid_mobile_release_evidence())
+    write_json(private_beta_evidence, valid_private_beta_evidence())
+    write_release_notes(release_notes)
+
+    result = summarize_release_packet(
+        ReleasePacketStatusOptions(
+            metadata_backup=metadata,
+            mail_store_backup=mail_store,
+            restore_drill_evidence=restore_drill,
+            mobile_release_evidence=mobile_evidence,
+            mobile_app_config=mobile_app_config,
+            private_beta_evidence=private_beta_evidence,
+            release_notes=release_notes,
+            release_version="v0.1.0-private-beta",
+        )
+    )
+
+    restore_check = next(check for check in result["checks"] if check["name"] == "restore-drill-evidence")
+    assert result["ready"] is False
+    assert result["failedChecks"] == ["restore-drill-evidence"]
+    assert restore_check["details"]["mailStoreRestored"] is False
 
 
 def test_release_packet_status_reports_mobile_draft_failures(tmp_path):

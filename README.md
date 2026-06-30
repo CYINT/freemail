@@ -420,6 +420,8 @@ Before running the hard release gate, inspect the local release packet inventory
   --manifest .freemail-qa\release\release-evidence-manifest.json
 ```
 
+Packet status is read-only. It validates restore-drill, mobile release, private-beta, and release-notes evidence locally, but it does not replace the hard release gate's GitHub Actions, Docker Compose, VPN runtime, metadata-readiness, or mail-core-readiness checks.
+
 Explicit artifact flags can override manifest entries when evidence is stored in a different location:
 
 ```powershell

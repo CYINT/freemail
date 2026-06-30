@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .mobile_release_gate import MobileReleaseGateOptions, run_mobile_release_gate
-from .release_gate import _check_private_beta_evidence, _check_release_notes
+from .release_gate import _check_private_beta_evidence, _check_release_notes, _check_restore_drill_evidence
 
 
 @dataclass(frozen=True)
@@ -33,6 +33,7 @@ def summarize_release_packet(options: ReleasePacketStatusOptions) -> dict[str, A
         _artifact("--release-notes", options.release_notes),
     ]
     checks = [
+        _restore_drill_check(options.restore_drill_evidence),
         _mobile_release_check(
             options.mobile_release_evidence,
             options.mobile_app_config,
@@ -108,6 +109,14 @@ def _mobile_release_check(
             "evidenceDetails": result["evidenceDetails"],
         },
     )
+
+
+def _restore_drill_check(path: Path | None) -> dict[str, Any]:
+    if path is None:
+        return _check("restore-drill-evidence", False, {"error": "restore drill evidence path is required"})
+    if not path.is_file():
+        return _check("restore-drill-evidence", False, {"error": "restore drill evidence file is missing"})
+    return _check_restore_drill_evidence(path)
 
 
 def _private_beta_check(path: Path | None) -> dict[str, Any]:
