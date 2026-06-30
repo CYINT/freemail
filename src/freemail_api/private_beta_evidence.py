@@ -10,6 +10,7 @@ from typing import Any
 
 EVIDENCE_FILENAMES = {
     "observed_dns": "observed-dns.{domain}.json",
+    "mail_core_apply": "mail-core-apply.{domain}.json",
     "deliverability": "deliverability.{domain}.json",
     "acceptance": "private-beta-acceptance.{domain}.json",
     "manifest": "private-beta-evidence-manifest.{domain}.json",
@@ -32,6 +33,7 @@ def create_private_beta_evidence_templates(options: PrivateBetaEvidenceTemplateO
 
     payloads = {
         "observed_dns": _observed_dns_template(domain),
+        "mail_core_apply": _mail_core_apply_template(domain, checked_at),
         "deliverability": _deliverability_template(domain, checked_at),
         "acceptance": _acceptance_template(domain, checked_at, options.decision_owner),
     }
@@ -118,6 +120,39 @@ def _deliverability_template(domain: str, checked_at: str) -> dict[str, Any]:
     }
 
 
+def _mail_core_apply_template(domain: str, checked_at: str) -> dict[str, Any]:
+    return {
+        "applied": False,
+        "appliedAt": checked_at,
+        "appliedBy": "",
+        "domain": domain,
+        "applyTool": "FreeMail Stalwart apply workflow",
+        "planStatus": {
+            "ready": False,
+            "operationTypes": [],
+            "domains": 0,
+            "dkimKeys": 0,
+            "accounts": 0,
+            "aliases": 0,
+            "missingProvisioningSecrets": [],
+        },
+        "result": {
+            "exitCode": None,
+            "stdoutSha256": "",
+            "stderrSha256": "",
+            "operationCounts": {},
+        },
+        "postApplyReadiness": {
+            "mailCoreReady": False,
+            "queueClear": False,
+        },
+        "evidenceNotes": [
+            "Record counts, timestamps, readiness, and output hashes only.",
+            "Do not paste raw Stalwart output or sensitive values into this file.",
+        ],
+    }
+
+
 def _acceptance_template(domain: str, accepted_at: str, decision_owner: str) -> dict[str, Any]:
     return {
         "accepted": False,
@@ -144,6 +179,7 @@ def _manifest_template(domain: str, generated_at: str, paths: dict[str, Path]) -
             "--acceptance": str(paths["acceptance"]),
             "--mail-flow-evidence": "Generate with scripts/qa_mail_flow.py after controlled-domain mail flow.",
             "--queue-evidence": "Generate with scripts/qa_stalwart_queue.py after controlled-domain mail flow.",
+            "--mail-core-apply-evidence": str(paths["mail_core_apply"]),
             "--metadata-backup": "Generate with scripts/backup_metadata.py before beta access.",
             "--mail-store-backup": "Generate with scripts/backup_mail_store.py before beta access.",
         },

@@ -376,7 +376,7 @@ Run the local release gate only after the candidate commit has been pushed and G
   --release-version v0.1.0-private-beta
 ```
 
-The release gate checks clean Git state, remote SHA, GitHub Actions CI, Compose config, backup evidence, mobile signed-build/store-submission evidence, controlled-domain private-beta evidence, release-notes evidence, VPN-only health/deployment metadata, metadata-store readiness, and mail-core protocol readiness.
+The release gate checks clean Git state, remote SHA, GitHub Actions CI, Compose config, backup evidence, mobile signed-build/store-submission evidence, controlled-domain private-beta evidence, mail-core apply evidence, release-notes evidence, VPN-only health/deployment metadata, metadata-store readiness, and mail-core protocol readiness.
 
 Run the private-beta runtime gate during development:
 
@@ -384,7 +384,7 @@ Run the private-beta runtime gate during development:
 .\.venv\Scripts\python.exe scripts\private_beta_gate.py --skip-dns --skip-evidence
 ```
 
-For a real beta domain, pass admin DNS guidance plus observed DNS evidence, mail-flow evidence, queue evidence, backups, and decision-owner acceptance. Omit `--observed-dns` only when the gate should resolve live MX/TXT records:
+For a real beta domain, pass admin DNS guidance plus observed DNS evidence, mail-flow evidence, queue evidence, credential-free mail-core apply evidence, backups, and decision-owner acceptance. Omit `--observed-dns` only when the gate should resolve live MX/TXT records:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\private_beta_gate.py `
@@ -393,6 +393,7 @@ For a real beta domain, pass admin DNS guidance plus observed DNS evidence, mail
   --observed-dns .freemail-qa\observed-dns-example.com.json `
   --mail-flow-evidence .freemail-qa\mail-flow-example.com.json `
   --queue-evidence .freemail-qa\queue-example.com.json `
+  --mail-core-apply-evidence .freemail-qa\mail-core-apply-example.com.json `
   --deliverability-evidence .freemail-qa\deliverability-example.com.json `
   --metadata-backup .freemail-qa\backups\metadata.json `
   --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
@@ -408,7 +409,7 @@ To avoid hand-authoring the JSON packet, create draft evidence templates first:
   --decision-owner "Decision Owner"
 ```
 
-The generated files are credential-free drafts. They intentionally keep `passed` and `accepted` false until controlled-domain DNS, mail flow, queue, deliverability, backup, and owner-review evidence are actually recorded.
+The generated files are credential-free drafts. They intentionally keep `passed`, `applied`, and `accepted` false until controlled-domain DNS, mail flow, mail-core apply, queue, deliverability, backup, and owner-review evidence are actually recorded.
 
 Generate queue evidence with `scripts\qa_stalwart_queue.py` after controlled mail-flow tests; the private-beta gate requires a clear queue with zero pending and due messages.
 

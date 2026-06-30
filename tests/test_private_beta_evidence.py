@@ -24,12 +24,15 @@ def test_private_beta_evidence_templates_create_draft_packet(tmp_path):
 
     assert result["domain"] == "example.com"
     observed_dns = json.loads((tmp_path / "observed-dns.example.com.json").read_text(encoding="utf-8"))
+    mail_core_apply = json.loads((tmp_path / "mail-core-apply.example.com.json").read_text(encoding="utf-8"))
     deliverability = json.loads((tmp_path / "deliverability.example.com.json").read_text(encoding="utf-8"))
     acceptance = json.loads((tmp_path / "private-beta-acceptance.example.com.json").read_text(encoding="utf-8"))
     manifest = json.loads((tmp_path / "private-beta-evidence-manifest.example.com.json").read_text(encoding="utf-8"))
 
     assert observed_dns["observedRecords"][0]["type"] == "MX"
     assert observed_dns["observedRecords"][0]["values"] == []
+    assert mail_core_apply["applied"] is False
+    assert mail_core_apply["planStatus"]["ready"] is False
     assert deliverability["checkedAt"] == "2026-06-30T00:00:00Z"
     assert deliverability["passed"] is False
     assert acceptance["accepted"] is False
@@ -37,6 +40,7 @@ def test_private_beta_evidence_templates_create_draft_packet(tmp_path):
     assert "vpn" in acceptance["accessBoundary"].lower()
     assert manifest["draftOnly"] is True
     assert "--mail-flow-evidence" in manifest["privateBetaGateInputs"]
+    assert "--mail-core-apply-evidence" in manifest["privateBetaGateInputs"]
 
 
 def test_private_beta_evidence_templates_do_not_accidentally_pass_gate(tmp_path):
@@ -79,6 +83,7 @@ def test_private_beta_evidence_templates_do_not_accidentally_pass_gate(tmp_path)
             skip_dns=True,
             mail_flow_evidence=mail_flow,
             queue_evidence=queue,
+            mail_core_apply_evidence=tmp_path / "mail-core-apply.example.com.json",
             deliverability_evidence=tmp_path / "deliverability.example.com.json",
             metadata_backup=metadata,
             mail_store_backup=mail_store,
@@ -88,6 +93,7 @@ def test_private_beta_evidence_templates_do_not_accidentally_pass_gate(tmp_path)
 
     checks = {check["name"]: check for check in result["checks"]}
     assert result["passed"] is False
+    assert checks["mail-core-apply-evidence"]["status"] == "fail"
     assert checks["deliverability-abuse-evidence"]["status"] == "fail"
     assert checks["private-beta-acceptance"]["status"] == "fail"
 

@@ -191,6 +191,7 @@ def _check_private_beta_evidence(path: Path | None) -> dict[str, Any]:
         "controlled-domain-dns",
         "controlled-mail-flow-evidence",
         "queue-evidence",
+        "mail-core-apply-evidence",
         "deliverability-abuse-evidence",
         "metadata-backup-evidence",
         "mail-store-backup-evidence",

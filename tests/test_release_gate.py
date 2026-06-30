@@ -411,6 +411,7 @@ def valid_private_beta_evidence():
             {"name": "controlled-domain-dns", "status": "pass", "details": {}},
             {"name": "controlled-mail-flow-evidence", "status": "pass", "details": {}},
             {"name": "queue-evidence", "status": "pass", "details": {}},
+            {"name": "mail-core-apply-evidence", "status": "pass", "details": {}},
             {"name": "deliverability-abuse-evidence", "status": "pass", "details": {}},
             {"name": "metadata-backup-evidence", "status": "pass", "details": {}},
             {"name": "mail-store-backup-evidence", "status": "pass", "details": {}},

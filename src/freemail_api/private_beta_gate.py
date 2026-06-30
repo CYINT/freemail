@@ -22,6 +22,7 @@ class PrivateBetaGateOptions:
     observed_dns: Path | None = None
     mail_flow_evidence: Path | None = None
     queue_evidence: Path | None = None
+    mail_core_apply_evidence: Path | None = None
     deliverability_evidence: Path | None = None
     metadata_backup: Path | None = None
     mail_store_backup: Path | None = None
@@ -89,6 +90,7 @@ def _check_beta_evidence(options: PrivateBetaGateOptions) -> list[dict[str, Any]
     return [
         _check_mail_flow_evidence(options),
         _check_queue_evidence(options.queue_evidence),
+        _check_mail_core_apply_evidence(options),
         _check_deliverability_evidence(options),
         _check_file("metadata-backup-evidence", options.metadata_backup, "--metadata-backup"),
         _check_file("mail-store-backup-evidence", options.mail_store_backup, "--mail-store-backup"),
@@ -204,6 +206,65 @@ def _check_queue_evidence(path: Path | None) -> dict[str, Any]:
     )
 
 
+def _check_mail_core_apply_evidence(options: PrivateBetaGateOptions) -> dict[str, Any]:
+    if options.mail_core_apply_evidence is None:
+        return _check("mail-core-apply-evidence", False, {"error": "--mail-core-apply-evidence is required"})
+    payload = _load_json(options.mail_core_apply_evidence)
+    expected_domain = (options.domain or "").lower()
+    evidence_domain = str(payload.get("domain", "")).lower()
+    plan_status = payload.get("planStatus") if isinstance(payload.get("planStatus"), dict) else {}
+    result = payload.get("result") if isinstance(payload.get("result"), dict) else {}
+    readiness = payload.get("postApplyReadiness") if isinstance(payload.get("postApplyReadiness"), dict) else {}
+    operation_types = plan_status.get("operationTypes", [])
+    operation_names = {str(operation).strip() for operation in operation_types} if isinstance(operation_types, list) else set()
+    missing_secrets = plan_status.get("missingProvisioningSecrets", [])
+    missing_secrets_count = len(missing_secrets) if isinstance(missing_secrets, list) else -1
+    domains = _coerce_int(plan_status.get("domains"))
+    accounts = _coerce_int(plan_status.get("accounts"))
+    dkim_keys = _coerce_int(plan_status.get("dkimKeys"))
+    leaked_sensitive_value = _contains_sensitive_evidence_value(payload)
+    passed = (
+        payload.get("applied") is True
+        and _is_timezone_aware_iso8601(payload.get("appliedAt"))
+        and (not expected_domain or evidence_domain == expected_domain)
+        and plan_status.get("ready") is True
+        and missing_secrets_count == 0
+        and domains > 0
+        and accounts > 0
+        and "Domain" in operation_names
+        and "Account" in operation_names
+        and (dkim_keys >= 0)
+        and result.get("exitCode") == 0
+        and readiness.get("mailCoreReady") is True
+        and readiness.get("queueClear") is True
+        and not leaked_sensitive_value
+    )
+    return _check(
+        "mail-core-apply-evidence",
+        passed,
+        _json_evidence_details(
+            options.mail_core_apply_evidence,
+            {
+                "applied": payload.get("applied"),
+                "appliedAt": payload.get("appliedAt"),
+                "domain": payload.get("domain"),
+                "expectedDomain": options.domain,
+                "planReady": plan_status.get("ready"),
+                "operationTypes": sorted(operation_names),
+                "domains": domains,
+                "dkimKeys": dkim_keys,
+                "accounts": accounts,
+                "aliases": _coerce_int(plan_status.get("aliases")),
+                "missingProvisioningSecrets": missing_secrets_count,
+                "exitCode": result.get("exitCode"),
+                "mailCoreReady": readiness.get("mailCoreReady"),
+                "queueClear": readiness.get("queueClear"),
+                "leakedSensitiveValue": leaked_sensitive_value,
+            },
+        ),
+    )
+
+
 def _check_acceptance(path: Path | None) -> dict[str, Any]:
     if path is None:
         return _check("private-beta-acceptance", False, {"error": "--acceptance is required"})
@@ -292,6 +353,31 @@ def _coerce_int(value: object) -> int:
         return int(value or 0)
     except (TypeError, ValueError):
         return -1
+
+
+def _contains_sensitive_evidence_value(value: object) -> bool:
+    if isinstance(value, dict):
+        return any(_contains_sensitive_evidence_value(item) for item in value.values())
+    if isinstance(value, list):
+        return any(_contains_sensitive_evidence_value(item) for item in value)
+    if not isinstance(value, str):
+        return False
+    lowered = value.lower()
+    return any(
+        marker in lowered
+        for marker in (
+            "-----begin ",
+            "private key",
+            "authorization:",
+            "bearer ",
+            "api_key=",
+            "apikey=",
+            "access_token=",
+            "refresh_token=",
+            "password=",
+            "stalwart_password=",
+        )
+    )
 
 
 def _is_timezone_aware_iso8601(value: object) -> bool:

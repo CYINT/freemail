@@ -422,6 +422,43 @@ def test_private_beta_gate_rejects_timezone_free_mail_flow_checked_at(tmp_path):
     assert check["details"]["checkedAt"] == "2026-06-30T00:00:00"
 
 
+def test_private_beta_gate_accepts_mail_core_apply_evidence(tmp_path):
+    evidence = tmp_path / "mail-core-apply.json"
+    write_mail_core_apply_evidence(evidence)
+
+    check = private_beta_gate._check_mail_core_apply_evidence(
+        PrivateBetaGateOptions(domain="example.com", mail_core_apply_evidence=evidence)
+    )
+
+    assert check["status"] == "pass"
+    assert check["details"]["operationTypes"] == ["Account", "DkimSignature", "Domain"]
+    assert check["details"]["sha256"] == hashlib.sha256(evidence.read_bytes()).hexdigest()
+
+
+def test_private_beta_gate_rejects_mail_core_apply_evidence_with_sensitive_value(tmp_path):
+    evidence = tmp_path / "mail-core-apply.json"
+    write_mail_core_apply_evidence(evidence, result={"exitCode": 0, "stdoutSha256": "Bearer leaked"})
+
+    check = private_beta_gate._check_mail_core_apply_evidence(
+        PrivateBetaGateOptions(domain="example.com", mail_core_apply_evidence=evidence)
+    )
+
+    assert check["status"] == "fail"
+    assert check["details"]["leakedSensitiveValue"] is True
+
+
+def test_private_beta_gate_rejects_mail_core_apply_evidence_without_successful_apply(tmp_path):
+    evidence = tmp_path / "mail-core-apply.json"
+    write_mail_core_apply_evidence(evidence, applied=False)
+
+    check = private_beta_gate._check_mail_core_apply_evidence(
+        PrivateBetaGateOptions(domain="example.com", mail_core_apply_evidence=evidence)
+    )
+
+    assert check["status"] == "fail"
+    assert check["details"]["applied"] is False
+
+
 def test_private_beta_gate_requires_beta_evidence_when_enabled():
     result = run_private_beta_gate(
         PrivateBetaGateOptions(
@@ -435,6 +472,7 @@ def test_private_beta_gate_requires_beta_evidence_when_enabled():
     assert [check["name"] for check in result["checks"]] == [
         "controlled-mail-flow-evidence",
         "queue-evidence",
+        "mail-core-apply-evidence",
         "deliverability-abuse-evidence",
         "metadata-backup-evidence",
         "mail-store-backup-evidence",
@@ -445,6 +483,7 @@ def test_private_beta_gate_requires_beta_evidence_when_enabled():
 def test_private_beta_gate_accepts_complete_beta_evidence(tmp_path):
     mail_flow = tmp_path / "mail-flow.json"
     queue = tmp_path / "queue.json"
+    mail_core_apply = tmp_path / "mail-core-apply.json"
     deliverability = tmp_path / "deliverability.json"
     metadata = tmp_path / "metadata.json"
     mail_store = tmp_path / "mail-store.tar.gz"
@@ -468,6 +507,7 @@ def test_private_beta_gate_accepts_complete_beta_evidence(tmp_path):
         json.dumps({"passed": True, "pending": 0, "due": 0, "reviewedAt": "2026-06-30T00:00:00Z"}),
         encoding="utf-8",
     )
+    write_mail_core_apply_evidence(mail_core_apply)
     deliverability.write_text(
         json.dumps(
             {
@@ -506,6 +546,7 @@ def test_private_beta_gate_accepts_complete_beta_evidence(tmp_path):
             skip_dns=True,
             mail_flow_evidence=mail_flow,
             queue_evidence=queue,
+            mail_core_apply_evidence=mail_core_apply,
             deliverability_evidence=deliverability,
             metadata_backup=metadata,
             mail_store_backup=mail_store,
@@ -519,6 +560,9 @@ def test_private_beta_gate_accepts_complete_beta_evidence(tmp_path):
         mail_flow.read_bytes()
     ).hexdigest()
     assert checks_by_name["queue-evidence"]["details"]["sha256"] == hashlib.sha256(queue.read_bytes()).hexdigest()
+    assert checks_by_name["mail-core-apply-evidence"]["details"]["sha256"] == hashlib.sha256(
+        mail_core_apply.read_bytes()
+    ).hexdigest()
     assert checks_by_name["deliverability-abuse-evidence"]["details"]["sha256"] == hashlib.sha256(
         deliverability.read_bytes()
     ).hexdigest()
@@ -527,3 +571,26 @@ def test_private_beta_gate_accepts_complete_beta_evidence(tmp_path):
     assert checks_by_name["private-beta-acceptance"]["details"]["sha256"] == hashlib.sha256(
         acceptance.read_bytes()
     ).hexdigest()
+
+
+def write_mail_core_apply_evidence(path, **overrides):
+    payload = {
+        "applied": True,
+        "appliedAt": "2026-06-30T00:00:00Z",
+        "appliedBy": "operator",
+        "domain": "example.com",
+        "applyTool": "FreeMail Stalwart apply workflow",
+        "planStatus": {
+            "ready": True,
+            "operationTypes": ["Domain", "DkimSignature", "Account"],
+            "domains": 1,
+            "dkimKeys": 1,
+            "accounts": 1,
+            "aliases": 0,
+            "missingProvisioningSecrets": [],
+        },
+        "result": {"exitCode": 0, "stdoutSha256": "a" * 64, "stderrSha256": "b" * 64},
+        "postApplyReadiness": {"mailCoreReady": True, "queueClear": True},
+    }
+    payload.update(overrides)
+    path.write_text(json.dumps(payload), encoding="utf-8")
