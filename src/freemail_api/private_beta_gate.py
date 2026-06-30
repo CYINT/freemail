@@ -114,16 +114,18 @@ def _check_mail_flow_evidence(options: PrivateBetaGateOptions) -> dict[str, Any]
     return _check(
         "controlled-mail-flow-evidence",
         passed,
-        {
-            "path": str(options.mail_flow_evidence),
-            "passed": payload.get("passed"),
-            "inboundAccepted": payload.get("inboundAccepted"),
-            "inboundFound": bool(inbound_found),
-            "submissionAccepted": payload.get("submissionAccepted"),
-            "submissionFound": bool(submission_found),
-            "requiredDkimDomain": payload.get("requiredDkimDomain"),
-            "expectedDomain": options.domain,
-        },
+        _json_evidence_details(
+            options.mail_flow_evidence,
+            {
+                "passed": payload.get("passed"),
+                "inboundAccepted": payload.get("inboundAccepted"),
+                "inboundFound": bool(inbound_found),
+                "submissionAccepted": payload.get("submissionAccepted"),
+                "submissionFound": bool(submission_found),
+                "requiredDkimDomain": payload.get("requiredDkimDomain"),
+                "expectedDomain": options.domain,
+            },
+        ),
     )
 
 
@@ -151,18 +153,20 @@ def _check_deliverability_evidence(options: PrivateBetaGateOptions) -> dict[str,
     return _check(
         "deliverability-abuse-evidence",
         passed,
-        {
-            "path": str(options.deliverability_evidence),
-            "passed": payload.get("passed"),
-            "domain": payload.get("domain"),
-            "expectedDomain": options.domain,
-            "spfAligned": payload.get("spfAligned"),
-            "dmarcAligned": payload.get("dmarcAligned"),
-            "dkimAligned": payload.get("dkimAligned"),
-            "queueReviewed": payload.get("queueReviewed"),
-            "bounceOrRetryReviewed": payload.get("bounceOrRetryReviewed"),
-            "abuseComplaints": abuse_complaints,
-        },
+        _json_evidence_details(
+            options.deliverability_evidence,
+            {
+                "passed": payload.get("passed"),
+                "domain": payload.get("domain"),
+                "expectedDomain": options.domain,
+                "spfAligned": payload.get("spfAligned"),
+                "dmarcAligned": payload.get("dmarcAligned"),
+                "dkimAligned": payload.get("dkimAligned"),
+                "queueReviewed": payload.get("queueReviewed"),
+                "bounceOrRetryReviewed": payload.get("bounceOrRetryReviewed"),
+                "abuseComplaints": abuse_complaints,
+            },
+        ),
     )
 
 
@@ -177,14 +181,16 @@ def _check_queue_evidence(path: Path | None) -> dict[str, Any]:
     return _check(
         "queue-evidence",
         passed,
-        {
-            "path": str(path),
-            "passed": payload.get("passed", True),
-            "clear": clear,
-            "pending": pending,
-            "due": due,
-            "reviewedAt": payload.get("reviewedAt"),
-        },
+        _json_evidence_details(
+            path,
+            {
+                "passed": payload.get("passed", True),
+                "clear": clear,
+                "pending": pending,
+                "due": due,
+                "reviewedAt": payload.get("reviewedAt"),
+            },
+        ),
     )
 
 
@@ -204,13 +210,15 @@ def _check_acceptance(path: Path | None) -> dict[str, Any]:
     return _check(
         "private-beta-acceptance",
         passed,
-        {
-            "path": str(path),
-            "accepted": payload.get("accepted"),
-            "decisionOwner": payload.get("decisionOwner"),
-            "accessBoundary": payload.get("accessBoundary"),
-            "knownLimitations": len(limitations) if isinstance(limitations, list) else 0,
-        },
+        _json_evidence_details(
+            path,
+            {
+                "accepted": payload.get("accepted"),
+                "decisionOwner": payload.get("decisionOwner"),
+                "accessBoundary": payload.get("accessBoundary"),
+                "knownLimitations": len(limitations) if isinstance(limitations, list) else 0,
+            },
+        ),
     )
 
 
@@ -220,6 +228,12 @@ def _check_file(name: str, path: Path | None, flag: str) -> dict[str, Any]:
     exists = path.is_file()
     size = path.stat().st_size if exists else 0
     return _check(name, exists and size > 0, _file_evidence_details(path, exists, size))
+
+
+def _json_evidence_details(path: Path, details: dict[str, Any]) -> dict[str, Any]:
+    file_details = _file_evidence_details(path)
+    file_details.update(details)
+    return file_details
 
 
 def resolve_observed_dns(expected_records: list[DnsRecord]) -> list[dict[str, object]]:

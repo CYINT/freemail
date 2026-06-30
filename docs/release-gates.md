@@ -58,7 +58,7 @@ For a controlled domain, first export DNS guidance from the admin API, capture o
   --acceptance .freemail-qa\private-beta-acceptance-example.com.json
 ```
 
-If `--observed-dns` is omitted, the gate resolves live MX/TXT DNS for the expected record names. The output JSON is release evidence and should be stored outside Git with the other private-beta artifacts. Backup evidence checks include the path, byte count, and SHA-256 checksum for both metadata and mail-store files.
+If `--observed-dns` is omitted, the gate resolves live MX/TXT DNS for the expected record names. The output JSON is release evidence and should be stored outside Git with the other private-beta artifacts. Evidence checks include the path, byte count, and SHA-256 checksum for mail-flow, queue, deliverability/abuse, backup, and acceptance files.
 
 Generate queue evidence with the Stalwart queue helper after controlled mail-flow tests:
 
@@ -106,7 +106,7 @@ Release provenance for a candidate consists of:
 - direct runtime dependency license-policy scan completion in that workflow
 - release notes path and checksum, committed under `docs/release-notes/`
 - release-gate JSON output, including backup file and release-notes SHA-256 checksums
-- private-beta gate JSON output for each controlled domain, including backup file SHA-256 checksums
+- private-beta gate JSON output for each controlled domain, including evidence-file SHA-256 checksums
 - deliverability/abuse evidence for each controlled domain
 - metadata readiness evidence for the active API database
 - metadata backup path and checksum, stored outside Git

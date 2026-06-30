@@ -293,5 +293,15 @@ def test_private_beta_gate_accepts_complete_beta_evidence(tmp_path):
 
     assert result["passed"] is True
     checks_by_name = {check["name"]: check for check in result["checks"]}
+    assert checks_by_name["controlled-mail-flow-evidence"]["details"]["sha256"] == hashlib.sha256(
+        mail_flow.read_bytes()
+    ).hexdigest()
+    assert checks_by_name["queue-evidence"]["details"]["sha256"] == hashlib.sha256(queue.read_bytes()).hexdigest()
+    assert checks_by_name["deliverability-abuse-evidence"]["details"]["sha256"] == hashlib.sha256(
+        deliverability.read_bytes()
+    ).hexdigest()
     assert checks_by_name["metadata-backup-evidence"]["details"]["sha256"] == hashlib.sha256(b"{}").hexdigest()
     assert checks_by_name["mail-store-backup-evidence"]["details"]["sha256"] == hashlib.sha256(b"backup").hexdigest()
+    assert checks_by_name["private-beta-acceptance"]["details"]["sha256"] == hashlib.sha256(
+        acceptance.read_bytes()
+    ).hexdigest()
