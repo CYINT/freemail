@@ -135,6 +135,165 @@ def test_admin_can_create_domain_user_mailbox_alias_and_audit_log(tmp_path):
         ]
 
 
+def test_admin_can_suspend_and_reactivate_domain_user_and_mailbox(tmp_path):
+    with make_client(tmp_path) as client:
+        domain = client.post("/api/v1/admin/domains", headers=admin_headers(), json={"name": "example.com"}).json()
+        user = client.post(
+            "/api/v1/admin/users",
+            headers=admin_headers(),
+            json={
+                "email": "admin@example.com",
+                "displayName": "Admin User",
+                "passwordHash": "argon2id-placeholder-hash",
+            },
+        ).json()
+        mailbox = client.post(
+            "/api/v1/admin/mailboxes",
+            headers=admin_headers(),
+            json={"userId": user["id"], "localPart": "admin", "domainId": domain["id"]},
+        ).json()
+
+        suspended_domain = client.patch(
+            f"/api/v1/admin/domains/{domain['id']}/status",
+            headers=admin_headers(),
+            json={"status": "suspended"},
+        )
+        suspended_user = client.patch(
+            f"/api/v1/admin/users/{user['id']}/status",
+            headers=admin_headers(),
+            json={"status": "suspended"},
+        )
+        suspended_mailbox = client.patch(
+            f"/api/v1/admin/mailboxes/{mailbox['id']}/status",
+            headers=admin_headers(),
+            json={"status": "suspended"},
+        )
+        reactivated_user = client.patch(
+            f"/api/v1/admin/users/{user['id']}/status",
+            headers=admin_headers(),
+            json={"status": "invited"},
+        )
+        audit_log = client.get("/api/v1/admin/audit-log", headers=admin_headers())
+
+    assert suspended_domain.status_code == 200
+    assert suspended_domain.json()["status"] == "suspended"
+    assert suspended_user.status_code == 200
+    assert suspended_user.json()["status"] == "suspended"
+    assert suspended_mailbox.status_code == 200
+    assert suspended_mailbox.json()["status"] == "suspended"
+    assert reactivated_user.status_code == 200
+    assert reactivated_user.json()["status"] == "invited"
+    assert [entry["action"] for entry in audit_log.json()][-4:] == [
+        "domain.suspend",
+        "user.suspend",
+        "mailbox.suspend",
+        "user.activate",
+    ]
+
+
+def test_admin_status_update_rejects_invalid_resource_status(tmp_path):
+    with make_client(tmp_path) as client:
+        domain = client.post("/api/v1/admin/domains", headers=admin_headers(), json={"name": "example.com"}).json()
+        response = client.patch(
+            f"/api/v1/admin/domains/{domain['id']}/status",
+            headers=admin_headers(),
+            json={"status": "invited"},
+        )
+
+    assert response.status_code == 422
+    assert "domains status must be one of" in response.json()["detail"]
+
+
+def test_suspended_mailbox_blocks_mailbox_api_access(tmp_path, monkeypatch):
+    def fake_snapshot(**_kwargs):
+        raise AssertionError("IMAP snapshot should not run for suspended mailbox")
+
+    monkeypatch.setattr("freemail_api.main.list_mailbox_snapshot", fake_snapshot)
+    with make_client(tmp_path) as client:
+        domain = client.post("/api/v1/admin/domains", headers=admin_headers(), json={"name": "example.com"}).json()
+        user = client.post(
+            "/api/v1/admin/users",
+            headers=admin_headers(),
+            json={
+                "email": "admin@example.com",
+                "displayName": "Admin User",
+                "passwordHash": "argon2id-placeholder-hash",
+            },
+        ).json()
+        mailbox = client.post(
+            "/api/v1/admin/mailboxes",
+            headers=admin_headers(),
+            json={"userId": user["id"], "localPart": "admin", "domainId": domain["id"]},
+        ).json()
+        client.patch(
+            f"/api/v1/admin/mailboxes/{mailbox['id']}/status",
+            headers=admin_headers(),
+            json={"status": "suspended"},
+        )
+        response = client.get(
+            "/api/v1/mailbox/snapshot",
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+        )
+        session_response = client.post(
+            "/api/v1/mailbox/session",
+            json={"email": "admin@example.com", "password": "secret"},
+        )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Mailbox is suspended"
+    assert session_response.status_code == 403
+    assert session_response.json()["detail"] == "Mailbox is suspended"
+
+
+def test_suspended_user_blocks_existing_bearer_session(tmp_path, monkeypatch):
+    class Snapshot:
+        def as_dict(self):
+            return {"email": "admin@example.com", "folders": [], "messages": []}
+
+    calls = []
+
+    def fake_snapshot(**_kwargs):
+        calls.append("snapshot")
+        return Snapshot()
+
+    monkeypatch.setattr("freemail_api.main.list_mailbox_snapshot", fake_snapshot)
+    with make_client(tmp_path) as client:
+        domain = client.post("/api/v1/admin/domains", headers=admin_headers(), json={"name": "example.com"}).json()
+        user = client.post(
+            "/api/v1/admin/users",
+            headers=admin_headers(),
+            json={
+                "email": "admin@example.com",
+                "displayName": "Admin User",
+                "passwordHash": "argon2id-placeholder-hash",
+            },
+        ).json()
+        client.post(
+            "/api/v1/admin/mailboxes",
+            headers=admin_headers(),
+            json={"userId": user["id"], "localPart": "admin", "domainId": domain["id"]},
+        )
+        session_response = client.post(
+            "/api/v1/mailbox/session",
+            json={"email": "admin@example.com", "password": "secret"},
+        )
+        token = session_response.json()["token"]
+        client.patch(
+            f"/api/v1/admin/users/{user['id']}/status",
+            headers=admin_headers(),
+            json={"status": "suspended"},
+        )
+        response = client.get("/api/v1/mailbox/snapshot", headers={"Authorization": f"Bearer {token}"})
+
+    assert session_response.status_code == 200
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Mailbox is suspended"
+    assert calls == ["snapshot"]
+
+
 def test_bootstrap_creates_only_first_admin_domain_and_mailbox(tmp_path):
     with make_client(tmp_path) as client:
         payload = {

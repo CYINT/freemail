@@ -63,10 +63,13 @@ Initial endpoints:
 - `POST /api/v1/bootstrap/admin`
 - `POST /api/v1/admin/domains`
 - `GET /api/v1/admin/domains`
+- `PATCH /api/v1/admin/domains/{domainId}/status`
 - `POST /api/v1/admin/users`
 - `GET /api/v1/admin/users`
+- `PATCH /api/v1/admin/users/{userId}/status`
 - `POST /api/v1/admin/mailboxes`
 - `GET /api/v1/admin/mailboxes`
+- `PATCH /api/v1/admin/mailboxes/{mailboxId}/status`
 - `POST /api/v1/admin/aliases`
 - `GET /api/v1/admin/aliases`
 - `POST /api/v1/admin/dkim-keys`
@@ -80,6 +83,8 @@ The current metadata store is SQLite at `FREEMAIL_DB_PATH`, defaulting to `data/
 The bootstrap endpoint requires `X-FreeMail-Bootstrap-Token`, refuses to run unless `FREEMAIL_BOOTSTRAP_TOKEN` is configured, and refuses to create a second administrator after the first admin exists.
 
 DNS guidance returns the MX, SPF, DMARC, and DKIM records expected for a domain. The DNS verification endpoint accepts observed DNS values and returns a check list plus a `ready` boolean; it is intended as the repeatable gate before controlled-domain mail-flow tests.
+
+Admin status endpoints support abuse response for private beta. Domains and mailboxes accept `active` or `suspended`; users accept `invited` or `suspended`. Status changes are audit logged, suspended metadata blocks mailbox API access for managed mailboxes, and suspended domains/mailboxes are excluded from Stalwart apply-plan exports.
 
 ## Docker
 

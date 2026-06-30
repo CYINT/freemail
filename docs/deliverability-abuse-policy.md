@@ -16,6 +16,7 @@ FreeMail is in a controlled private-beta posture. Do not expose the stack direct
 
 - Treat unexpected outbound volume, repeated recipient refusal, queue growth, or external abuse complaints as a beta-blocking incident.
 - Preserve audit evidence: mailbox address, timestamps, queue state, rate-limit counters, and relevant SMTP error text.
+- Use the admin status endpoints to suspend affected domains, users, or mailboxes while preserving audit history.
 - Suspend or rotate the affected mailbox credentials in the mail core before raising global limits.
 - Do not add proprietary blocklists, reputation feeds, or spam engines unless their licenses are compatible with AGPL distribution or they are optional external integrations.
 

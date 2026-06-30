@@ -38,6 +38,7 @@ from .outbound_policy import record_outbound_send
 from .push_delivery import dispatch_push_notification
 from .push_delivery import PushDeliveryConfig
 from .schemas import (
+    AdminStatusUpdate,
     AliasCreate,
     AliasRecord,
     AuditRecord,
@@ -181,11 +182,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         token = bearer_token(authorization)
         if token:
             try:
-                return resolve_mailbox_session(
+                credentials = resolve_mailbox_session(
                     connection,
                     token=token,
                     secret=active_settings.session_secret,
                 )
+                ensure_mailbox_access_allowed(connection, credentials.email)
+                return credentials
             except SessionConfigurationError as error:
                 raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -195,7 +198,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid mailbox session") from error
         if not x_freemail_mailbox_email or not x_freemail_mailbox_password:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Mailbox credentials required")
+        ensure_mailbox_access_allowed(connection, x_freemail_mailbox_email)
         return MailboxCredentials(email=x_freemail_mailbox_email, password=x_freemail_mailbox_password)
+
+    def ensure_mailbox_access_allowed(connection: sqlite3.Connection, email: str) -> None:
+        if not database.is_mailbox_access_allowed(connection, email):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Mailbox is suspended")
 
     def reject_protected_folder(folder: str, *, action: str) -> None:
         if folder.strip().lower() in protected_folders:
@@ -263,6 +271,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         connection: sqlite3.Connection = Depends(get_connection),
     ) -> dict[str, object]:
         try:
+            ensure_mailbox_access_allowed(connection, str(payload.email))
             list_mailbox_snapshot(
                 email=str(payload.email),
                 password=payload.password,
@@ -816,6 +825,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     ) -> dict[str, object]:
         return _row_to_dict(_create_or_raise(lambda: database.create_domain(connection, payload, actor)))
 
+    @app.patch("/api/v1/admin/domains/{domain_id}/status", response_model=DomainRecord)
+    def update_domain_status(
+        domain_id: int,
+        payload: AdminStatusUpdate,
+        actor: str = Depends(require_admin),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        return _row_to_dict(
+            _create_or_raise(lambda: database.update_status(connection, "domains", domain_id, payload.status, actor))
+        )
+
     @app.get("/api/v1/admin/users", response_model=list[UserRecord])
     def list_users(
         _actor: str = Depends(require_admin),
@@ -831,6 +851,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     ) -> dict[str, object]:
         return _row_to_dict(_create_or_raise(lambda: database.create_user(connection, payload, actor)))
 
+    @app.patch("/api/v1/admin/users/{user_id}/status", response_model=UserRecord)
+    def update_user_status(
+        user_id: int,
+        payload: AdminStatusUpdate,
+        actor: str = Depends(require_admin),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        return _row_to_dict(
+            _create_or_raise(lambda: database.update_status(connection, "users", user_id, payload.status, actor))
+        )
+
     @app.get("/api/v1/admin/mailboxes", response_model=list[MailboxRecord])
     def list_mailboxes(
         _actor: str = Depends(require_admin),
@@ -845,6 +876,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         connection: sqlite3.Connection = Depends(get_connection),
     ) -> dict[str, object]:
         return _row_to_dict(_create_or_raise(lambda: database.create_mailbox(connection, payload, actor)))
+
+    @app.patch("/api/v1/admin/mailboxes/{mailbox_id}/status", response_model=MailboxRecord)
+    def update_mailbox_status(
+        mailbox_id: int,
+        payload: AdminStatusUpdate,
+        actor: str = Depends(require_admin),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        return _row_to_dict(
+            _create_or_raise(lambda: database.update_status(connection, "mailboxes", mailbox_id, payload.status, actor))
+        )
 
     @app.get("/api/v1/admin/aliases", response_model=list[AliasRecord])
     def list_aliases(
@@ -938,6 +980,8 @@ def _create_or_raise(create_record):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
     except database.MissingRecordError as error:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except database.InvalidStatusError as error:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)) from error
 
 
 def _row_to_dict(row: sqlite3.Row) -> dict[str, object]:

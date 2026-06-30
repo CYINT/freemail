@@ -72,9 +72,13 @@ def _account_values(connection: sqlite3.Connection, options: PlanOptions) -> dic
     values: dict[str, dict[str, object]] = {}
     rows = connection.execute(
         """
-        SELECT users.email, users.display_name
+        SELECT DISTINCT users.email, users.display_name
         FROM users
+        JOIN mailboxes ON mailboxes.user_id = users.id
+        JOIN domains ON domains.id = mailboxes.domain_id
         WHERE users.status = 'invited'
+          AND mailboxes.status = 'active'
+          AND domains.status = 'active'
         ORDER BY users.id
         """
     )
@@ -114,11 +118,13 @@ def _account_aliases(connection: sqlite3.Connection, email: str) -> dict[str, di
         SELECT mailboxes.address
         FROM mailboxes
         JOIN users ON users.id = mailboxes.user_id
-        WHERE users.email = ? AND mailboxes.status = 'active'
+        JOIN domains ON domains.id = mailboxes.domain_id
+        WHERE users.email = ? AND mailboxes.status = 'active' AND domains.status = 'active'
         UNION
         SELECT aliases.source AS address
         FROM aliases
-        WHERE aliases.destination = ? AND aliases.status = 'active'
+        JOIN domains ON domains.name = substr(aliases.source, instr(aliases.source, '@') + 1)
+        WHERE aliases.destination = ? AND aliases.status = 'active' AND domains.status = 'active'
         ORDER BY address
         """,
         [email, email],

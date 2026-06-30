@@ -10,6 +10,10 @@ class ApiModel(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 
+class AdminStatusUpdate(ApiModel):
+    status: str = Field(pattern=r"^(active|invited|suspended)$")
+
+
 class DomainCreate(ApiModel):
     name: str = Field(min_length=1, max_length=253, pattern=r"^[A-Za-z0-9.-]+$")
 

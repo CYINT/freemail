@@ -9,6 +9,7 @@ from freemail_api.database import (
     create_mailbox,
     create_user,
     initialize,
+    update_status,
 )
 from freemail_api.schemas import AliasCreate, DkimKeyCreate, DomainCreate, MailboxCreate, UserCreate
 from freemail_api.stalwart_plan import MissingProvisioningSecretError, PlanOptions, build_apply_plan
@@ -80,11 +81,89 @@ def test_build_apply_plan_requires_user_secret_by_default(tmp_path):
     initialize(str(db_path))
     with sqlite3.connect(db_path) as connection:
         connection.row_factory = sqlite3.Row
-        create_user(
+        domain = create_domain(connection, DomainCreate(name="example.com"), "test")
+        user = create_user(
             connection,
             UserCreate(email="admin@example.com", displayName="Admin User", passwordHash="argon2id-placeholder-hash"),
+            "test",
+        )
+        create_mailbox(
+            connection,
+            MailboxCreate(userId=int(user["id"]), localPart="admin", domainId=int(domain["id"])),
             "test",
         )
 
         with pytest.raises(MissingProvisioningSecretError):
             build_apply_plan(connection, PlanOptions(user_secrets={}))
+
+
+def test_build_apply_plan_excludes_suspended_domain_and_mailbox(tmp_path):
+    db_path = tmp_path / "freemail.sqlite"
+    initialize(str(db_path))
+    with sqlite3.connect(db_path) as connection:
+        connection.row_factory = sqlite3.Row
+        active_domain = create_domain(connection, DomainCreate(name="active.example"), "test")
+        suspended_domain = create_domain(connection, DomainCreate(name="suspended.example"), "test")
+        active_user = create_user(
+            connection,
+            UserCreate(email="active@active.example", displayName="Active User", passwordHash="argon2id-placeholder"),
+            "test",
+        )
+        suspended_domain_user = create_user(
+            connection,
+            UserCreate(
+                email="user@suspended.example",
+                displayName="Suspended Domain User",
+                passwordHash="argon2id-placeholder",
+            ),
+            "test",
+        )
+        suspended_mailbox_user = create_user(
+            connection,
+            UserCreate(
+                email="disabled@active.example",
+                displayName="Disabled Mailbox User",
+                passwordHash="argon2id-placeholder",
+            ),
+            "test",
+        )
+        create_mailbox(
+            connection,
+            MailboxCreate(userId=int(active_user["id"]), localPart="active", domainId=int(active_domain["id"])),
+            "test",
+        )
+        create_mailbox(
+            connection,
+            MailboxCreate(
+                userId=int(suspended_domain_user["id"]),
+                localPart="user",
+                domainId=int(suspended_domain["id"]),
+            ),
+            "test",
+        )
+        disabled_mailbox = create_mailbox(
+            connection,
+            MailboxCreate(
+                userId=int(suspended_mailbox_user["id"]),
+                localPart="disabled",
+                domainId=int(active_domain["id"]),
+            ),
+            "test",
+        )
+        update_status(connection, "domains", int(suspended_domain["id"]), "suspended", "test")
+        update_status(connection, "mailboxes", int(disabled_mailbox["id"]), "suspended", "test")
+
+        plan = build_apply_plan(
+            connection,
+            PlanOptions(
+                user_secrets={
+                    "active@active.example": "active-secret",
+                    "user@suspended.example": "domain-secret",
+                    "disabled@active.example": "mailbox-secret",
+                }
+            ),
+        )
+
+    assert [operation["object"] for operation in plan] == ["Domain", "Account"]
+    assert set(plan[0]["value"]) == {"domain-active-example"}
+    assert set(plan[1]["value"]) == {"account-active-active-example"}

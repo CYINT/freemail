@@ -133,6 +133,17 @@ class MissingRecordError(ValueError):
     pass
 
 
+class InvalidStatusError(ValueError):
+    pass
+
+
+STATUS_TABLES = {
+    "domains": {"target_type": "domain", "allowed": {"active", "suspended"}},
+    "users": {"target_type": "user", "allowed": {"invited", "suspended"}},
+    "mailboxes": {"target_type": "mailbox", "allowed": {"active", "suspended"}},
+}
+
+
 def connect(database_path: str) -> sqlite3.Connection:
     path = Path(database_path)
     if path.parent != Path("."):
@@ -226,6 +237,23 @@ def create_mailbox(connection: sqlite3.Connection, payload: MailboxCreate, actor
     return _get_row(connection, "mailboxes", row_id)
 
 
+def update_status(connection: sqlite3.Connection, table: str, row_id: int, status: str, actor: str) -> sqlite3.Row:
+    config = STATUS_TABLES.get(table)
+    if config is None:
+        raise ValueError(f"Unsupported status table: {table}")
+    normalized_status = status.lower()
+    if normalized_status not in config["allowed"]:
+        allowed = ", ".join(sorted(config["allowed"]))
+        raise InvalidStatusError(f"{table} status must be one of: {allowed}")
+    _get_row(connection, table, row_id)
+    connection.execute(f"UPDATE {table} SET status = ? WHERE id = ?", [normalized_status, row_id])
+    target_type = str(config["target_type"])
+    action = f"{target_type}.{'suspend' if normalized_status == 'suspended' else 'activate'}"
+    _audit(connection, actor, action, target_type, row_id)
+    connection.commit()
+    return _get_row(connection, table, row_id)
+
+
 def create_alias(connection: sqlite3.Connection, payload: AliasCreate, actor: str) -> sqlite3.Row:
     row_id = _execute_insert(
         connection,
@@ -299,6 +327,22 @@ def get_mailbox_session(connection: sqlite3.Connection, token_hash: str, now: in
         [token_hash, now],
     ).fetchone()
     return row
+
+
+def is_mailbox_access_allowed(connection: sqlite3.Connection, email: str) -> bool:
+    row = connection.execute(
+        """
+        SELECT users.status AS user_status, mailboxes.status AS mailbox_status, domains.status AS domain_status
+        FROM mailboxes
+        JOIN users ON users.id = mailboxes.user_id
+        JOIN domains ON domains.id = mailboxes.domain_id
+        WHERE mailboxes.address = ?
+        """,
+        [email.lower()],
+    ).fetchone()
+    if row is None:
+        return True
+    return row["user_status"] != "suspended" and row["mailbox_status"] == "active" and row["domain_status"] == "active"
 
 
 def revoke_mailbox_session(connection: sqlite3.Connection, token_hash: str) -> None:
