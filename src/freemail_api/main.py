@@ -76,6 +76,8 @@ from .schemas import (
     MailboxMessageDetailRecord,
     MailboxMoveCreate,
     MailboxMoveRecord,
+    MailboxPreferencesRecord,
+    MailboxPreferencesUpdate,
     MailCoreSyncPlanStatusCreate,
     MailCoreSyncPlanStatusRecord,
     MailboxPushDeviceCreate,
@@ -166,6 +168,7 @@ COMPONENT_READINESS = {
         "evidence": [
             "mailbox session login, folder navigation, search, contacts, message read, read/unread state, star state, compose, attachments, archive, move, and delete controls",
             "bulk message actions for read/unread, star/unstar, archive, spam, delete, and move",
+            "persistent mailbox preferences with default compose signatures",
             "server-side Drafts persistence and compose reopen support for saved drafts",
             "server-side Sent Items persistence for accepted outbound messages",
             "token-gated admin console for bootstrap, users, domains, mailboxes, aliases, DKIM, DNS guidance, status actions, sync status, and audit logs",
@@ -180,6 +183,7 @@ COMPONENT_READINESS = {
         "evidence": [
             "Expo/React Native client with VPN API target, mailbox sessions, message workflows, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder controls, contacts, attachments, offline metadata cache, and push-device flows",
             "bulk read/star/archive/spam/delete/move client controls over the shared mailbox API",
+            "mobile preference controls for default compose signatures",
             "compose/send path uses the shared mailbox API contract with Sent Items persistence status",
             "mobile static QA, config validation, native prebuild drill, typecheck, and dependency audit in CI",
         ],
@@ -212,7 +216,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.add_middleware(
             CORSMiddleware,
             allow_origins=cors_origins,
-            allow_methods=["DELETE", "GET", "PATCH", "POST", "OPTIONS"],
+            allow_methods=["DELETE", "GET", "PATCH", "POST", "PUT", "OPTIONS"],
             allow_headers=[
                 "Authorization",
                 "Content-Type",
@@ -465,6 +469,42 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if token:
             revoke_mailbox_session(connection, token)
         return {"revoked": True}
+
+    @app.get("/api/v1/mailbox/preferences", response_model=MailboxPreferencesRecord)
+    def mailbox_preferences_get(
+        authorization: str | None = Header(default=None),
+        x_freemail_mailbox_email: str | None = Header(default=None),
+        x_freemail_mailbox_password: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, str]:
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=x_freemail_mailbox_email,
+            x_freemail_mailbox_password=x_freemail_mailbox_password,
+            connection=connection,
+        )
+        return database.get_mailbox_preferences(connection, email=credentials.email)
+
+    @app.put("/api/v1/mailbox/preferences", response_model=MailboxPreferencesRecord)
+    def mailbox_preferences_update(
+        payload: MailboxPreferencesUpdate,
+        authorization: str | None = Header(default=None),
+        x_freemail_mailbox_email: str | None = Header(default=None),
+        x_freemail_mailbox_password: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, str]:
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=x_freemail_mailbox_email,
+            x_freemail_mailbox_password=x_freemail_mailbox_password,
+            connection=connection,
+        )
+        return database.upsert_mailbox_preferences(
+            connection,
+            email=credentials.email,
+            display_name=payload.display_name,
+            signature=payload.signature,
+        )
 
     @app.post("/api/v1/mailbox/push/devices", response_model=MailboxPushDeviceRecord)
     def mailbox_push_device_register(

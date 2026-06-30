@@ -35,6 +35,9 @@ const bulkSpamAction = document.querySelector("#bulk-spam-action");
 const bulkDeleteAction = document.querySelector("#bulk-delete-action");
 const contactsAction = document.querySelector("#contacts-action");
 const contactsList = document.querySelector("#contacts-list");
+const preferencesForm = document.querySelector("#mailbox-preferences");
+const preferenceDisplayName = document.querySelector("#preference-display-name");
+const preferenceSignature = document.querySelector("#preference-signature");
 const composeTo = document.querySelector("#compose-to");
 const composeSubject = document.querySelector("#compose-subject");
 const composeBody = document.querySelector("#compose-body");
@@ -76,6 +79,10 @@ let adminSession = {
 };
 let selectedMessageDetail = null;
 let selectedMessageIds = new Set();
+let mailboxPreferences = {
+  displayName: "",
+  signature: "",
+};
 
 restoreMailboxSession();
 restoreAdminSession();
@@ -97,6 +104,11 @@ composeForm?.addEventListener("submit", async (event) => {
 
 saveDraftAction?.addEventListener("click", async () => {
   await saveMailboxDraft(await composePayload());
+});
+
+preferencesForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await saveMailboxPreferences();
 });
 
 searchForm?.addEventListener("submit", async (event) => {
@@ -338,6 +350,7 @@ async function createMailboxSession({ email, password, apiBaseUrl }) {
     };
     persistMailboxSession(mailboxSession);
     await loadMailboxSnapshot(mailboxSession.folder);
+    await loadMailboxPreferences({ quiet: true });
   } catch (error) {
     forgetMailboxSession();
     setStatus(`Session start failed: ${readableError(error)}`, "error");
@@ -361,6 +374,76 @@ async function revokeMailboxSession() {
   renderFolders([], "INBOX");
   renderMessages([]);
   setStatus("Signed out.", "idle");
+}
+
+async function loadMailboxPreferences({ quiet = false } = {}) {
+  if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
+    return;
+  }
+  try {
+    const response = await fetch(new URL("/api/v1/mailbox/preferences", mailboxSession.apiBaseUrl), {
+      headers: mailboxHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const preferences = await response.json();
+    mailboxPreferences = {
+      displayName: preferences.displayName || "",
+      signature: preferences.signature || "",
+    };
+    renderMailboxPreferences();
+    if (!quiet) {
+      setStatus("Preferences loaded.", "ready");
+    }
+  } catch (error) {
+    if (!quiet) {
+      setStatus(`Preference load failed: ${readableError(error)}`, "error");
+    }
+  }
+}
+
+async function saveMailboxPreferences() {
+  if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
+    setStatus("Load a mailbox before saving preferences.", "error");
+    return;
+  }
+  const payload = {
+    displayName: String(preferenceDisplayName?.value || "").trim(),
+    signature: String(preferenceSignature?.value || "").trim(),
+  };
+  setStatus("Saving preferences...", "loading");
+  try {
+    const response = await fetch(new URL("/api/v1/mailbox/preferences", mailboxSession.apiBaseUrl), {
+      method: "PUT",
+      headers: {
+        ...mailboxHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const preferences = await response.json();
+    mailboxPreferences = {
+      displayName: preferences.displayName || "",
+      signature: preferences.signature || "",
+    };
+    renderMailboxPreferences();
+    setStatus("Preferences saved.", "ready");
+  } catch (error) {
+    setStatus(`Preference save failed: ${readableError(error)}`, "error");
+  }
+}
+
+function renderMailboxPreferences() {
+  if (preferenceDisplayName) {
+    preferenceDisplayName.value = mailboxPreferences.displayName || "";
+  }
+  if (preferenceSignature) {
+    preferenceSignature.value = mailboxPreferences.signature || "";
+  }
 }
 
 async function loadMailboxSnapshot(folder) {
@@ -972,7 +1055,7 @@ function fillCompose({ to, subject, body }) {
     composeSubject.value = subject;
   }
   if (composeBody) {
-    composeBody.value = body;
+    composeBody.value = withSignature(body);
     composeBody.focus();
   }
 }
@@ -1141,6 +1224,7 @@ function restoreMailboxSession() {
       emailInput.value = mailboxSession.email;
     }
     loadMailboxSnapshot(mailboxSession.folder);
+    loadMailboxPreferences({ quiet: true });
   } catch (_error) {
     forgetMailboxSession();
   }
@@ -1161,8 +1245,10 @@ function persistMailboxSession(session) {
 function forgetMailboxSession() {
   window.localStorage.removeItem(mailboxSessionStorageKey);
   mailboxSession = { email: "", token: "", apiBaseUrl: "", folder: "INBOX" };
+  mailboxPreferences = { displayName: "", signature: "" };
   selectedMessageDetail = null;
   selectedMessageIds = new Set();
+  renderMailboxPreferences();
   renderDraftActions(null);
   clearSearch();
 }
@@ -1597,9 +1683,19 @@ async function composePayload() {
       .map((recipient) => recipient.trim())
       .filter(Boolean),
     subject: String(form.get("subject") || "").trim(),
-    body: String(form.get("body") || ""),
+    body: withSignature(String(form.get("body") || "")),
     attachments: await filesToAttachments(composeAttachments?.files || []),
   };
+}
+
+function withSignature(body) {
+  const signature = String(mailboxPreferences.signature || "").trim();
+  const current = String(body || "");
+  if (!signature || current.includes(signature)) {
+    return current;
+  }
+  const separator = current.trim() ? "\n\n-- \n" : "-- \n";
+  return `${current}${separator}${signature}`;
 }
 
 function fileToBase64(file) {

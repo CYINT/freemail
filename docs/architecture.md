@@ -32,6 +32,7 @@ The first persistence boundary is:
 - `aliases`: forwarding aliases
 - `dkim_keys`: generated DKIM private keys and public DNS TXT values
 - `audit_log`: administrative changes
+- `mailbox_preferences`: mailbox-scoped display names and default compose signatures
 - `admin_sessions`: runtime-only hashed administrator bearer sessions, excluded from metadata backups
 
 Future migrations can move this store to PostgreSQL without changing the external API contract.
@@ -108,6 +109,7 @@ The current mobile foundation covers:
 - mailbox session creation and revocation
 - SecureStore-backed bearer-session persistence
 - inbox snapshot, message read, read/unread and star-state controls, bulk message actions, compose/send, reply, and forward workflows
+- mailbox preferences and default compose signatures through the shared mailbox preferences API
 - folder navigation and non-core folder create/rename/delete controls
 - folder-scoped search and contacts
 - attachment metadata display and authenticated download/share handling

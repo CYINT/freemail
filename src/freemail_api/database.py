@@ -135,6 +135,13 @@ CREATE TABLE IF NOT EXISTS mailbox_push_notifications (
 
 CREATE INDEX IF NOT EXISTS idx_mailbox_push_notifications_mailbox_created
 ON mailbox_push_notifications(mailbox_email, created_at);
+
+CREATE TABLE IF NOT EXISTS mailbox_preferences (
+    mailbox_email TEXT PRIMARY KEY,
+    display_name TEXT NOT NULL DEFAULT '',
+    signature TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 
@@ -204,6 +211,7 @@ REQUIRED_TABLE_COLUMNS = {
         "created_at",
         "delivered_at",
     },
+    "mailbox_preferences": {"mailbox_email", "display_name", "signature", "updated_at"},
 }
 
 
@@ -250,10 +258,11 @@ def metadata_readiness(connection: sqlite3.Connection) -> dict[str, Any]:
 
 
 def list_rows(connection: sqlite3.Connection, table: str) -> list[sqlite3.Row]:
-    allowed_tables = {"domains", "users", "mailboxes", "aliases", "audit_log", "dkim_keys"}
+    allowed_tables = {"domains", "users", "mailboxes", "aliases", "audit_log", "dkim_keys", "mailbox_preferences"}
     if table not in allowed_tables:
         raise ValueError(f"Unsupported table: {table}")
-    return list(connection.execute(f"SELECT * FROM {table} ORDER BY id"))
+    order_column = "mailbox_email" if table == "mailbox_preferences" else "id"
+    return list(connection.execute(f"SELECT * FROM {table} ORDER BY {order_column}"))
 
 
 def has_admin_user(connection: sqlite3.Connection) -> bool:
@@ -556,6 +565,49 @@ def record_outbound_send_event(
 def delete_old_outbound_send_events(connection: sqlite3.Connection, *, before: int) -> None:
     connection.execute("DELETE FROM outbound_send_events WHERE created_at < ?", [before])
     connection.commit()
+
+
+def get_mailbox_preferences(connection: sqlite3.Connection, *, email: str) -> dict[str, str]:
+    normalized_email = email.lower()
+    row = connection.execute(
+        """
+        SELECT mailbox_email, display_name, signature, updated_at
+        FROM mailbox_preferences
+        WHERE mailbox_email = ?
+        """,
+        [normalized_email],
+    ).fetchone()
+    if row is None:
+        return {
+            "mailbox_email": normalized_email,
+            "display_name": "",
+            "signature": "",
+            "updated_at": "",
+        }
+    return dict(row)
+
+
+def upsert_mailbox_preferences(
+    connection: sqlite3.Connection,
+    *,
+    email: str,
+    display_name: str,
+    signature: str,
+) -> dict[str, str]:
+    normalized_email = email.lower()
+    connection.execute(
+        """
+        INSERT INTO mailbox_preferences (mailbox_email, display_name, signature, updated_at)
+        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(mailbox_email) DO UPDATE SET
+            display_name = excluded.display_name,
+            signature = excluded.signature,
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        [normalized_email, display_name.strip(), signature.strip()],
+    )
+    connection.commit()
+    return get_mailbox_preferences(connection, email=normalized_email)
 
 
 def upsert_mailbox_push_device(

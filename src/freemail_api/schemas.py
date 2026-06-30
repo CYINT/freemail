@@ -348,6 +348,20 @@ class MailboxSessionDeleteRecord(ApiModel):
     revoked: bool
 
 
+class MailboxPreferencesUpdate(ApiModel):
+    display_name: str = Field(default="", max_length=160)
+    signature: str = Field(default="", max_length=4000)
+
+
+class MailboxPreferencesRecord(ApiModel):
+    mailbox_email: EmailStr
+    display_name: str
+    signature: str
+    updated_at: str
+
+    model_config = ConfigDict(alias_generator=to_camel, from_attributes=True, populate_by_name=True)
+
+
 class MailboxPushDeviceCreate(ApiModel):
     device_id: str = Field(min_length=8, max_length=160, pattern=r"^[A-Za-z0-9._:-]+$")
     platform: str = Field(min_length=3, max_length=20, pattern=r"^(ios|android|web|development)$")

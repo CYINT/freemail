@@ -1689,6 +1689,45 @@ def test_mailbox_bulk_action_returns_imap_bulk_payload(tmp_path, monkeypatch):
     }
 
 
+def test_mailbox_preferences_require_mailbox_credentials(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.get("/api/v1/mailbox/preferences")
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Mailbox credentials required"
+
+
+def test_mailbox_preferences_default_and_update_persist(tmp_path):
+    headers = {
+        "X-FreeMail-Mailbox-Email": "Admin@Example.com",
+        "X-FreeMail-Mailbox-Password": "secret",
+    }
+
+    with make_client(tmp_path) as client:
+        default_response = client.get("/api/v1/mailbox/preferences", headers=headers)
+        update_response = client.put(
+            "/api/v1/mailbox/preferences",
+            headers=headers,
+            json={"displayName": "Admin User", "signature": "Regards,\nAdmin"},
+        )
+        loaded_response = client.get("/api/v1/mailbox/preferences", headers=headers)
+
+    assert default_response.status_code == 200
+    assert default_response.json() == {
+        "mailboxEmail": "admin@example.com",
+        "displayName": "",
+        "signature": "",
+        "updatedAt": "",
+    }
+    assert update_response.status_code == 200
+    assert update_response.json()["mailboxEmail"] == "admin@example.com"
+    assert update_response.json()["displayName"] == "Admin User"
+    assert update_response.json()["signature"] == "Regards,\nAdmin"
+    assert loaded_response.status_code == 200
+    assert loaded_response.json()["signature"] == "Regards,\nAdmin"
+    assert loaded_response.json()["updatedAt"]
+
+
 def test_mailbox_message_requires_mailbox_credentials(tmp_path):
     with make_client(tmp_path) as client:
         response = client.get("/api/v1/mailbox/message?folder=INBOX&message_id=1")

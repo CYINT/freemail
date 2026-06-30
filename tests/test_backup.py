@@ -46,6 +46,12 @@ def test_metadata_backup_round_trip_preserves_core_metadata_and_key_material(tmp
             title="FreeMail",
             body="New message",
         )
+        database.upsert_mailbox_preferences(
+            connection,
+            email="admin@example.com",
+            display_name="Admin User",
+            signature="Regards,\nAdmin",
+        )
         backup = export_metadata_backup(connection, generated_at="2026-06-30T00:00:00+00:00")
 
     assert backup["schemaVersion"] == 1
@@ -61,6 +67,7 @@ def test_metadata_backup_round_trip_preserves_core_metadata_and_key_material(tmp
     assert "mailbox_push_devices" not in backup["tables"]
     assert "mailbox_push_notifications" not in backup["tables"]
     assert backup["tables"]["dkim_keys"][0]["private_key_pem"] == "private-key-pem"
+    assert backup["tables"]["mailbox_preferences"][0]["signature"] == "Regards,\nAdmin"
 
     with database.connect(str(target_path)) as connection:
         restore_metadata_backup(connection, backup)
@@ -72,6 +79,9 @@ def test_metadata_backup_round_trip_preserves_core_metadata_and_key_material(tmp
         assert [dict(row) for row in database.list_rows(connection, "aliases")] == backup["tables"]["aliases"]
         assert [dict(row) for row in database.list_rows(connection, "dkim_keys")] == backup["tables"]["dkim_keys"]
         assert [dict(row) for row in database.list_rows(connection, "audit_log")] == backup["tables"]["audit_log"]
+        assert [dict(row) for row in database.list_rows(connection, "mailbox_preferences")] == backup["tables"][
+            "mailbox_preferences"
+        ]
         assert connection.execute("SELECT COUNT(*) FROM admin_sessions").fetchone()[0] == 0
         assert connection.execute("SELECT COUNT(*) FROM mailbox_sessions").fetchone()[0] == 0
         assert connection.execute("SELECT COUNT(*) FROM outbound_send_events").fetchone()[0] == 0

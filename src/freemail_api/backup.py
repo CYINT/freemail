@@ -7,7 +7,7 @@ from typing import Any
 
 
 BACKUP_SCHEMA_VERSION = 1
-BACKUP_TABLES = ("domains", "users", "mailboxes", "aliases", "dkim_keys", "audit_log")
+BACKUP_TABLES = ("domains", "users", "mailboxes", "aliases", "dkim_keys", "audit_log", "mailbox_preferences")
 RESTORE_DELETE_ORDER = tuple(reversed(BACKUP_TABLES))
 
 
@@ -57,7 +57,8 @@ def restore_metadata_backup(
 
 
 def _export_table(connection: sqlite3.Connection, table: str) -> list[dict[str, Any]]:
-    rows = connection.execute(f"SELECT * FROM {table} ORDER BY id").fetchall()
+    order_column = "mailbox_email" if table == "mailbox_preferences" else "id"
+    rows = connection.execute(f"SELECT * FROM {table} ORDER BY {order_column}").fetchall()
     return [dict(row) for row in rows]
 
 

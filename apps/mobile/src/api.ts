@@ -123,6 +123,13 @@ export type BulkMessageAction = {
   succeeded: number;
 };
 
+export type MailboxPreferences = {
+  mailboxEmail: string;
+  displayName: string;
+  signature: string;
+  updatedAt: string;
+};
+
 export async function createMailboxSession(apiBaseUrl: string, email: string, password: string): Promise<MailboxSession> {
   const response = await request(apiBaseUrl, "/api/v1/mailbox/session", {
     method: "POST",
@@ -342,6 +349,28 @@ export async function saveMailboxDraft(session: MailboxSession, message: Compose
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ ...message, draftFolder: "Drafts" }),
+  });
+  return response.json();
+}
+
+export async function loadMailboxPreferences(session: MailboxSession): Promise<MailboxPreferences> {
+  const response = await request(session.apiBaseUrl, "/api/v1/mailbox/preferences", {
+    headers: mailboxHeaders(session),
+  });
+  return response.json();
+}
+
+export async function updateMailboxPreferences(
+  session: MailboxSession,
+  preferences: Pick<MailboxPreferences, "displayName" | "signature">,
+): Promise<MailboxPreferences> {
+  const response = await request(session.apiBaseUrl, "/api/v1/mailbox/preferences", {
+    method: "PUT",
+    headers: {
+      ...mailboxHeaders(session),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(preferences),
   });
   return response.json();
 }

@@ -45,6 +45,8 @@ def test_static_web_validation_flags_credential_storage():
         '<form class="compose-panel" id="compose-form"><input id="compose-attachments">'
         '<button id="save-draft-action">Save draft</button></form>'
         '<button id="contacts-action">Load</button><div id="contacts-list"></div>'
+        '<form id="mailbox-preferences"><input id="preference-display-name">'
+        '<textarea id="preference-signature"></textarea></form>'
         '<button id="reply-action">Reply</button><button id="forward-action">Forward</button>'
         '<button id="edit-draft-action">Edit draft</button>'
         '<button id="star-action">Star</button><button id="unstar-action">Unstar</button>'
@@ -76,6 +78,8 @@ def test_static_web_validation_flags_credential_storage():
         "setMailboxMessageReadState({}, true); Message marked read; Message marked unread; "
         "setMailboxMessageStarState({}, true); Message starred; Message unstarred; "
         "bulkMailboxMessages('archive', 'Bulk messages archived'); selectedMessageIds.add('1'); "
+        "fetch('/api/v1/mailbox/preferences'); loadMailboxPreferences(); saveMailboxPreferences(); "
+        "renderMailboxPreferences(); Preferences saved; withSignature('body'); "
         "fetch('/api/v1/mailbox/draft'); saveMailboxDraft({}); Draft saved; composePayload(); "
         "searchMailboxMessages('term'); loadMailboxContacts(); renderContacts([]); "
         "createMailboxFolder('x'); renameMailboxFolder('y'); deleteMailboxFolder('z'); mutateMailboxFolder('POST', {}); "

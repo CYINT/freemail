@@ -28,10 +28,12 @@ import {
   loadMailboxAttachment,
   loadMailboxContacts,
   loadMailboxMessage,
+  loadMailboxPreferences,
   loadMailboxPushDevices,
   loadMailboxPushNotifications,
   loadMailboxSnapshot,
   MailAttachment,
+  MailboxPreferences,
   MailboxSession,
   MailContact,
   MailFolder,
@@ -49,6 +51,7 @@ import {
   sendMailboxMessage,
   setMailboxMessageReadState,
   setMailboxMessageStarState,
+  updateMailboxPreferences,
 } from "./src/api";
 import { clearCachedMailboxSnapshots, loadCachedMailboxSnapshot, saveCachedMailboxSnapshot } from "./src/offlineCache";
 import { clearStoredMailboxSession, loadStoredMailboxSession, saveMailboxSession } from "./src/sessionStore";
@@ -82,6 +85,9 @@ export default function App() {
   const [renameFolderName, setRenameFolderName] = useState("");
   const [pushDeviceId, setPushDeviceId] = useState("");
   const [pushToken, setPushToken] = useState("");
+  const [mailboxPreferences, setMailboxPreferences] = useState<MailboxPreferences | null>(null);
+  const [preferenceDisplayName, setPreferenceDisplayName] = useState("");
+  const [preferenceSignature, setPreferenceSignature] = useState("");
   const [composeTo, setComposeTo] = useState("");
   const [composeSubject, setComposeSubject] = useState("");
   const [composeBody, setComposeBody] = useState("");
@@ -127,6 +133,9 @@ export default function App() {
     setContacts([]);
     setPushDevices([]);
     setPushNotifications([]);
+    setMailboxPreferences(null);
+    setPreferenceDisplayName("");
+    setPreferenceSignature("");
     setSelectedMessage(null);
     await clearStoredMailboxSession();
     if (activeSession) {
@@ -153,9 +162,10 @@ export default function App() {
         setContacts(cached.contacts);
         setStatus(`Showing cached ${cached.folder} from ${formatCachedAt(cached.cachedAt)}.`);
       }
-      const [snapshot, contactList] = await Promise.all([
+      const [snapshot, contactList, preferences] = await Promise.all([
         loadMailboxSnapshot(activeSession, targetFolder),
         loadMailboxContacts(activeSession, targetFolder),
+        loadMailboxPreferences(activeSession),
       ]);
       const devices = await loadMailboxPushDevices(activeSession);
       const notifications = await loadMailboxPushNotifications(activeSession);
@@ -166,9 +176,34 @@ export default function App() {
       setContacts(contactList.contacts || []);
       setPushDevices(devices || []);
       setPushNotifications(notifications || []);
+      setMailboxPreferences(preferences);
+      setPreferenceDisplayName(preferences.displayName || "");
+      setPreferenceSignature(preferences.signature || "");
       setSelectedMessage(null);
       await saveCachedMailboxSnapshot(activeSession, targetFolder, snapshot, contactList.contacts || []);
       setStatus(`Loaded ${snapshot.messages?.length || 0} messages from ${targetFolder}.`);
+    } catch (error) {
+      setStatus(readableError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function savePreferences() {
+    if (!session) {
+      return;
+    }
+    setLoading(true);
+    setStatus("Saving preferences...");
+    try {
+      const saved = await updateMailboxPreferences(session, {
+        displayName: preferenceDisplayName.trim(),
+        signature: preferenceSignature.trim(),
+      });
+      setMailboxPreferences(saved);
+      setPreferenceDisplayName(saved.displayName || "");
+      setPreferenceSignature(saved.signature || "");
+      setStatus("Preferences saved.");
     } catch (error) {
       setStatus(readableError(error));
     } finally {
@@ -320,13 +355,21 @@ export default function App() {
         .map((recipient) => recipient.trim())
         .filter(Boolean),
       subject: composeSubject.trim(),
-      body: composeBody,
+      body: withSignature(composeBody),
       attachments: composeAttachments.map(({ filename, contentType, contentBase64 }) => ({
         filename,
         contentType,
         contentBase64,
       })),
     };
+  }
+
+  function withSignature(body: string) {
+    const signature = (mailboxPreferences?.signature || preferenceSignature).trim();
+    if (!signature || body.includes(signature)) {
+      return body;
+    }
+    return `${body}${body.trim() ? "\n\n-- \n" : "-- \n"}${signature}`;
   }
 
   async function addFolder() {
@@ -384,7 +427,7 @@ export default function App() {
     }
     setComposeTo(selectedMessage.sender);
     setComposeSubject(prefixedSubject("Re:", selectedMessage.subject));
-    setComposeBody(`\n\nOn ${selectedMessage.date}, ${selectedMessage.sender} wrote:\n${quoteBody(selectedMessage.body)}`);
+    setComposeBody(withSignature(`\n\nOn ${selectedMessage.date}, ${selectedMessage.sender} wrote:\n${quoteBody(selectedMessage.body)}`));
   }
 
   function forwardSelectedMessage() {
@@ -393,7 +436,11 @@ export default function App() {
     }
     setComposeTo("");
     setComposeSubject(prefixedSubject("Fwd:", selectedMessage.subject));
-    setComposeBody(`\n\nForwarded message\nFrom: ${selectedMessage.sender}\nTo: ${selectedMessage.recipients}\n\n${selectedMessage.body}`);
+    setComposeBody(
+      withSignature(
+        `\n\nForwarded message\nFrom: ${selectedMessage.sender}\nTo: ${selectedMessage.recipients}\n\n${selectedMessage.body}`,
+      ),
+    );
   }
 
   function editSelectedDraft() {
@@ -829,6 +876,26 @@ export default function App() {
             </View>
 
             <View style={styles.panel}>
+              <Text style={styles.sectionTitle}>Preferences</Text>
+              <TextInput
+                value={preferenceDisplayName}
+                onChangeText={setPreferenceDisplayName}
+                style={styles.input}
+                placeholder="Display name"
+              />
+              <TextInput
+                value={preferenceSignature}
+                onChangeText={setPreferenceSignature}
+                style={[styles.input, styles.signatureInput]}
+                multiline
+                placeholder="Signature"
+              />
+              <Pressable style={styles.secondaryButton} onPress={savePreferences}>
+                <Text>Save preferences</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.panel}>
               <Text style={styles.sectionTitle}>Compose</Text>
               <TextInput value={composeTo} onChangeText={setComposeTo} style={styles.input} autoCapitalize="none" placeholder="To" />
               <TextInput value={composeSubject} onChangeText={setComposeSubject} style={styles.input} placeholder="Subject" />
@@ -1032,6 +1099,7 @@ const styles = StyleSheet.create({
   meta: { color: "#697386", fontSize: 12 },
   body: { color: "#1f2937", fontSize: 15, lineHeight: 22, marginTop: 4 },
   input: { borderColor: "#cbd5e1", borderRadius: 8, borderWidth: 1, minHeight: 44, paddingHorizontal: 10 },
+  signatureInput: { minHeight: 92, paddingTop: 10, textAlignVertical: "top" },
   composeBody: { minHeight: 110, paddingTop: 10, textAlignVertical: "top" },
   primaryButton: { alignItems: "center", backgroundColor: "#176b5f", borderRadius: 8, minHeight: 44, justifyContent: "center" },
   primaryButtonText: { color: "#ffffff", fontWeight: "700" },

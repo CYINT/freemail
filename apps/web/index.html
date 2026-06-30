@@ -49,6 +49,12 @@
             <p>Load contacts from mailbox headers.</p>
           </div>
         </section>
+        <form class="preferences-panel" id="mailbox-preferences" aria-label="Mailbox preferences">
+          <strong>Preferences</strong>
+          <label>Display name <input id="preference-display-name" name="displayName" type="text" maxlength="160"></label>
+          <label>Signature <textarea id="preference-signature" name="signature" rows="4" maxlength="4000" placeholder="Regards,&#10;FreeMail"></textarea></label>
+          <button type="submit">Save preferences</button>
+        </form>
       </aside>
 
       <main class="workspace">
