@@ -31,22 +31,38 @@ Do not use skipped gates as release evidence.
 
 ## Private-Beta Gate
 
-Before private-beta use, run the private-beta gate. Runtime-only mode verifies the VPN-only deployment contract and mail-core readiness:
+Before private-beta use, run the private-beta gate. Runtime-only development mode verifies the VPN-only deployment contract and mail-core readiness:
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\private_beta_gate.py --skip-dns
+.\.venv\Scripts\python.exe scripts\private_beta_gate.py --skip-dns --skip-evidence
 ```
 
-For a controlled domain, first export DNS guidance from the admin API and capture observed DNS values, then run:
+For a controlled domain, first export DNS guidance from the admin API, capture observed DNS values, run controlled mail-flow and queue checks, collect backup evidence, record decision-owner acceptance, then run:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\private_beta_gate.py `
   --domain example.com `
   --dns-guidance .freemail-qa\dns-guidance-example.com.json `
-  --observed-dns .freemail-qa\observed-dns-example.com.json
+  --observed-dns .freemail-qa\observed-dns-example.com.json `
+  --mail-flow-evidence .freemail-qa\mail-flow-example.com.json `
+  --queue-evidence .freemail-qa\queue-example.com.json `
+  --metadata-backup .freemail-qa\backups\metadata.json `
+  --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
+  --acceptance .freemail-qa\private-beta-acceptance-example.com.json
 ```
 
 If `--observed-dns` is omitted, the gate resolves live MX/TXT DNS for the expected record names. The output JSON is release evidence and should be stored outside Git with the other private-beta artifacts.
+
+The acceptance JSON must include:
+
+```json
+{
+  "accepted": true,
+  "decisionOwner": "CEO",
+  "accessBoundary": "Dragonscale/VPN clients only",
+  "knownLimitations": ["private beta only"]
+}
+```
 
 ## Provenance
 

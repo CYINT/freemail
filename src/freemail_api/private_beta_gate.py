@@ -18,7 +18,13 @@ class PrivateBetaGateOptions:
     domain: str | None = None
     dns_guidance: Path | None = None
     observed_dns: Path | None = None
+    mail_flow_evidence: Path | None = None
+    queue_evidence: Path | None = None
+    metadata_backup: Path | None = None
+    mail_store_backup: Path | None = None
+    acceptance: Path | None = None
     skip_dns: bool = False
+    skip_evidence: bool = False
     health_url: str | None = "https://freemail.kuzuryu.ai/health"
     deployment_url: str | None = "https://freemail.kuzuryu.ai/api/v1/deployment"
     readiness_url: str | None = "https://freemail.kuzuryu.ai/api/v1/mail-core/readiness"
@@ -31,6 +37,8 @@ def run_private_beta_gate(options: PrivateBetaGateOptions) -> dict[str, Any]:
         checks.extend(_check_runtime(options.health_url, options.deployment_url, options.readiness_url, "unknown"))
     if not options.skip_dns:
         checks.append(_check_dns_posture(options))
+    if not options.skip_evidence:
+        checks.extend(_check_beta_evidence(options))
     passed = all(check["status"] == "pass" for check in checks)
     return {
         "passed": passed,
@@ -63,6 +71,96 @@ def _check_dns_posture(options: PrivateBetaGateOptions) -> dict[str, Any]:
             "posture": posture.as_dict(),
         },
     )
+
+
+def _check_beta_evidence(options: PrivateBetaGateOptions) -> list[dict[str, Any]]:
+    return [
+        _check_mail_flow_evidence(options),
+        _check_queue_evidence(options.queue_evidence),
+        _check_file("metadata-backup-evidence", options.metadata_backup, "--metadata-backup"),
+        _check_file("mail-store-backup-evidence", options.mail_store_backup, "--mail-store-backup"),
+        _check_acceptance(options.acceptance),
+    ]
+
+
+def _check_mail_flow_evidence(options: PrivateBetaGateOptions) -> dict[str, Any]:
+    if options.mail_flow_evidence is None:
+        return _check("controlled-mail-flow-evidence", False, {"error": "--mail-flow-evidence is required"})
+    payload = _load_json(options.mail_flow_evidence)
+    required_domain = str(payload.get("requiredDkimDomain", "")).lower()
+    expected_domain = (options.domain or "").lower()
+    inbound_found = payload.get("inboundFound")
+    submission_found = payload.get("submissionFound")
+    passed = (
+        payload.get("passed") is True
+        and payload.get("inboundAccepted") is True
+        and isinstance(inbound_found, dict)
+        and payload.get("submissionAccepted") is True
+        and isinstance(submission_found, dict)
+        and (not expected_domain or required_domain == expected_domain)
+    )
+    return _check(
+        "controlled-mail-flow-evidence",
+        passed,
+        {
+            "path": str(options.mail_flow_evidence),
+            "passed": payload.get("passed"),
+            "inboundAccepted": payload.get("inboundAccepted"),
+            "inboundFound": bool(inbound_found),
+            "submissionAccepted": payload.get("submissionAccepted"),
+            "submissionFound": bool(submission_found),
+            "requiredDkimDomain": payload.get("requiredDkimDomain"),
+            "expectedDomain": options.domain,
+        },
+    )
+
+
+def _check_queue_evidence(path: Path | None) -> dict[str, Any]:
+    if path is None:
+        return _check("queue-evidence", False, {"error": "--queue-evidence is required"})
+    payload = _load_json(path)
+    pending = int(payload.get("pending", payload.get("pendingMessages", 0)) or 0)
+    due = int(payload.get("due", payload.get("dueMessages", 0)) or 0)
+    passed = payload.get("passed", True) is True and pending == 0 and due == 0
+    return _check(
+        "queue-evidence",
+        passed,
+        {"path": str(path), "passed": payload.get("passed", True), "pending": pending, "due": due},
+    )
+
+
+def _check_acceptance(path: Path | None) -> dict[str, Any]:
+    if path is None:
+        return _check("private-beta-acceptance", False, {"error": "--acceptance is required"})
+    payload = _load_json(path)
+    boundary = str(payload.get("accessBoundary", ""))
+    limitations = payload.get("knownLimitations", [])
+    passed = (
+        payload.get("accepted") is True
+        and bool(str(payload.get("decisionOwner", "")).strip())
+        and "vpn" in boundary.lower()
+        and isinstance(limitations, list)
+        and bool(limitations)
+    )
+    return _check(
+        "private-beta-acceptance",
+        passed,
+        {
+            "path": str(path),
+            "accepted": payload.get("accepted"),
+            "decisionOwner": payload.get("decisionOwner"),
+            "accessBoundary": payload.get("accessBoundary"),
+            "knownLimitations": len(limitations) if isinstance(limitations, list) else 0,
+        },
+    )
+
+
+def _check_file(name: str, path: Path | None, flag: str) -> dict[str, Any]:
+    if path is None:
+        return _check(name, False, {"error": f"{flag} is required"})
+    exists = path.is_file()
+    size = path.stat().st_size if exists else 0
+    return _check(name, exists and size > 0, {"path": str(path), "bytes": size})
 
 
 def resolve_observed_dns(expected_records: list[DnsRecord]) -> list[dict[str, object]]:

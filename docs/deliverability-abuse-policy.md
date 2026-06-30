@@ -22,7 +22,7 @@ FreeMail is in a controlled private-beta posture. Do not expose the stack direct
 ## Release Gates
 
 - DNS posture verification must be green for each beta domain.
-- `scripts/private_beta_gate.py` must pass for the runtime boundary and every controlled beta domain.
+- `scripts/private_beta_gate.py` must pass for the runtime boundary, DNS posture, mail-flow evidence, queue evidence, backup evidence, and decision-owner acceptance for every controlled beta domain.
 - Local DKIM-signing smoke must pass for the mailbox domain.
 - Queue gate must be clear after controlled outbound tests unless the test explicitly records retry/bounce behavior.
 - SPF and DMARC evidence must be recorded for the controlled domain before external beta use.

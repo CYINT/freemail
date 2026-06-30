@@ -337,19 +337,24 @@ Run the local release gate only after the candidate commit has been pushed and G
 
 The release gate checks clean Git state, remote SHA, GitHub Actions CI, Compose config, backup evidence, VPN-only health/deployment metadata, and mail-core protocol readiness.
 
-Run the private-beta gate before controlled-domain use:
+Run the private-beta runtime gate during development:
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\private_beta_gate.py --skip-dns
+.\.venv\Scripts\python.exe scripts\private_beta_gate.py --skip-dns --skip-evidence
 ```
 
-For a real beta domain, pass admin DNS guidance plus observed DNS evidence, or omit `--observed-dns` to resolve live MX/TXT records:
+For a real beta domain, pass admin DNS guidance plus observed DNS evidence, mail-flow evidence, queue evidence, backups, and decision-owner acceptance. Omit `--observed-dns` only when the gate should resolve live MX/TXT records:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\private_beta_gate.py `
   --domain example.com `
   --dns-guidance .freemail-qa\dns-guidance-example.com.json `
-  --observed-dns .freemail-qa\observed-dns-example.com.json
+  --observed-dns .freemail-qa\observed-dns-example.com.json `
+  --mail-flow-evidence .freemail-qa\mail-flow-example.com.json `
+  --queue-evidence .freemail-qa\queue-example.com.json `
+  --metadata-backup .freemail-qa\backups\metadata.json `
+  --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
+  --acceptance .freemail-qa\private-beta-acceptance-example.com.json
 ```
 
 ## VPN-Only Deployment

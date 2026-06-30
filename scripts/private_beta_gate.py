@@ -13,7 +13,13 @@ def main() -> int:
     parser.add_argument("--domain")
     parser.add_argument("--dns-guidance", type=Path)
     parser.add_argument("--observed-dns", type=Path)
+    parser.add_argument("--mail-flow-evidence", type=Path)
+    parser.add_argument("--queue-evidence", type=Path)
+    parser.add_argument("--metadata-backup", type=Path)
+    parser.add_argument("--mail-store-backup", type=Path)
+    parser.add_argument("--acceptance", type=Path)
     parser.add_argument("--skip-dns", action="store_true")
+    parser.add_argument("--skip-evidence", action="store_true")
     parser.add_argument("--health-url", default="https://freemail.kuzuryu.ai/health")
     parser.add_argument("--deployment-url", default="https://freemail.kuzuryu.ai/api/v1/deployment")
     parser.add_argument("--readiness-url", default="https://freemail.kuzuryu.ai/api/v1/mail-core/readiness")
@@ -25,7 +31,13 @@ def main() -> int:
             domain=args.domain,
             dns_guidance=args.dns_guidance,
             observed_dns=args.observed_dns,
+            mail_flow_evidence=args.mail_flow_evidence,
+            queue_evidence=args.queue_evidence,
+            metadata_backup=args.metadata_backup,
+            mail_store_backup=args.mail_store_backup,
+            acceptance=args.acceptance,
             skip_dns=args.skip_dns,
+            skip_evidence=args.skip_evidence,
             health_url=args.health_url,
             deployment_url=args.deployment_url,
             readiness_url=args.readiness_url,

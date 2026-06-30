@@ -14,7 +14,7 @@ def test_private_beta_gate_runtime_only_checks_vpn_boundary(monkeypatch):
 
     monkeypatch.setattr("freemail_api.release_gate._fetch_json", fake_fetch)
 
-    result = run_private_beta_gate(PrivateBetaGateOptions(skip_dns=True))
+    result = run_private_beta_gate(PrivateBetaGateOptions(skip_dns=True, skip_evidence=True))
 
     assert result["passed"] is True
     assert [check["name"] for check in result["checks"]] == [
@@ -75,6 +75,7 @@ def test_private_beta_gate_accepts_matching_observed_dns(tmp_path):
             dns_guidance=guidance,
             observed_dns=observed,
             skip_runtime=True,
+            skip_evidence=True,
         )
     )
 
@@ -100,3 +101,73 @@ def test_resolve_observed_dns_reports_missing_answers(monkeypatch):
     )
 
     assert observed == [{"type": "TXT", "name": "example.com", "values": []}]
+
+
+def test_private_beta_gate_requires_beta_evidence_when_enabled():
+    result = run_private_beta_gate(
+        PrivateBetaGateOptions(
+            domain="example.com",
+            skip_runtime=True,
+            skip_dns=True,
+        )
+    )
+
+    assert result["passed"] is False
+    assert [check["name"] for check in result["checks"]] == [
+        "controlled-mail-flow-evidence",
+        "queue-evidence",
+        "metadata-backup-evidence",
+        "mail-store-backup-evidence",
+        "private-beta-acceptance",
+    ]
+
+
+def test_private_beta_gate_accepts_complete_beta_evidence(tmp_path):
+    mail_flow = tmp_path / "mail-flow.json"
+    queue = tmp_path / "queue.json"
+    metadata = tmp_path / "metadata.json"
+    mail_store = tmp_path / "mail-store.tar.gz"
+    acceptance = tmp_path / "acceptance.json"
+
+    mail_flow.write_text(
+        json.dumps(
+            {
+                "passed": True,
+                "inboundAccepted": True,
+                "inboundFound": {"folder": "INBOX", "message_ids": ["1"]},
+                "submissionAccepted": True,
+                "submissionFound": {"folder": "Sent", "message_ids": ["2"]},
+                "requiredDkimDomain": "example.com",
+            }
+        ),
+        encoding="utf-8",
+    )
+    queue.write_text(json.dumps({"passed": True, "pending": 0, "due": 0}), encoding="utf-8")
+    metadata.write_text("{}", encoding="utf-8")
+    mail_store.write_bytes(b"backup")
+    acceptance.write_text(
+        json.dumps(
+            {
+                "accepted": True,
+                "decisionOwner": "CEO",
+                "accessBoundary": "Dragonscale/VPN clients only",
+                "knownLimitations": ["private beta only"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = run_private_beta_gate(
+        PrivateBetaGateOptions(
+            domain="example.com",
+            skip_runtime=True,
+            skip_dns=True,
+            mail_flow_evidence=mail_flow,
+            queue_evidence=queue,
+            metadata_backup=metadata,
+            mail_store_backup=mail_store,
+            acceptance=acceptance,
+        )
+    )
+
+    assert result["passed"] is True
