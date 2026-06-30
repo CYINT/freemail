@@ -3,21 +3,25 @@ from email.message import EmailMessage
 from freemail_api.mailbox_imap import (
     ArchivedMailboxMessage,
     MailboxAttachment,
+    MailboxContact,
+    MailboxContacts,
     MailboxFolder,
     MailboxMessage,
-    MailboxSearchResult,
     MailboxMessageDetail,
+    MailboxSearchResult,
     MovedMailboxMessage,
     MailboxSnapshot,
     _archive_message,
     _attachment_contents_from_message,
     _attachments_from_message,
     _body_from_message,
+    _contacts_from_header,
     _count_from_select,
     _ensure_folder,
     _flags_from_fetch,
     _get_attachment,
     _get_message,
+    _list_contacts,
     _list_folders,
     _list_messages,
     _move_message,
@@ -159,6 +163,20 @@ def test_search_result_serializes_messages():
     assert result.as_dict()["messages"][0]["subject"] == "Hello"
 
 
+def test_contacts_serializes_records():
+    contacts = MailboxContacts(
+        email="admin@example.com",
+        folder="INBOX",
+        contacts=[MailboxContact(name="Sender", email="sender@example.com", message_count=2)],
+    )
+
+    assert contacts.as_dict() == {
+        "email": "admin@example.com",
+        "folder": "INBOX",
+        "contacts": [{"name": "Sender", "email": "sender@example.com", "message_count": 2}],
+    }
+
+
 def test_archived_message_serializes_archive_result():
     archived = ArchivedMailboxMessage(folder="INBOX", message_id="7", archive_folder="Archive", archived=True)
 
@@ -211,6 +229,30 @@ def test_search_messages_uses_sender_recipient_subject_and_body_criteria():
 
 def test_search_messages_returns_empty_for_blank_query():
     assert _search_messages(FakeImap(), folder="INBOX", query=" ", limit=10) == []
+
+
+def test_list_contacts_deduplicates_addresses_by_frequency():
+    contacts = _list_contacts(FakeImap(), folder="INBOX", limit=3)
+
+    assert contacts == [
+        MailboxContact(name="", email="admin@example.com", message_count=3),
+        MailboxContact(name="", email="sender@example.com", message_count=3),
+    ]
+
+
+def test_contacts_from_header_parses_common_address_fields():
+    message = EmailMessage()
+    message["From"] = "Sender <sender@example.com>"
+    message["Reply-To"] = "Replies <reply@example.com>"
+    message["To"] = "Admin <admin@example.com>"
+    message["Cc"] = "Copy <copy@example.com>"
+
+    assert _contacts_from_header(message) == [
+        ("Sender", "sender@example.com"),
+        ("Replies", "reply@example.com"),
+        ("Admin", "admin@example.com"),
+        ("Copy", "copy@example.com"),
+    ]
 
 
 def test_search_criteria_covers_expected_fields():

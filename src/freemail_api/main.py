@@ -19,6 +19,7 @@ from .mail_core import probe_mail_core
 from .mailbox_imap import archive_mailbox_message
 from .mailbox_imap import get_mailbox_attachment
 from .mailbox_imap import get_mailbox_message
+from .mailbox_imap import list_mailbox_contacts
 from .mailbox_imap import list_mailbox_snapshot
 from .mailbox_imap import move_mailbox_message
 from .mailbox_imap import search_mailbox_messages
@@ -39,6 +40,7 @@ from .schemas import (
     DomainRecord,
     MailboxArchiveCreate,
     MailboxArchiveRecord,
+    MailboxContactsRecord,
     MailboxCreate,
     MailboxMessageDetailRecord,
     MailboxMoveCreate,
@@ -305,6 +307,38 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 port=active_settings.imap_port,
                 folder=folder,
                 query=clean_query,
+                limit=limit,
+            )
+        except OSError as error:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+        except imaplib.IMAP4.error as error:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Mailbox authentication failed") from error
+        return result.as_dict()
+
+    @app.get("/api/v1/mailbox/contacts", response_model=MailboxContactsRecord)
+    def mailbox_contacts(
+        folder: str = "INBOX",
+        limit: int = 100,
+        authorization: str | None = Header(default=None),
+        x_freemail_mailbox_email: str | None = Header(default=None),
+        x_freemail_mailbox_password: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=x_freemail_mailbox_email,
+            x_freemail_mailbox_password=x_freemail_mailbox_password,
+            connection=connection,
+        )
+        if limit < 1 or limit > 500:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="limit must be between 1 and 500")
+        try:
+            result = list_mailbox_contacts(
+                email=credentials.email,
+                password=credentials.password,
+                host=active_settings.mail_core_host,
+                port=active_settings.imap_port,
+                folder=folder,
                 limit=limit,
             )
         except OSError as error:

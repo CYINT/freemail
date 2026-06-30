@@ -193,6 +193,18 @@ class MailboxSearchRecord(ApiModel):
     messages: list[MailboxMessageSummary]
 
 
+class MailboxContactRecord(ApiModel):
+    name: str
+    email: EmailStr
+    message_count: int
+
+
+class MailboxContactsRecord(ApiModel):
+    email: EmailStr
+    folder: str
+    contacts: list[MailboxContactRecord]
+
+
 class MailboxSessionCreate(ApiModel):
     email: EmailStr
     password: str = Field(min_length=1, max_length=512)

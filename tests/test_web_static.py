@@ -39,6 +39,7 @@ def test_static_web_validation_flags_credential_storage():
         '<div id="message-body"></div>'
         '<div id="message-attachments"></div>'
         '<form class="compose-panel" id="compose-form"><input id="compose-attachments"></form>'
+        '<button id="contacts-action">Load</button><div id="contacts-list"></div>'
         '<button id="reply-action">Reply</button><button id="forward-action">Forward</button>'
         '<button id="archive-action">Archive</button>'
         '<button id="spam-action">Spam</button><button id="delete-action">Delete</button>'
@@ -51,11 +52,12 @@ def test_static_web_validation_flags_credential_storage():
         "@media (max-width: 640px) {} button { min-height: 38px; outline: 1px solid; border-radius: 8px; }",
         "fetch('/api/v1/mailbox/session', {headers: {Authorization: 'Bearer token'}}); "
         "fetch('/api/v1/mailbox/snapshot'); fetch('/api/v1/mailbox/search'); fetch('/api/v1/mailbox/message'); "
+        "fetch('/api/v1/mailbox/contacts'); "
         "fetch('/api/v1/mailbox/message/attachment'); fetch('/api/v1/mailbox/message/archive'); "
         "fetch('/api/v1/mailbox/message/move'); "
         "renderMessageBody('body'); renderMessageAttachments({}); downloadMailboxAttachment({}, {}); "
         "filesToAttachments([]); fileToBase64({}); archiveMailboxMessage({}); moveMailboxMessage({}, 'Trash', 'Done'); "
-        "searchMailboxMessages('term'); "
+        "searchMailboxMessages('term'); loadMailboxContacts(); renderContacts([]); "
         "restoreMailboxSession(); persistMailboxSession({}); forgetMailboxSession(); clearSearch(); "
         "prefillReply({}); prefillForward({}); quoteMessage({}, 'reply'); "
         "fetch('/api/v1/mailbox/send', {method: \"POST\", "

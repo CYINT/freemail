@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from email.utils import getaddresses
 from email.parser import BytesParser
 from email.policy import default
 import imaplib
@@ -80,6 +81,30 @@ class MailboxSearchResult:
             "folder": self.folder,
             "query": self.query,
             "messages": [message.as_dict() for message in self.messages],
+        }
+
+
+@dataclass(frozen=True)
+class MailboxContact:
+    name: str
+    email: str
+    message_count: int
+
+    def as_dict(self) -> dict[str, object]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class MailboxContacts:
+    email: str
+    folder: str
+    contacts: list[MailboxContact]
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "email": self.email,
+            "folder": self.folder,
+            "contacts": [contact.as_dict() for contact in self.contacts],
         }
 
 
@@ -184,6 +209,24 @@ def search_mailbox_messages(
         imap.login(email, password)
         messages = _search_messages(imap, folder=folder, query=query, limit=limit)
     return MailboxSearchResult(email=email, folder=folder, query=query, messages=messages)
+
+
+def list_mailbox_contacts(
+    *,
+    email: str,
+    password: str,
+    host: str,
+    port: int,
+    folder: str = "INBOX",
+    limit: int = 100,
+    timeout_seconds: float = 10.0,
+    verify_tls: bool = False,
+) -> MailboxContacts:
+    tls_context = _tls_context(verify_tls=verify_tls)
+    with imaplib.IMAP4_SSL(host, port, ssl_context=tls_context, timeout=timeout_seconds) as imap:
+        imap.login(email, password)
+        contacts = _list_contacts(imap, folder=folder, limit=limit)
+    return MailboxContacts(email=email, folder=folder, contacts=contacts)
 
 
 def get_mailbox_message(
@@ -319,6 +362,44 @@ def _search_messages(imap: imaplib.IMAP4_SSL, *, folder: str, query: str, limit:
         if message:
             messages.append(message)
     return messages
+
+
+def _list_contacts(imap: imaplib.IMAP4_SSL, *, folder: str, limit: int) -> list[MailboxContact]:
+    status, _data = imap.select(f'"{folder}"', readonly=True)
+    if status != "OK":
+        return []
+    search_status, search_data = imap.search(None, "ALL")
+    if search_status != "OK" or not search_data:
+        return []
+    contact_rows: dict[str, MailboxContact] = {}
+    for message_id in search_data[0].split()[-limit:]:
+        fetch_status, fetch_data = imap.fetch(message_id, "(BODY.PEEK[HEADER])")
+        if fetch_status != "OK" or not fetch_data or not isinstance(fetch_data[0], tuple):
+            continue
+        header = BytesParser(policy=default).parsebytes(fetch_data[0][1])
+        for name, address in _contacts_from_header(header):
+            key = address.lower()
+            current = contact_rows.get(key)
+            if current:
+                contact_rows[key] = MailboxContact(
+                    name=current.name or name,
+                    email=current.email,
+                    message_count=current.message_count + 1,
+                )
+            else:
+                contact_rows[key] = MailboxContact(name=name, email=address, message_count=1)
+    return sorted(contact_rows.values(), key=lambda contact: (-contact.message_count, contact.email))
+
+
+def _contacts_from_header(header) -> list[tuple[str, str]]:
+    fields = [str(header.get(field, "")) for field in ("from", "reply-to", "to", "cc")]
+    contacts = []
+    for name, address in getaddresses(fields):
+        clean_address = address.strip()
+        if "@" not in clean_address:
+            continue
+        contacts.append((name.strip(), clean_address))
+    return contacts
 
 
 def _message_header(imap: imaplib.IMAP4_SSL, *, folder: str, message_id: bytes) -> MailboxMessage | None:

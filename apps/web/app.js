@@ -15,6 +15,8 @@ const forwardAction = document.querySelector("#forward-action");
 const archiveAction = document.querySelector("#archive-action");
 const spamAction = document.querySelector("#spam-action");
 const deleteAction = document.querySelector("#delete-action");
+const contactsAction = document.querySelector("#contacts-action");
+const contactsList = document.querySelector("#contacts-list");
 const composeTo = document.querySelector("#compose-to");
 const composeSubject = document.querySelector("#compose-subject");
 const composeBody = document.querySelector("#compose-body");
@@ -102,6 +104,10 @@ deleteAction?.addEventListener("click", async () => {
   await moveMailboxMessage(selectedMessageDetail, "Deleted Items", "Message moved to trash.");
 });
 
+contactsAction?.addEventListener("click", async () => {
+  await loadMailboxContacts();
+});
+
 logoutAction?.addEventListener("click", async () => {
   await revokeMailboxSession();
 });
@@ -179,6 +185,7 @@ async function loadMailboxSnapshot(folder) {
     renderFolders(snapshot.folders || [], folder);
     renderMessages(snapshot.messages || []);
     setStatus(`Loaded ${snapshot.messages?.length || 0} messages from ${folder}.`, "ready");
+    loadMailboxContacts({ quiet: true });
   } catch (error) {
     setStatus(`Mailbox load failed: ${readableError(error)}`, "error");
   }
@@ -275,6 +282,38 @@ async function moveMailboxMessage(message, targetFolder, successMessage) {
   }
 }
 
+async function loadMailboxContacts({ quiet = false } = {}) {
+  if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
+    if (!quiet) {
+      setStatus("Sign in to load contacts.", "error");
+    }
+    return;
+  }
+  if (!quiet) {
+    setStatus("Loading contacts...", "loading");
+  }
+  try {
+    const url = new URL("/api/v1/mailbox/contacts", mailboxSession.apiBaseUrl);
+    url.searchParams.set("folder", mailboxSession.folder || "INBOX");
+    url.searchParams.set("limit", "100");
+    const response = await fetch(url, {
+      headers: mailboxHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const result = await response.json();
+    renderContacts(result.contacts || []);
+    if (!quiet) {
+      setStatus(`Loaded ${result.contacts?.length || 0} contacts.`, "ready");
+    }
+  } catch (error) {
+    if (!quiet) {
+      setStatus(`Contacts load failed: ${readableError(error)}`, "error");
+    }
+  }
+}
+
 async function sendMailboxMessage(message) {
   if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
     setStatus("Load a mailbox before sending.", "error");
@@ -303,6 +342,33 @@ async function sendMailboxMessage(message) {
   } catch (error) {
     setStatus(`Send failed: ${readableError(error)}`, "error");
   }
+}
+
+function renderContacts(contacts) {
+  if (!contactsList) {
+    return;
+  }
+  if (!contacts.length) {
+    contactsList.replaceChildren(emptyContactsMessage());
+    return;
+  }
+  contactsList.replaceChildren(
+    ...contacts.slice(0, 12).map((contact) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "contact-item";
+      button.title = contact.email;
+      button.innerHTML = `
+        <span>${escapeHtml(contact.name || contact.email)}</span>
+        <small>${escapeHtml(contact.email)} - ${contact.messageCount || 1}</small>
+      `;
+      button.addEventListener("click", () => {
+        addComposeRecipient(contact.email);
+        setStatus(`Added ${contact.email} to compose.`, "ready");
+      });
+      return button;
+    }),
+  );
 }
 
 function renderFolders(folders, activeFolder) {
@@ -383,6 +449,21 @@ async function selectMessage(message, row) {
     renderMessageBody(`Message load failed: ${readableError(error)}`);
     renderMessageAttachments(null);
   }
+}
+
+function addComposeRecipient(email) {
+  if (!composeTo || !email) {
+    return;
+  }
+  const existing = composeTo.value
+    .split(",")
+    .map((recipient) => recipient.trim())
+    .filter(Boolean);
+  if (!existing.map((recipient) => recipient.toLowerCase()).includes(email.toLowerCase())) {
+    existing.push(email);
+  }
+  composeTo.value = existing.join(", ");
+  composeTo.focus();
 }
 
 function prefillReply(message) {
@@ -617,6 +698,12 @@ function emptyMessage() {
   row.tabIndex = 0;
   row.innerHTML = "<span class=\"sender\">FreeMail</span><strong>No messages</strong><p>This folder is empty.</p><time></time>";
   return row;
+}
+
+function emptyContactsMessage() {
+  const node = document.createElement("p");
+  node.textContent = "No contacts found in this folder yet.";
+  return node;
 }
 
 function setStatus(message, state) {

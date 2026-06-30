@@ -453,6 +453,66 @@ def test_mailbox_search_returns_imap_results(tmp_path, monkeypatch):
     assert response.json()["messages"][0]["subject"] == "Hello"
 
 
+def test_mailbox_contacts_requires_mailbox_credentials(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.get("/api/v1/mailbox/contacts")
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Mailbox credentials required"
+
+
+def test_mailbox_contacts_validates_limit(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.get(
+            "/api/v1/mailbox/contacts?limit=501",
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+        )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "limit must be between 1 and 500"
+
+
+def test_mailbox_contacts_returns_imap_contacts(tmp_path, monkeypatch):
+    class Result:
+        def as_dict(self):
+            return {
+                "email": "admin@example.com",
+                "folder": "INBOX",
+                "contacts": [
+                    {
+                        "name": "Sender",
+                        "email": "sender@example.net",
+                        "message_count": 3,
+                    }
+                ],
+            }
+
+    def fake_contacts(**kwargs):
+        assert kwargs["email"] == "admin@example.com"
+        assert kwargs["password"] == "secret"
+        assert kwargs["folder"] == "INBOX"
+        assert kwargs["limit"] == 10
+        return Result()
+
+    monkeypatch.setattr("freemail_api.main.list_mailbox_contacts", fake_contacts)
+
+    with make_client(tmp_path) as client:
+        response = client.get(
+            "/api/v1/mailbox/contacts?folder=INBOX&limit=10",
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["contacts"][0]["email"] == "sender@example.net"
+    assert response.json()["contacts"][0]["messageCount"] == 3
+
+
 def test_mailbox_move_requires_mailbox_credentials(tmp_path):
     with make_client(tmp_path) as client:
         response = client.post(

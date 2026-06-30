@@ -147,6 +147,69 @@ textarea:focus-visible,
   background: #e2ece9;
 }
 
+.contacts-panel {
+  display: grid;
+  gap: 0.5rem;
+  border-top: 1px solid #d6e0e8;
+  padding-top: 0.75rem;
+}
+
+.contacts-panel > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: #3a4856;
+}
+
+.contacts-panel > div:first-child button {
+  min-height: 32px;
+  padding: 0.25rem 0.55rem;
+}
+
+.contacts-list {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.contacts-list p {
+  margin: 0;
+  color: #667584;
+  font-size: 0.82rem;
+}
+
+.contact-item {
+  width: 100%;
+  display: grid;
+  justify-items: start;
+  gap: 0.1rem;
+  min-height: 46px;
+  overflow: hidden;
+  border-color: #d6e0e8;
+  background: #ffffff;
+  padding: 0.35rem 0.55rem;
+  text-align: left;
+}
+
+.contact-item span,
+.contact-item small {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contact-item span {
+  color: #243140;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.contact-item small {
+  color: #667584;
+  font-size: 0.74rem;
+}
+
 .workspace {
   min-width: 0;
   display: grid;
@@ -383,6 +446,10 @@ h2 {
     gap: 1rem;
   }
 
+  .contacts-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .mail-layout {
     grid-template-columns: 1fr;
   }
@@ -407,6 +474,10 @@ h2 {
 
   .folder-nav a {
     min-width: 0;
+  }
+
+  .contacts-list {
+    grid-template-columns: 1fr;
   }
 
   .topbar,
