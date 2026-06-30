@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     release_commit: str = Field(default="unknown", validation_alias="FREEMAIL_RELEASE_COMMIT")
     database_path: str = Field(default="data/freemail.sqlite", validation_alias="FREEMAIL_DB_PATH")
     admin_api_token: str | None = Field(default=None, validation_alias="FREEMAIL_ADMIN_API_TOKEN")
+    bootstrap_token: str | None = Field(default=None, validation_alias="FREEMAIL_BOOTSTRAP_TOKEN")
     vpn_only: bool = True
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore", populate_by_name=True)

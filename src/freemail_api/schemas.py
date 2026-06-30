@@ -22,6 +22,20 @@ class DomainRecord(ApiModel):
     model_config = ConfigDict(alias_generator=to_camel, from_attributes=True, populate_by_name=True)
 
 
+class BootstrapAdminCreate(ApiModel):
+    domain_name: str = Field(min_length=1, max_length=253, pattern=r"^[A-Za-z0-9.-]+$")
+    email: EmailStr
+    display_name: str = Field(min_length=1, max_length=160)
+    password_hash: str = Field(min_length=20, max_length=512)
+    mailbox_local_part: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9._%+-]+$")
+
+
+class BootstrapAdminRecord(ApiModel):
+    domain: DomainRecord
+    user: "UserRecord"
+    mailbox: "MailboxRecord"
+
+
 class UserCreate(ApiModel):
     email: EmailStr
     display_name: str = Field(min_length=1, max_length=160)
@@ -66,6 +80,39 @@ class AliasRecord(ApiModel):
     status: str
 
     model_config = ConfigDict(alias_generator=to_camel, from_attributes=True, populate_by_name=True)
+
+
+class DkimKeyCreate(ApiModel):
+    selector: str = Field(min_length=1, max_length=63, pattern=r"^[A-Za-z0-9_-]+$")
+    domain_id: int = Field(gt=0)
+
+
+class DkimKeyRecord(ApiModel):
+    id: int
+    domain_id: int
+    selector: str
+    dns_name: str
+    public_txt: str
+    status: str
+
+    model_config = ConfigDict(alias_generator=to_camel, from_attributes=True, populate_by_name=True)
+
+
+class DkimKeyCreated(DkimKeyRecord):
+    private_key_pem: str
+
+
+class DnsRecord(ApiModel):
+    type: str
+    name: str
+    value: str
+    ttl: int = 3600
+    purpose: str
+
+
+class DomainDnsGuidance(ApiModel):
+    domain: str
+    records: list[DnsRecord]
 
 
 class AuditRecord(ApiModel):

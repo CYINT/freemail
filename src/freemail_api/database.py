@@ -4,7 +4,7 @@ import sqlite3
 from collections.abc import Iterable
 from pathlib import Path
 
-from .schemas import AliasCreate, DomainCreate, MailboxCreate, UserCreate
+from .schemas import AliasCreate, BootstrapAdminCreate, DkimKeyCreate, DomainCreate, MailboxCreate, UserCreate
 
 
 SCHEMA = """
@@ -54,6 +54,18 @@ CREATE TABLE IF NOT EXISTS audit_log (
     target_id INTEGER NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS dkim_keys (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    domain_id INTEGER NOT NULL REFERENCES domains(id) ON DELETE CASCADE,
+    selector TEXT NOT NULL,
+    dns_name TEXT NOT NULL,
+    public_txt TEXT NOT NULL,
+    private_key_pem TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(domain_id, selector)
+);
 """
 
 
@@ -81,10 +93,41 @@ def initialize(database_path: str) -> None:
 
 
 def list_rows(connection: sqlite3.Connection, table: str) -> list[sqlite3.Row]:
-    allowed_tables = {"domains", "users", "mailboxes", "aliases", "audit_log"}
+    allowed_tables = {"domains", "users", "mailboxes", "aliases", "audit_log", "dkim_keys"}
     if table not in allowed_tables:
         raise ValueError(f"Unsupported table: {table}")
     return list(connection.execute(f"SELECT * FROM {table} ORDER BY id"))
+
+
+def has_admin_user(connection: sqlite3.Connection) -> bool:
+    row = connection.execute("SELECT 1 FROM users WHERE is_admin = 1 LIMIT 1").fetchone()
+    return row is not None
+
+
+def bootstrap_admin(connection: sqlite3.Connection, payload: BootstrapAdminCreate, actor: str) -> dict[str, sqlite3.Row]:
+    if has_admin_user(connection):
+        raise DuplicateRecordError("administrator already exists")
+    domain = create_domain(connection, DomainCreate(name=payload.domain_name), actor)
+    user = create_user(
+        connection,
+        UserCreate(
+            email=payload.email,
+            display_name=payload.display_name,
+            password_hash=payload.password_hash,
+            is_admin=True,
+        ),
+        actor,
+    )
+    mailbox = create_mailbox(
+        connection,
+        MailboxCreate(
+            user_id=int(user["id"]),
+            local_part=payload.mailbox_local_part,
+            domain_id=int(domain["id"]),
+        ),
+        actor,
+    )
+    return {"domain": domain, "user": user, "mailbox": mailbox}
 
 
 def create_domain(connection: sqlite3.Connection, payload: DomainCreate, actor: str) -> sqlite3.Row:
@@ -135,6 +178,38 @@ def create_alias(connection: sqlite3.Connection, payload: AliasCreate, actor: st
     _audit(connection, actor, "alias.create", "alias", row_id)
     connection.commit()
     return _get_row(connection, "aliases", row_id)
+
+
+def create_dkim_key(
+    connection: sqlite3.Connection,
+    payload: DkimKeyCreate,
+    public_txt: str,
+    private_key_pem: str,
+    actor: str,
+) -> sqlite3.Row:
+    domain = _get_row(connection, "domains", payload.domain_id)
+    selector = payload.selector.lower()
+    dns_name = f"{selector}._domainkey.{domain['name']}"
+    row_id = _execute_insert(
+        connection,
+        """
+        INSERT INTO dkim_keys (domain_id, selector, dns_name, public_txt, private_key_pem)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        [payload.domain_id, selector, dns_name, public_txt, private_key_pem],
+    )
+    _audit(connection, actor, "dkim.create", "dkim_key", row_id)
+    connection.commit()
+    return _get_row(connection, "dkim_keys", row_id)
+
+
+def get_domain(connection: sqlite3.Connection, domain_id: int) -> sqlite3.Row:
+    return _get_row(connection, "domains", domain_id)
+
+
+def list_dkim_keys_for_domain(connection: sqlite3.Connection, domain_id: int) -> list[sqlite3.Row]:
+    _get_row(connection, "domains", domain_id)
+    return list(connection.execute("SELECT * FROM dkim_keys WHERE domain_id = ? ORDER BY id", [domain_id]))
 
 
 def _execute_insert(connection: sqlite3.Connection, statement: str, values: Iterable[object]) -> int:

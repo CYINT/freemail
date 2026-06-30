@@ -9,6 +9,7 @@ services:
       FREEMAIL_RELEASE_COMMIT: ${FREEMAIL_RELEASE_COMMIT:-unknown}
       FREEMAIL_DB_PATH: ${FREEMAIL_DB_PATH:-/app/data/freemail.sqlite}
       FREEMAIL_ADMIN_API_TOKEN: ${FREEMAIL_ADMIN_API_TOKEN:-}
+      FREEMAIL_BOOTSTRAP_TOKEN: ${FREEMAIL_BOOTSTRAP_TOKEN:-}
     volumes:
       - freemail_data:/app/data
     ports:

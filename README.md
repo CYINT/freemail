@@ -60,6 +60,7 @@ Admin endpoints require `X-FreeMail-Admin-Token` and remain disabled until `FREE
 
 Initial endpoints:
 
+- `POST /api/v1/bootstrap/admin`
 - `POST /api/v1/admin/domains`
 - `GET /api/v1/admin/domains`
 - `POST /api/v1/admin/users`
@@ -68,9 +69,14 @@ Initial endpoints:
 - `GET /api/v1/admin/mailboxes`
 - `POST /api/v1/admin/aliases`
 - `GET /api/v1/admin/aliases`
+- `POST /api/v1/admin/dkim-keys`
+- `GET /api/v1/admin/dkim-keys`
+- `GET /api/v1/admin/domains/{domainId}/dns`
 - `GET /api/v1/admin/audit-log`
 
 The current metadata store is SQLite at `FREEMAIL_DB_PATH`, defaulting to `data/freemail.sqlite` locally and a Docker volume path in Compose. Mail-store persistence remains part of the Stalwart mail-core spike.
+
+The bootstrap endpoint requires `X-FreeMail-Bootstrap-Token`, refuses to run unless `FREEMAIL_BOOTSTRAP_TOKEN` is configured, and refuses to create a second administrator after the first admin exists.
 
 ## Docker
 

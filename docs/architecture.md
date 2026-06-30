@@ -16,7 +16,7 @@ The implementation should not become one mail-server blob. Keep the mail-core ca
 
 The admin API owns FreeMail metadata for domains, users, mailboxes, aliases, and audit logs. The current implementation uses SQLite through explicit repository functions so the early product can keep a small dependency surface while still proving persistence and API contracts.
 
-Admin endpoints require the `X-FreeMail-Admin-Token` header and are unavailable until `FREEMAIL_ADMIN_API_TOKEN` is configured. This keeps the open-source default from shipping an active hardcoded credential.
+Admin endpoints require the `X-FreeMail-Admin-Token` header and are unavailable until `FREEMAIL_ADMIN_API_TOKEN` is configured. The first-admin bootstrap endpoint separately requires `X-FreeMail-Bootstrap-Token` and refuses to run once an administrator exists. This keeps the open-source default from shipping an active hardcoded credential.
 
 The first persistence boundary is:
 
@@ -24,9 +24,12 @@ The first persistence boundary is:
 - `users`: invite-created users with password hashes only
 - `mailboxes`: user-owned mailbox addresses under hosted domains
 - `aliases`: forwarding aliases
+- `dkim_keys`: generated DKIM private keys and public DNS TXT values
 - `audit_log`: administrative changes
 
 Future migrations can move this store to PostgreSQL without changing the external API contract.
+
+The current DKIM key surface generates 2048-bit RSA keys and returns the private key only on key creation. List and DNS-guidance responses expose only public DNS material.
 
 ## Mail-Core Candidate
 

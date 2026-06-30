@@ -22,7 +22,7 @@
 - DNS guidance for MX, SPF, DKIM, and DMARC.
 - Audit logs.
 
-Current progress: persistent token-gated APIs exist for domains, invite-created users, mailboxes, aliases, and audit logs. DKIM and DNS guidance are still pending.
+Current progress: persistent token-gated APIs exist for administrator bootstrap, domains, invite-created users, mailboxes, aliases, DKIM keys, generated MX/SPF/DKIM/DMARC DNS guidance, and audit logs. The remaining work is production auth/session integration and mail-core synchronization.
 
 ## M3 - Webmail MVP
 
