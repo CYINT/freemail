@@ -247,6 +247,19 @@ class MailboxMoveRecord(ApiModel):
     target_folder: str
 
 
+class MailboxReadStateCreate(ApiModel):
+    folder: str = Field(min_length=1, max_length=160)
+    message_id: str = Field(min_length=1, max_length=64)
+    read: bool
+
+
+class MailboxReadStateRecord(ApiModel):
+    folder: str
+    message_id: str
+    read: bool
+    unread: bool
+
+
 class MailboxFolderCreate(ApiModel):
     folder: str = Field(min_length=1, max_length=160, pattern=r'^[^"/\\\r\n]+$')
 

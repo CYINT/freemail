@@ -189,6 +189,22 @@ export async function moveMailboxMessage(
   });
 }
 
+export async function setMailboxMessageReadState(
+  session: MailboxSession,
+  folder: string,
+  messageId: string,
+  read: boolean,
+): Promise<void> {
+  await request(session.apiBaseUrl, "/api/v1/mailbox/message/read-state", {
+    method: "POST",
+    headers: {
+      ...mailboxHeaders(session),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ folder, messageId, read }),
+  });
+}
+
 export async function registerMailboxPushDevice(
   session: MailboxSession,
   deviceId: string,

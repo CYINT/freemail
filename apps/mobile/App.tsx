@@ -45,6 +45,7 @@ import {
   revokeMailboxPushDevice,
   searchMailbox,
   sendMailboxMessage,
+  setMailboxMessageReadState,
 } from "./src/api";
 import { clearCachedMailboxSnapshots, loadCachedMailboxSnapshot, saveCachedMailboxSnapshot } from "./src/offlineCache";
 import { clearStoredMailboxSession, loadStoredMailboxSession, saveMailboxSession } from "./src/sessionStore";
@@ -458,6 +459,24 @@ export default function App() {
     }
   }
 
+  async function setSelectedMessageReadState(read: boolean) {
+    if (!session || !selectedMessage) {
+      return;
+    }
+    setLoading(true);
+    setStatus(read ? "Marking message read..." : "Marking message unread...");
+    try {
+      await setMailboxMessageReadState(session, selectedMessage.folder, selectedMessage.messageId, read);
+      setSelectedMessage({ ...selectedMessage, unread: !read });
+      await refreshMailbox(session, folder);
+      setStatus(read ? "Message marked read." : "Message marked unread.");
+    } catch (error) {
+      setStatus(readableError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function addContactToDraft(contact: MailContact) {
     const existing = composeTo
       .split(",")
@@ -573,6 +592,12 @@ export default function App() {
                   </Pressable>
                   <Pressable style={styles.secondaryButton} onPress={forwardSelectedMessage}>
                     <Text>Forward</Text>
+                  </Pressable>
+                  <Pressable style={styles.secondaryButton} onPress={() => setSelectedMessageReadState(true)}>
+                    <Text>Mark read</Text>
+                  </Pressable>
+                  <Pressable style={styles.secondaryButton} onPress={() => setSelectedMessageReadState(false)}>
+                    <Text>Mark unread</Text>
                   </Pressable>
                   <Pressable style={styles.secondaryButton} onPress={archiveSelectedMessage}>
                     <Text>Archive</Text>

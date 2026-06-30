@@ -16,6 +16,8 @@ const searchQuery = document.querySelector("#search-query");
 const logoutAction = document.querySelector("#mailbox-logout");
 const replyAction = document.querySelector("#reply-action");
 const forwardAction = document.querySelector("#forward-action");
+const markReadAction = document.querySelector("#mark-read-action");
+const markUnreadAction = document.querySelector("#mark-unread-action");
 const archiveAction = document.querySelector("#archive-action");
 const spamAction = document.querySelector("#spam-action");
 const deleteAction = document.querySelector("#delete-action");
@@ -123,6 +125,22 @@ forwardAction?.addEventListener("click", () => {
     return;
   }
   prefillForward(selectedMessageDetail);
+});
+
+markReadAction?.addEventListener("click", async () => {
+  if (!selectedMessageDetail) {
+    setStatus("Select a message before marking read.", "error");
+    return;
+  }
+  await setMailboxMessageReadState(selectedMessageDetail, true);
+});
+
+markUnreadAction?.addEventListener("click", async () => {
+  if (!selectedMessageDetail) {
+    setStatus("Select a message before marking unread.", "error");
+    return;
+  }
+  await setMailboxMessageReadState(selectedMessageDetail, false);
 });
 
 archiveAction?.addEventListener("click", async () => {
@@ -422,6 +440,37 @@ async function moveMailboxMessage(message, targetFolder, successMessage) {
     await loadMailboxSnapshot(mailboxSession.folder);
   } catch (error) {
     setStatus(`Move failed: ${readableError(error)}`, "error");
+  }
+}
+
+async function setMailboxMessageReadState(message, read) {
+  if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
+    setStatus("Load a mailbox before changing read state.", "error");
+    return;
+  }
+  setStatus(read ? "Marking message read..." : "Marking message unread...", "loading");
+  try {
+    const url = new URL("/api/v1/mailbox/message/read-state", mailboxSession.apiBaseUrl);
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        ...mailboxHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        folder: message.folder,
+        messageId: message.messageId,
+        read,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    selectedMessageDetail = { ...message, unread: !read };
+    setStatus(read ? "Message marked read." : "Message marked unread.", "ready");
+    await loadMailboxSnapshot(mailboxSession.folder);
+  } catch (error) {
+    setStatus(`Read state update failed: ${readableError(error)}`, "error");
   }
 }
 

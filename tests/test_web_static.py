@@ -45,10 +45,11 @@ def test_static_web_validation_flags_credential_storage():
         '<form class="compose-panel" id="compose-form"><input id="compose-attachments"></form>'
         '<button id="contacts-action">Load</button><div id="contacts-list"></div>'
         '<button id="reply-action">Reply</button><button id="forward-action">Forward</button>'
+        '<button id="mark-read-action">Mark read</button><button id="mark-unread-action">Mark unread</button>'
         '<button id="archive-action">Archive</button>'
         '<button id="spam-action">Spam</button><button id="delete-action">Delete</button>'
         '<section class="message-list"><article class="message-row reader compose-panel">'
-        "Inbox Compose Reply Forward Attach Send Junk Mail Spam Delete</article></section></main>"
+        "Inbox Compose Reply Forward Mark read Mark unread Attach Send Junk Mail Spam Delete</article></section></main>"
     )
 
     failures = _validate(
@@ -60,8 +61,10 @@ def test_static_web_validation_flags_credential_storage():
         "fetch('/api/v1/mailbox/folder'); "
         "fetch('/api/v1/mailbox/message/attachment'); fetch('/api/v1/mailbox/message/archive'); "
         "fetch('/api/v1/mailbox/message/move'); "
+        "fetch('/api/v1/mailbox/message/read-state'); "
         "renderMessageBody('body'); renderMessageAttachments({}); downloadMailboxAttachment({}, {}); "
         "filesToAttachments([]); fileToBase64({}); archiveMailboxMessage({}); moveMailboxMessage({}, 'Trash', 'Done'); "
+        "setMailboxMessageReadState({}, true); Message marked read; Message marked unread; "
         "searchMailboxMessages('term'); loadMailboxContacts(); renderContacts([]); "
         "createMailboxFolder('x'); renameMailboxFolder('y'); deleteMailboxFolder('z'); mutateMailboxFolder('POST', {}); "
         "restoreMailboxSession(); persistMailboxSession({}); forgetMailboxSession(); clearSearch(); "

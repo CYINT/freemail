@@ -29,6 +29,7 @@ from .mailbox_imap import list_mailbox_snapshot
 from .mailbox_imap import move_mailbox_message
 from .mailbox_imap import rename_mailbox_folder
 from .mailbox_imap import search_mailbox_messages
+from .mailbox_imap import set_mailbox_message_read_state
 from .mailbox_smtp import OutboundAttachment
 from .mailbox_smtp import send_mailbox_message
 from .outbound_policy import enforce_outbound_rate_limit
@@ -75,6 +76,8 @@ from .schemas import (
     MailboxPushDeviceRecord,
     MailboxPushNotificationCreate,
     MailboxPushNotificationRecord,
+    MailboxReadStateCreate,
+    MailboxReadStateRecord,
     MailboxRecord,
     MailboxSearchRecord,
     MailboxSendCreate,
@@ -152,7 +155,7 @@ COMPONENT_READINESS = {
     "webmail": {
         "status": "beta-ready",
         "evidence": [
-            "mailbox session login, folder navigation, search, contacts, message read, compose, attachments, archive, move, and delete controls",
+            "mailbox session login, folder navigation, search, contacts, message read, read/unread state, compose, attachments, archive, move, and delete controls",
             "token-gated admin console for bootstrap, users, domains, mailboxes, aliases, DKIM, DNS guidance, status actions, sync status, and audit logs",
             "browser and static QA in CI",
         ],
@@ -163,7 +166,7 @@ COMPONENT_READINESS = {
     "mobile": {
         "status": "source-ready",
         "evidence": [
-            "Expo/React Native client with VPN API target, mailbox sessions, message workflows, archive/spam/delete actions, folder controls, contacts, attachments, offline metadata cache, and push-device flows",
+            "Expo/React Native client with VPN API target, mailbox sessions, message workflows, read/unread state, archive/spam/delete actions, folder controls, contacts, attachments, offline metadata cache, and push-device flows",
             "mobile static QA, config validation, native prebuild drill, typecheck, and dependency audit in CI",
         ],
         "remainingReleaseEvidence": [
@@ -882,6 +885,36 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except imaplib.IMAP4.error as error:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mailbox message not found") from error
         return moved.as_dict()
+
+    @app.post("/api/v1/mailbox/message/read-state", response_model=MailboxReadStateRecord)
+    def mailbox_read_state(
+        payload: MailboxReadStateCreate,
+        authorization: str | None = Header(default=None),
+        x_freemail_mailbox_email: str | None = Header(default=None),
+        x_freemail_mailbox_password: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=x_freemail_mailbox_email,
+            x_freemail_mailbox_password=x_freemail_mailbox_password,
+            connection=connection,
+        )
+        try:
+            state = set_mailbox_message_read_state(
+                email=credentials.email,
+                password=credentials.password,
+                host=active_settings.mail_core_host,
+                port=active_settings.imap_port,
+                folder=payload.folder,
+                message_id=payload.message_id,
+                read=payload.read,
+            )
+        except OSError as error:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+        except imaplib.IMAP4.error as error:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mailbox message not found") from error
+        return state.as_dict()
 
     @app.post("/api/v1/mailbox/send", response_model=MailboxSendRecord)
     def mailbox_send(

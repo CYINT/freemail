@@ -64,7 +64,19 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
     if missing_classes:
         failures.append(f"missing classes: {', '.join(missing_classes)}")
 
-    required_text = ["Inbox", "Compose", "Reply", "Forward", "Attach", "Send", "Junk Mail", "Spam", "Delete"]
+    required_text = [
+        "Inbox",
+        "Compose",
+        "Reply",
+        "Forward",
+        "Mark read",
+        "Mark unread",
+        "Attach",
+        "Send",
+        "Junk Mail",
+        "Spam",
+        "Delete",
+    ]
     page_text = " ".join(parser.text)
     for text in required_text:
         if text not in page_text:
@@ -109,6 +121,8 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         "contacts-list",
         "reply-action",
         "forward-action",
+        "mark-read-action",
+        "mark-unread-action",
         "archive-action",
         "spam-action",
         "delete-action",
@@ -148,6 +162,7 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         "/api/v1/mailbox/message/attachment",
         "/api/v1/mailbox/message/archive",
         "/api/v1/mailbox/message/move",
+        "/api/v1/mailbox/message/read-state",
         "/api/v1/mailbox/send",
         "/api/v1/admin/session",
         "/api/v1/bootstrap/admin",
@@ -162,6 +177,9 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         "/status",
         "archiveMailboxMessage",
         "moveMailboxMessage",
+        "setMailboxMessageReadState",
+        "Message marked read",
+        "Message marked unread",
         "searchMailboxMessages",
         "loadMailboxContacts",
         "renderContacts",

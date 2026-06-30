@@ -131,6 +131,17 @@ class MovedMailboxMessage:
 
 
 @dataclass(frozen=True)
+class ReadStateMailboxMessage:
+    folder: str
+    message_id: str
+    read: bool
+    unread: bool
+
+    def as_dict(self) -> dict[str, object]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class MutatedMailboxFolder:
     folder: str
     action: str
@@ -201,6 +212,25 @@ def move_mailbox_message(
         imap.login(email, password)
         _move_message(imap, folder=folder, message_id=message_id, target_folder=target_folder)
     return MovedMailboxMessage(folder=folder, message_id=message_id, target_folder=target_folder, moved=True)
+
+
+def set_mailbox_message_read_state(
+    *,
+    email: str,
+    password: str,
+    host: str,
+    port: int,
+    folder: str,
+    message_id: str,
+    read: bool,
+    timeout_seconds: float = 10.0,
+    verify_tls: bool = False,
+) -> ReadStateMailboxMessage:
+    tls_context = _tls_context(verify_tls=verify_tls)
+    with imaplib.IMAP4_SSL(host, port, ssl_context=tls_context, timeout=timeout_seconds) as imap:
+        imap.login(email, password)
+        _set_message_seen(imap, folder=folder, message_id=message_id, read=read)
+    return ReadStateMailboxMessage(folder=folder, message_id=message_id, read=read, unread=not read)
 
 
 def search_mailbox_messages(
@@ -348,6 +378,16 @@ def _move_message(imap: imaplib.IMAP4_SSL, *, folder: str, message_id: str, targ
     expunge_status, _expunge_data = imap.expunge()
     if expunge_status != "OK":
         raise imaplib.IMAP4.error("Mailbox source folder expunge failed")
+
+
+def _set_message_seen(imap: imaplib.IMAP4_SSL, *, folder: str, message_id: str, read: bool) -> None:
+    status, _data = imap.select(f'"{folder}"', readonly=False)
+    if status != "OK":
+        raise imaplib.IMAP4.error(f"Mailbox folder not found: {folder}")
+    command = "+FLAGS" if read else "-FLAGS"
+    store_status, _store_data = imap.store(message_id.encode("ascii"), command, r"(\Seen)")
+    if store_status != "OK":
+        raise imaplib.IMAP4.error("Mailbox message read state could not be updated")
 
 
 def _ensure_folder(imap: imaplib.IMAP4_SSL, folder: str) -> None:

@@ -25,8 +25,8 @@ The FreeMail program includes:
 This repository is at the implementation baseline. It contains:
 
 - A FastAPI admin/runtime API with persistent SQLite-backed domain, user, mailbox, alias, and audit-log surfaces.
-- A static webmail preview shell with inbox, search, message reader, compose, folder navigation, token-gated admin setup, and responsive layout QA.
-- An Expo/React Native mobile client scaffold with secure session storage, mailbox workflows, archive/spam/delete actions, and static QA.
+- A static webmail preview shell with inbox, search, message reader, read/unread controls, compose, folder navigation, token-gated admin setup, and responsive layout QA.
+- An Expo/React Native mobile client scaffold with secure session storage, mailbox workflows, read/unread controls, archive/spam/delete actions, and static QA.
 - A Docker Compose stack with VPN-only loopback bindings by default.
 - A Stalwart mail-core candidate profile for the first architecture spike.
 - CI for linting, tests, repository secret scanning, dependency audit, Compose validation, and image build.

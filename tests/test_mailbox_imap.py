@@ -12,6 +12,7 @@ from freemail_api.mailbox_imap import (
     MovedMailboxMessage,
     MailboxSnapshot,
     MutatedMailboxFolder,
+    ReadStateMailboxMessage,
     _archive_message,
     _attachment_contents_from_message,
     _attachments_from_message,
@@ -33,6 +34,7 @@ from freemail_api.mailbox_imap import (
     _rename_folder,
     _search_criteria,
     _search_messages,
+    _set_message_seen,
     _tls_context,
 )
 
@@ -213,6 +215,17 @@ def test_moved_message_serializes_move_result():
     }
 
 
+def test_read_state_message_serializes_flag_result():
+    state = ReadStateMailboxMessage(folder="INBOX", message_id="7", read=True, unread=False)
+
+    assert state.as_dict() == {
+        "folder": "INBOX",
+        "message_id": "7",
+        "read": True,
+        "unread": False,
+    }
+
+
 def test_mutated_folder_serializes_folder_action():
     mutation = MutatedMailboxFolder(folder="Clients", target_folder="Customers", action="rename", success=True)
 
@@ -361,6 +374,24 @@ def test_move_message_copies_to_target_marks_deleted_and_expunges():
     assert imap.copied_messages == [(b"4", '"Deleted Items"')]
     assert imap.stored_flags == [(b"4", "+FLAGS", r"(\Deleted)")]
     assert imap.expunge_called is True
+
+
+def test_set_message_seen_adds_seen_flag_for_read_state():
+    imap = FakeImap()
+
+    _set_message_seen(imap, folder="INBOX", message_id="5", read=True)
+
+    assert imap.selected_folders == [('"INBOX"', False)]
+    assert imap.stored_flags == [(b"5", "+FLAGS", r"(\Seen)")]
+
+
+def test_set_message_seen_removes_seen_flag_for_unread_state():
+    imap = FakeImap()
+
+    _set_message_seen(imap, folder="INBOX", message_id="5", read=False)
+
+    assert imap.selected_folders == [('"INBOX"', False)]
+    assert imap.stored_flags == [(b"5", "-FLAGS", r"(\Seen)")]
 
 
 def test_ensure_folder_creates_missing_archive_folder():
