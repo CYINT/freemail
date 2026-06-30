@@ -90,6 +90,30 @@ Inspect the evidence packet before using it in a release candidate:
 
 The status command is read-only. It reports the evidence file path, checksum, failed mobile-release checks, and whether the packet is ready for the hard release gate. It does not run native builds, access app-store APIs, sign artifacts, or connect to real devices.
 
+After each signed build completes in the private signing environment, update the credential-free `builds` section through the collector:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\collect_mobile_build_evidence.py `
+  --evidence .freemail-qa\mobile-release-evidence.json `
+  --platform ios `
+  --signed `
+  --build-url "https://example.invalid/ios-build" `
+  --artifact-type ipa `
+  --artifact-bytes 123 `
+  --artifact-sha256 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+.\.venv\Scripts\python.exe scripts\collect_mobile_build_evidence.py `
+  --evidence .freemail-qa\mobile-release-evidence.json `
+  --platform android `
+  --signed `
+  --build-url "https://example.invalid/android-build" `
+  --artifact-type aab `
+  --artifact-bytes 456 `
+  --artifact-sha256 "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+```
+
+The signed-build collector exits nonzero unless the platform build record is complete. It records only artifact type, byte count, SHA-256, distribution, and a credential-free HTTPS provenance URL; never pass keystores, provisioning profiles, signing passwords, certificates, raw Expo credentials, or private CI logs.
+
 After each real-device private-beta test, update the credential-free `deviceValidation` section through the collector instead of hand-editing JSON:
 
 ```powershell
@@ -123,6 +147,30 @@ After TestFlight and Play internal-testing submission, require store submission 
 ```powershell
 .\.venv\Scripts\python.exe scripts\mobile_release_gate.py --evidence .freemail-qa\mobile-release-evidence.json --require-store-submission
 ```
+
+Record those store submissions with:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\collect_mobile_store_submission.py `
+  --evidence .freemail-qa\mobile-release-evidence.json `
+  --platform ios `
+  --submitted `
+  --track testflight `
+  --submission-url "https://example.invalid/testflight" `
+  --submitted-at "2026-06-30T00:00:00Z" `
+  --review-state "processing"
+
+.\.venv\Scripts\python.exe scripts\collect_mobile_store_submission.py `
+  --evidence .freemail-qa\mobile-release-evidence.json `
+  --platform android `
+  --submitted `
+  --track internal-testing `
+  --submission-url "https://example.invalid/play-internal" `
+  --submitted-at "2026-06-30T00:00:00Z" `
+  --review-state "draft-release-created"
+```
+
+The store-submission collector exits nonzero unless the platform submission record is complete. It records store, identifier, track, submitted timestamp, review state, and a credential-free HTTPS evidence URL; never pass App Store Connect API keys, Play service-account JSON, passwords, private keys, provisioning profiles, keystores, or raw tokens.
 
 The evidence must not include API keys, Apple certificates, provisioning profiles, keystores, passwords, private keys, service-account JSON, or raw tokens. It must include signed build records, store-submission records when `--require-store-submission` is used, real-device validation records for iOS and Android, and the VPN-only private-beta boundary. Build, submission, and device evidence URLs must be HTTPS URLs to credential-free evidence. Store submission `submittedAt` and device validation `testedAt` values must be timezone-aware ISO-8601 timestamps. Artifact `sha256` values must be full 64-character SHA-256 hex strings:
 

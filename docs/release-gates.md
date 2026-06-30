@@ -123,7 +123,7 @@ The gate verifies:
 - resolved Compose port bindings for the API, web, and mail-core profiles are loopback-only
 - metadata and mail-store backup evidence files exist, are non-empty, and have SHA-256 checksums recorded in the gate output
 - restore-drill evidence exists and proves metadata restore, Stalwart apply-plan export, and mail-store restore into a drill volume
-- mobile signed-build, real-device private-beta validation, and store-submission evidence passes `scripts/mobile_release_gate.py` with credential-free proof for both iOS and Android; use `scripts/collect_mobile_device_validation.py` for the real-device records
+- mobile signed-build, real-device private-beta validation, and store-submission evidence passes `scripts/mobile_release_gate.py` with credential-free proof for both iOS and Android; use `scripts/collect_mobile_build_evidence.py`, `scripts/collect_mobile_device_validation.py`, and `scripts/collect_mobile_store_submission.py` for those records
 - private-beta gate output passes for at least one controlled domain and includes DNS, mail-flow, queue, mail-core apply, deliverability/abuse, backup, restore-drill, and decision-owner acceptance checks
 - release notes exist, are non-empty, include the candidate version, include verification, known-limitations, and VPN-boundary language, contain no placeholder markers, and have a SHA-256 checksum recorded in the gate output
 - `https://freemail.kuzuryu.ai/health` reports VPN-only health and the exact candidate commit
