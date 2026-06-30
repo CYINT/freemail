@@ -73,3 +73,4 @@ Before private beta, record evidence that:
 - The restored metadata can export a Stalwart apply plan.
 - Mail-core volume backup and restore are tested in the target deployment environment, first into a drill volume and then against the active volume only when a rollback archive exists.
 - DKIM records generated from restored key material match the active DNS guidance.
+- Release and private-beta gate outputs record SHA-256 checksums for the metadata and mail-store backup files.

@@ -9,6 +9,7 @@ import dns.resolver
 
 from .dns_policy import verify_dns_posture
 from .release_gate import _check
+from .release_gate import _file_evidence_details
 from .release_gate import _check_runtime
 from .schemas import DnsRecord
 
@@ -201,7 +202,7 @@ def _check_file(name: str, path: Path | None, flag: str) -> dict[str, Any]:
         return _check(name, False, {"error": f"{flag} is required"})
     exists = path.is_file()
     size = path.stat().st_size if exists else 0
-    return _check(name, exists and size > 0, {"path": str(path), "bytes": size})
+    return _check(name, exists and size > 0, _file_evidence_details(path, exists, size))
 
 
 def resolve_observed_dns(expected_records: list[DnsRecord]) -> list[dict[str, object]]:

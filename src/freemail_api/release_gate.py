@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -117,7 +118,24 @@ def _check_backup_evidence(
 def _check_backup_file(name: str, path: Path) -> dict[str, Any]:
     exists = path.is_file()
     size = path.stat().st_size if exists else 0
-    return _check(name, exists and size > 0, {"path": str(path), "bytes": size})
+    return _check(name, exists and size > 0, _file_evidence_details(path, exists, size))
+
+
+def _file_evidence_details(path: Path, exists: bool | None = None, size: int | None = None) -> dict[str, Any]:
+    resolved_exists = path.is_file() if exists is None else exists
+    resolved_size = path.stat().st_size if size is None and resolved_exists else (size or 0)
+    details: dict[str, Any] = {"path": str(path), "bytes": resolved_size}
+    if resolved_exists and resolved_size > 0:
+        details["sha256"] = _sha256_file(path)
+    return details
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _check_runtime(

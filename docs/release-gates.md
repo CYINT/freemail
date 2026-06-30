@@ -16,7 +16,7 @@ The gate verifies:
 - `origin/main` points at the current commit
 - GitHub Actions `CI` completed successfully for the current commit
 - `docker compose config --quiet`
-- metadata and mail-store backup evidence files exist and are non-empty
+- metadata and mail-store backup evidence files exist, are non-empty, and have SHA-256 checksums recorded in the gate output
 - `https://freemail.kuzuryu.ai/health` reports VPN-only health and release metadata
 - `https://freemail.kuzuryu.ai/api/v1/deployment` reports `vpn-only` exposure and `publicInternet: false`
 - `https://freemail.kuzuryu.ai/api/v1/mail-core/readiness` reports SMTP, submission, IMAP, and JMAP readiness
@@ -52,7 +52,7 @@ For a controlled domain, first export DNS guidance from the admin API, capture o
   --acceptance .freemail-qa\private-beta-acceptance-example.com.json
 ```
 
-If `--observed-dns` is omitted, the gate resolves live MX/TXT DNS for the expected record names. The output JSON is release evidence and should be stored outside Git with the other private-beta artifacts.
+If `--observed-dns` is omitted, the gate resolves live MX/TXT DNS for the expected record names. The output JSON is release evidence and should be stored outside Git with the other private-beta artifacts. Backup evidence checks include the path, byte count, and SHA-256 checksum for both metadata and mail-store files.
 
 The acceptance JSON must include:
 
@@ -88,8 +88,8 @@ Release provenance for a candidate consists of:
 - commit SHA
 - GitHub Actions run URL for the passing `CI` workflow
 - Codecov upload completion in that workflow
-- release-gate JSON output
-- private-beta gate JSON output for each controlled domain
+- release-gate JSON output, including backup file SHA-256 checksums
+- private-beta gate JSON output for each controlled domain, including backup file SHA-256 checksums
 - deliverability/abuse evidence for each controlled domain
 - metadata backup path and checksum, stored outside Git
 - mail-store backup path and checksum, stored outside Git

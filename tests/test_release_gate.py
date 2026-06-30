@@ -1,3 +1,4 @@
+import hashlib
 from pathlib import Path
 
 import pytest
@@ -38,6 +39,9 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
     result = run_release_gate(ReleaseGateOptions(metadata_backup=metadata, mail_store_backup=mail_store))
 
     assert result["passed"] is True
+    checks_by_name = {check["name"]: check for check in result["checks"]}
+    assert checks_by_name["metadata-backup"]["details"]["sha256"] == hashlib.sha256(b"{}").hexdigest()
+    assert checks_by_name["mail-store-backup"]["details"]["sha256"] == hashlib.sha256(b"archive").hexdigest()
     assert {check["name"] for check in result["checks"]} == {
         "git-clean",
         "remote-sha",
@@ -108,3 +112,14 @@ def test_backup_file_check_requires_non_empty_file(tmp_path):
 
     assert release_gate._check_backup_file("missing", missing)["status"] == "fail"
     assert release_gate._check_backup_file("empty", empty)["status"] == "fail"
+
+
+def test_backup_file_check_records_sha256_for_non_empty_file(tmp_path):
+    archive = tmp_path / "mail-store.tar.gz"
+    archive.write_bytes(b"backup")
+
+    check = release_gate._check_backup_file("mail-store-backup", archive)
+
+    assert check["status"] == "pass"
+    assert check["details"]["bytes"] == 6
+    assert check["details"]["sha256"] == hashlib.sha256(b"backup").hexdigest()

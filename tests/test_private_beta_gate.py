@@ -1,3 +1,4 @@
+import hashlib
 import json
 
 from freemail_api import private_beta_gate
@@ -226,3 +227,6 @@ def test_private_beta_gate_accepts_complete_beta_evidence(tmp_path):
     )
 
     assert result["passed"] is True
+    checks_by_name = {check["name"]: check for check in result["checks"]}
+    assert checks_by_name["metadata-backup-evidence"]["details"]["sha256"] == hashlib.sha256(b"{}").hexdigest()
+    assert checks_by_name["mail-store-backup-evidence"]["details"]["sha256"] == hashlib.sha256(b"backup").hexdigest()
