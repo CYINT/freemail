@@ -35,6 +35,7 @@ from .outbound_policy import enforce_outbound_rate_limit
 from .outbound_policy import OutboundRateLimitExceeded
 from .outbound_policy import OutboundRatePolicy
 from .outbound_policy import record_outbound_send
+from .passwords import hash_initial_password
 from .push_delivery import dispatch_push_notification
 from .push_delivery import PushDeliveryConfig
 from .schemas import (
@@ -76,6 +77,7 @@ from .schemas import (
     MailboxSessionDeleteRecord,
     MailboxSessionRecord,
     MailboxSnapshotRecord,
+    StoredUserCreate,
     UserCreate,
     UserRecord,
 )
@@ -807,7 +809,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         actor: str = Depends(require_bootstrap),
         connection: sqlite3.Connection = Depends(get_connection),
     ) -> dict[str, dict[str, object]]:
-        result = _create_or_raise(lambda: database.bootstrap_admin(connection, payload, actor))
+        password_hash = hash_initial_password(payload.initial_password)
+        result = _create_or_raise(
+            lambda: database.bootstrap_admin(
+                connection,
+                domain_name=payload.domain_name,
+                email=str(payload.email),
+                display_name=payload.display_name,
+                password_hash=password_hash,
+                mailbox_local_part=payload.mailbox_local_part,
+                actor=actor,
+            )
+        )
         return {
             "domain": _row_to_dict(result["domain"]),
             "user": _row_to_dict(result["user"]),
@@ -853,7 +866,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         actor: str = Depends(require_admin),
         connection: sqlite3.Connection = Depends(get_connection),
     ) -> dict[str, object]:
-        return _row_to_dict(_create_or_raise(lambda: database.create_user(connection, payload, actor)))
+        stored_payload = StoredUserCreate(
+            email=payload.email,
+            display_name=payload.display_name,
+            password_hash=hash_initial_password(payload.initial_password),
+            is_admin=payload.is_admin,
+        )
+        return _row_to_dict(_create_or_raise(lambda: database.create_user(connection, stored_payload, actor)))
 
     @app.patch("/api/v1/admin/users/{user_id}/status", response_model=UserRecord)
     def update_user_status(

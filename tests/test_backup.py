@@ -7,7 +7,7 @@ import pytest
 
 from freemail_api import database
 from freemail_api.backup import BackupError, export_metadata_backup, restore_metadata_backup
-from freemail_api.schemas import AliasCreate, DkimKeyCreate, DomainCreate, MailboxCreate, UserCreate
+from freemail_api.schemas import AliasCreate, DkimKeyCreate, DomainCreate, MailboxCreate, StoredUserCreate
 
 
 def test_metadata_backup_round_trip_preserves_core_metadata_and_key_material(tmp_path):
@@ -227,7 +227,7 @@ def _seed_metadata(connection: sqlite3.Connection) -> None:
     domain = database.create_domain(connection, DomainCreate(name="example.com"), "test")
     user = database.create_user(
         connection,
-        UserCreate(
+        StoredUserCreate(
             email="admin@example.com",
             displayName="Admin User",
             passwordHash="argon2id-placeholder-hash",

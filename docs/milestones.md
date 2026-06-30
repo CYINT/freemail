@@ -22,7 +22,7 @@
 - DNS guidance for MX, SPF, DKIM, and DMARC.
 - Audit logs.
 
-Current progress: persistent token-gated APIs exist for administrator bootstrap, domains, invite-created users, mailboxes, aliases, DKIM keys, generated MX/SPF/DKIM/DMARC DNS guidance, and audit logs. The webmail preview now includes a token-gated admin console for bootstrap, domain, user, mailbox, alias, DKIM, DNS-guidance, suspension/reactivation, and audit-log workflows. The remaining work is production auth/session integration and mail-core synchronization.
+Current progress: persistent token-gated APIs exist for administrator bootstrap, domains, invite-created users, mailboxes, aliases, DKIM keys, generated MX/SPF/DKIM/DMARC DNS guidance, and audit logs. Bootstrap and user creation accept one-time initial passwords and hash them server-side with Argon2id before storage. The webmail preview now includes a token-gated admin console for bootstrap, domain, user, mailbox, alias, DKIM, DNS-guidance, suspension/reactivation, and audit-log workflows. The remaining work is production auth/session integration and mail-core synchronization.
 
 ## M3 - Webmail MVP
 

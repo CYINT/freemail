@@ -53,7 +53,7 @@ def test_bootstrap_requires_configured_token(tmp_path):
                 "domainName": "example.com",
                 "email": "admin@example.com",
                 "displayName": "Admin User",
-                "passwordHash": "argon2id-placeholder-hash",
+                "initialPassword": "correct horse battery",
                 "mailboxLocalPart": "admin",
             },
         )
@@ -93,7 +93,7 @@ def test_admin_can_create_domain_user_mailbox_alias_and_audit_log(tmp_path):
             json={
                 "email": "Admin@Example.com",
                 "displayName": "Admin User",
-                "passwordHash": "argon2id-placeholder-hash",
+                "initialPassword": "correct horse battery",
                 "isAdmin": True,
             },
         )
@@ -101,6 +101,10 @@ def test_admin_can_create_domain_user_mailbox_alias_and_audit_log(tmp_path):
         assert user.json()["email"] == "admin@example.com"
         assert user.json()["isAdmin"] is True
         assert "passwordHash" not in user.json()
+        with sqlite3.connect(tmp_path / "freemail.sqlite") as connection:
+            stored_hash = connection.execute("SELECT password_hash FROM users WHERE email = ?", ["admin@example.com"]).fetchone()[0]
+        assert stored_hash.startswith("$argon2id$")
+        assert stored_hash != "correct horse battery"
 
         mailbox = client.post(
             "/api/v1/admin/mailboxes",
@@ -135,6 +139,22 @@ def test_admin_can_create_domain_user_mailbox_alias_and_audit_log(tmp_path):
         ]
 
 
+def test_admin_user_create_rejects_client_supplied_password_hash(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.post(
+            "/api/v1/admin/users",
+            headers=admin_headers(),
+            json={
+                "email": "admin@example.com",
+                "displayName": "Admin User",
+                "passwordHash": "argon2id-placeholder-hash",
+            },
+        )
+
+    assert response.status_code == 422
+    assert any(error["loc"][-1] == "initialPassword" for error in response.json()["detail"])
+
+
 def test_admin_can_suspend_and_reactivate_domain_user_and_mailbox(tmp_path):
     with make_client(tmp_path) as client:
         domain = client.post("/api/v1/admin/domains", headers=admin_headers(), json={"name": "example.com"}).json()
@@ -144,7 +164,7 @@ def test_admin_can_suspend_and_reactivate_domain_user_and_mailbox(tmp_path):
             json={
                 "email": "admin@example.com",
                 "displayName": "Admin User",
-                "passwordHash": "argon2id-placeholder-hash",
+                "initialPassword": "correct horse battery",
             },
         ).json()
         mailbox = client.post(
@@ -200,7 +220,7 @@ def test_admin_can_suspend_alias_and_dkim_key(tmp_path):
             json={
                 "email": "admin@example.com",
                 "displayName": "Admin User",
-                "passwordHash": "argon2id-placeholder-hash",
+                "initialPassword": "correct horse battery",
             },
         ).json()
         client.post(
@@ -266,7 +286,7 @@ def test_suspended_mailbox_blocks_mailbox_api_access(tmp_path, monkeypatch):
             json={
                 "email": "admin@example.com",
                 "displayName": "Admin User",
-                "passwordHash": "argon2id-placeholder-hash",
+                "initialPassword": "correct horse battery",
             },
         ).json()
         mailbox = client.post(
@@ -317,7 +337,7 @@ def test_suspended_user_blocks_existing_bearer_session(tmp_path, monkeypatch):
             json={
                 "email": "admin@example.com",
                 "displayName": "Admin User",
-                "passwordHash": "argon2id-placeholder-hash",
+                "initialPassword": "correct horse battery",
             },
         ).json()
         client.post(
@@ -349,7 +369,7 @@ def test_bootstrap_creates_only_first_admin_domain_and_mailbox(tmp_path):
             "domainName": "Example.COM",
             "email": "Admin@Example.com",
             "displayName": "Admin User",
-            "passwordHash": "argon2id-placeholder-hash",
+            "initialPassword": "correct horse battery",
             "mailboxLocalPart": "Admin",
         }
 

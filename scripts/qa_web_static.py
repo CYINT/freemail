@@ -128,6 +128,8 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
     ]:
         if marker not in " ".join(parser.attributes.get("id", [])):
             failures.append(f"missing live mailbox UI marker: {marker}")
+    if "initialPassword" not in html_text(parser):
+        failures.append("missing initialPassword admin form field")
     for marker in [
         "fetch(",
         "/api/v1/mailbox/session",
@@ -187,6 +189,8 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
     ]:
         if marker not in js_text:
             failures.append(f"missing live mailbox client marker: {marker}")
+    if "passwordhash" in html_text(parser).lower() or "passwordHash" in js_text:
+        failures.append("web admin client must submit initialPassword, not passwordHash")
     for forbidden in ["sessionStorage", "document.cookie"]:
         if forbidden in js_text:
             failures.append(f"mailbox client must not store credentials with {forbidden}")
@@ -195,6 +199,10 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
     if re.search(r"password[^;\n]{0,120}localStorage\.(setItem|getItem)", js_text, flags=re.IGNORECASE):
         failures.append("mailbox client must not store mailbox passwords in localStorage")
     return failures
+
+
+def html_text(parser: StaticWebParser) -> str:
+    return " ".join(parser.text + [item for values in parser.attributes.values() for item in values])
 
 
 if __name__ == "__main__":

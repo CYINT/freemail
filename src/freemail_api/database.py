@@ -5,7 +5,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
-from .schemas import AliasCreate, BootstrapAdminCreate, DkimKeyCreate, DomainCreate, MailboxCreate, UserCreate
+from .schemas import AliasCreate, DkimKeyCreate, DomainCreate, MailboxCreate, StoredUserCreate
 
 
 SCHEMA = """
@@ -248,16 +248,25 @@ def has_admin_user(connection: sqlite3.Connection) -> bool:
     return row is not None
 
 
-def bootstrap_admin(connection: sqlite3.Connection, payload: BootstrapAdminCreate, actor: str) -> dict[str, sqlite3.Row]:
+def bootstrap_admin(
+    connection: sqlite3.Connection,
+    *,
+    domain_name: str,
+    email: str,
+    display_name: str,
+    password_hash: str,
+    mailbox_local_part: str,
+    actor: str,
+) -> dict[str, sqlite3.Row]:
     if has_admin_user(connection):
         raise DuplicateRecordError("administrator already exists")
-    domain = create_domain(connection, DomainCreate(name=payload.domain_name), actor)
+    domain = create_domain(connection, DomainCreate(name=domain_name), actor)
     user = create_user(
         connection,
-        UserCreate(
-            email=payload.email,
-            display_name=payload.display_name,
-            password_hash=payload.password_hash,
+        StoredUserCreate(
+            email=email,
+            display_name=display_name,
+            password_hash=password_hash,
             is_admin=True,
         ),
         actor,
@@ -266,7 +275,7 @@ def bootstrap_admin(connection: sqlite3.Connection, payload: BootstrapAdminCreat
         connection,
         MailboxCreate(
             user_id=int(user["id"]),
-            local_part=payload.mailbox_local_part,
+            local_part=mailbox_local_part,
             domain_id=int(domain["id"]),
         ),
         actor,
@@ -282,7 +291,7 @@ def create_domain(connection: sqlite3.Connection, payload: DomainCreate, actor: 
     return _get_row(connection, "domains", row_id)
 
 
-def create_user(connection: sqlite3.Connection, payload: UserCreate, actor: str) -> sqlite3.Row:
+def create_user(connection: sqlite3.Connection, payload: StoredUserCreate, actor: str) -> sqlite3.Row:
     row_id = _execute_insert(
         connection,
         """

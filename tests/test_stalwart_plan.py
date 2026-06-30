@@ -11,7 +11,7 @@ from freemail_api.database import (
     initialize,
     update_status,
 )
-from freemail_api.schemas import AliasCreate, DkimKeyCreate, DomainCreate, MailboxCreate, UserCreate
+from freemail_api.schemas import AliasCreate, DkimKeyCreate, DomainCreate, MailboxCreate, StoredUserCreate
 from freemail_api.stalwart_plan import MissingProvisioningSecretError, PlanOptions, build_apply_plan
 
 
@@ -23,7 +23,7 @@ def test_build_apply_plan_exports_domains_dkim_accounts_and_aliases(tmp_path):
         domain = create_domain(connection, DomainCreate(name="example.com"), "test")
         user = create_user(
             connection,
-            UserCreate(
+            StoredUserCreate(
                 email="admin@example.com",
                 displayName="Admin User",
                 passwordHash="argon2id-placeholder-hash",
@@ -84,7 +84,7 @@ def test_build_apply_plan_requires_user_secret_by_default(tmp_path):
         domain = create_domain(connection, DomainCreate(name="example.com"), "test")
         user = create_user(
             connection,
-            UserCreate(email="admin@example.com", displayName="Admin User", passwordHash="argon2id-placeholder-hash"),
+            StoredUserCreate(email="admin@example.com", displayName="Admin User", passwordHash="argon2id-placeholder-hash"),
             "test",
         )
         create_mailbox(
@@ -106,12 +106,12 @@ def test_build_apply_plan_excludes_suspended_domain_and_mailbox(tmp_path):
         suspended_domain = create_domain(connection, DomainCreate(name="suspended.example"), "test")
         active_user = create_user(
             connection,
-            UserCreate(email="active@active.example", displayName="Active User", passwordHash="argon2id-placeholder"),
+            StoredUserCreate(email="active@active.example", displayName="Active User", passwordHash="argon2id-placeholder"),
             "test",
         )
         suspended_domain_user = create_user(
             connection,
-            UserCreate(
+            StoredUserCreate(
                 email="user@suspended.example",
                 displayName="Suspended Domain User",
                 passwordHash="argon2id-placeholder",
@@ -120,7 +120,7 @@ def test_build_apply_plan_excludes_suspended_domain_and_mailbox(tmp_path):
         )
         suspended_mailbox_user = create_user(
             connection,
-            UserCreate(
+            StoredUserCreate(
                 email="disabled@active.example",
                 displayName="Disabled Mailbox User",
                 passwordHash="argon2id-placeholder",
@@ -177,7 +177,7 @@ def test_build_apply_plan_excludes_suspended_alias_and_dkim_key(tmp_path):
         domain = create_domain(connection, DomainCreate(name="example.com"), "test")
         user = create_user(
             connection,
-            UserCreate(email="admin@example.com", displayName="Admin User", passwordHash="argon2id-placeholder"),
+            StoredUserCreate(email="admin@example.com", displayName="Admin User", passwordHash="argon2id-placeholder"),
             "test",
         )
         create_mailbox(

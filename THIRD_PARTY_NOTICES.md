@@ -7,6 +7,7 @@ This file tracks runtime dependencies and infrastructure components considered f
 | Component | Purpose | License posture | Status |
 | --- | --- | --- | --- |
 | Python | Admin/runtime API | Python Software Foundation License | Accepted |
+| argon2-cffi | Server-side administrator and user password hashing | MIT | Accepted |
 | cryptography | Session and push-token encryption primitives | Apache-2.0 OR BSD-3-Clause | Accepted |
 | dnspython | DNS posture verification | ISC | Accepted |
 | email-validator | API email address validation | Unlicense | Accepted |

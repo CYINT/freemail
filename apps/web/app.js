@@ -174,7 +174,7 @@ bootstrapAdminForm?.addEventListener("submit", async (event) => {
     domainName: String(form.get("domainName") || "").trim(),
     email: String(form.get("email") || "").trim(),
     displayName: String(form.get("displayName") || "").trim(),
-    passwordHash: String(form.get("passwordHash") || "").trim(),
+    initialPassword: String(form.get("initialPassword") || ""),
     mailboxLocalPart: String(form.get("mailboxLocalPart") || "").trim(),
   });
 });
@@ -193,7 +193,7 @@ adminUserForm?.addEventListener("submit", async (event) => {
     {
       email: String(form.get("email") || "").trim(),
       displayName: String(form.get("displayName") || "").trim(),
-      passwordHash: String(form.get("passwordHash") || "").trim(),
+      initialPassword: String(form.get("initialPassword") || ""),
       isAdmin: form.get("isAdmin") === "on",
     },
     "User invited.",

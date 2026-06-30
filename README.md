@@ -63,7 +63,7 @@ Run repository hygiene scans before publishing changes:
 
 ## Admin API
 
-Admin endpoints require `X-FreeMail-Admin-Token` and remain disabled until `FREEMAIL_ADMIN_API_TOKEN` is set. Do not commit a real token. The webmail preview includes an operator admin console for bootstrap, domain, user, mailbox, alias, DKIM, DNS-guidance, suspension/reactivation, and audit-log workflows; it requires the operator to provide the API URL and tokens at runtime.
+Admin endpoints require `X-FreeMail-Admin-Token` and remain disabled until `FREEMAIL_ADMIN_API_TOKEN` is set. Do not commit a real token. The webmail preview includes an operator admin console for bootstrap, domain, user, mailbox, alias, DKIM, DNS-guidance, suspension/reactivation, and audit-log workflows; it requires the operator to provide the API URL and tokens at runtime. Bootstrap and user creation accept one-time `initialPassword` values and hash them server-side with Argon2id before storage.
 
 Initial endpoints:
 

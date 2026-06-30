@@ -30,7 +30,7 @@ class BootstrapAdminCreate(ApiModel):
     domain_name: str = Field(min_length=1, max_length=253, pattern=r"^[A-Za-z0-9.-]+$")
     email: EmailStr
     display_name: str = Field(min_length=1, max_length=160)
-    password_hash: str = Field(min_length=20, max_length=512)
+    initial_password: str = Field(min_length=12, max_length=512)
     mailbox_local_part: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9._%+-]+$")
 
 
@@ -41,6 +41,13 @@ class BootstrapAdminRecord(ApiModel):
 
 
 class UserCreate(ApiModel):
+    email: EmailStr
+    display_name: str = Field(min_length=1, max_length=160)
+    initial_password: str = Field(min_length=12, max_length=512)
+    is_admin: bool = False
+
+
+class StoredUserCreate(ApiModel):
     email: EmailStr
     display_name: str = Field(min_length=1, max_length=160)
     password_hash: str = Field(min_length=20, max_length=512)
