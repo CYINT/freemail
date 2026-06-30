@@ -18,6 +18,7 @@ The gate verifies:
 - `docker compose config --quiet`
 - metadata and mail-store backup evidence files exist and are non-empty
 - `https://freemail.kuzuryu.ai/health` reports VPN-only health and release metadata
+- `https://freemail.kuzuryu.ai/api/v1/deployment` reports `vpn-only` exposure and `publicInternet: false`
 - `https://freemail.kuzuryu.ai/api/v1/mail-core/readiness` reports SMTP, submission, IMAP, and JMAP readiness
 
 For offline development only, individual external checks can be skipped:
@@ -28,6 +29,25 @@ For offline development only, individual external checks can be skipped:
 
 Do not use skipped gates as release evidence.
 
+## Private-Beta Gate
+
+Before private-beta use, run the private-beta gate. Runtime-only mode verifies the VPN-only deployment contract and mail-core readiness:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\private_beta_gate.py --skip-dns
+```
+
+For a controlled domain, first export DNS guidance from the admin API and capture observed DNS values, then run:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\private_beta_gate.py `
+  --domain example.com `
+  --dns-guidance .freemail-qa\dns-guidance-example.com.json `
+  --observed-dns .freemail-qa\observed-dns-example.com.json
+```
+
+If `--observed-dns` is omitted, the gate resolves live MX/TXT DNS for the expected record names. The output JSON is release evidence and should be stored outside Git with the other private-beta artifacts.
+
 ## Provenance
 
 Release provenance for a candidate consists of:
@@ -36,6 +56,7 @@ Release provenance for a candidate consists of:
 - GitHub Actions run URL for the passing `CI` workflow
 - Codecov upload completion in that workflow
 - release-gate JSON output
+- private-beta gate JSON output for each controlled domain
 - metadata backup path and checksum, stored outside Git
 - mail-store backup path and checksum, stored outside Git
 - deployment hostname and exposure boundary evidence

@@ -18,6 +18,7 @@ class ReleaseGateOptions:
     remote: str = "origin"
     branch: str = "main"
     health_url: str | None = "https://freemail.kuzuryu.ai/health"
+    deployment_url: str | None = "https://freemail.kuzuryu.ai/api/v1/deployment"
     readiness_url: str | None = "https://freemail.kuzuryu.ai/api/v1/mail-core/readiness"
     metadata_backup: Path | None = None
     mail_store_backup: Path | None = None
@@ -38,7 +39,7 @@ def run_release_gate(options: ReleaseGateOptions) -> dict[str, Any]:
     if not options.skip_backup_evidence:
         checks.extend(_check_backup_evidence(options.metadata_backup, options.mail_store_backup))
     if not options.skip_runtime:
-        checks.extend(_check_runtime(options.health_url, options.readiness_url, commit))
+        checks.extend(_check_runtime(options.health_url, options.deployment_url, options.readiness_url, commit))
 
     passed = all(check["status"] == "pass" for check in checks)
     return {
@@ -119,7 +120,12 @@ def _check_backup_file(name: str, path: Path) -> dict[str, Any]:
     return _check(name, exists and size > 0, {"path": str(path), "bytes": size})
 
 
-def _check_runtime(health_url: str | None, readiness_url: str | None, commit: str) -> list[dict[str, Any]]:
+def _check_runtime(
+    health_url: str | None,
+    deployment_url: str | None,
+    readiness_url: str | None,
+    commit: str,
+) -> list[dict[str, Any]]:
     checks: list[dict[str, Any]] = []
     if health_url:
         health = _fetch_json(health_url)
@@ -135,6 +141,22 @@ def _check_runtime(health_url: str | None, readiness_url: str | None, commit: st
                     "status": health.get("status"),
                     "vpnOnly": health.get("vpnOnly"),
                     "releaseCommit": release.get("commit"),
+                },
+            )
+        )
+    if deployment_url:
+        deployment = _fetch_json(deployment_url)
+        checks.append(
+            _check(
+                "deployment-boundary",
+                deployment.get("exposure") == "vpn-only"
+                and deployment.get("publicInternet") is False
+                and str(deployment.get("requiredBoundary", "")).lower().find("vpn") >= 0,
+                {
+                    "url": deployment_url,
+                    "exposure": deployment.get("exposure"),
+                    "publicInternet": deployment.get("publicInternet"),
+                    "requiredBoundary": deployment.get("requiredBoundary"),
                 },
             )
         )

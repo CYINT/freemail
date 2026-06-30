@@ -28,6 +28,8 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
     def fake_fetch(url):
         if url.endswith("/health"):
             return {"status": "ok", "vpnOnly": True, "release": {"commit": "abc123"}}
+        if url.endswith("/deployment"):
+            return {"exposure": "vpn-only", "publicInternet": False, "requiredBoundary": "Dragonscale/VPN clients only"}
         return {"status": "ready", "tcpReachable": True, "protocolReady": True}
 
     monkeypatch.setattr(release_gate, "_command", fake_command)
@@ -44,6 +46,7 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
         "metadata-backup",
         "mail-store-backup",
         "runtime-health",
+        "deployment-boundary",
         "mail-core-readiness",
     }
 
@@ -80,9 +83,22 @@ def test_assert_release_gate_raises_for_failed_checks(tmp_path, monkeypatch):
 def test_runtime_health_accepts_unknown_commit_for_unstamped_local_container(monkeypatch):
     monkeypatch.setattr(release_gate, "_fetch_json", lambda _url: {"status": "ok", "vpnOnly": True, "release": {"commit": "unknown"}})
 
-    checks = release_gate._check_runtime("https://freemail.kuzuryu.ai/health", None, "abc123")
+    checks = release_gate._check_runtime("https://freemail.kuzuryu.ai/health", None, None, "abc123")
 
     assert checks[0]["status"] == "pass"
+
+
+def test_runtime_deployment_boundary_requires_vpn_only(monkeypatch):
+    monkeypatch.setattr(
+        release_gate,
+        "_fetch_json",
+        lambda _url: {"exposure": "public", "publicInternet": True, "requiredBoundary": "internet"},
+    )
+
+    checks = release_gate._check_runtime(None, "https://freemail.kuzuryu.ai/api/v1/deployment", None, "abc123")
+
+    assert checks[0]["name"] == "deployment-boundary"
+    assert checks[0]["status"] == "fail"
 
 
 def test_backup_file_check_requires_non_empty_file(tmp_path):

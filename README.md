@@ -335,7 +335,22 @@ Run the local release gate only after the candidate commit has been pushed and G
   --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz
 ```
 
-The release gate checks clean Git state, remote SHA, GitHub Actions CI, Compose config, backup evidence, VPN-only health metadata, and mail-core protocol readiness.
+The release gate checks clean Git state, remote SHA, GitHub Actions CI, Compose config, backup evidence, VPN-only health/deployment metadata, and mail-core protocol readiness.
+
+Run the private-beta gate before controlled-domain use:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\private_beta_gate.py --skip-dns
+```
+
+For a real beta domain, pass admin DNS guidance plus observed DNS evidence, or omit `--observed-dns` to resolve live MX/TXT records:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\private_beta_gate.py `
+  --domain example.com `
+  --dns-guidance .freemail-qa\dns-guidance-example.com.json `
+  --observed-dns .freemail-qa\observed-dns-example.com.json
+```
 
 ## VPN-Only Deployment
 

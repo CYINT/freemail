@@ -14,6 +14,7 @@ def main() -> int:
     parser.add_argument("--remote", default="origin")
     parser.add_argument("--branch", default="main")
     parser.add_argument("--health-url", default="https://freemail.kuzuryu.ai/health")
+    parser.add_argument("--deployment-url", default="https://freemail.kuzuryu.ai/api/v1/deployment")
     parser.add_argument("--readiness-url", default="https://freemail.kuzuryu.ai/api/v1/mail-core/readiness")
     parser.add_argument("--metadata-backup", type=Path)
     parser.add_argument("--mail-store-backup", type=Path)
@@ -27,6 +28,7 @@ def main() -> int:
         remote=args.remote,
         branch=args.branch,
         health_url=args.health_url,
+        deployment_url=args.deployment_url,
         readiness_url=args.readiness_url,
         metadata_backup=args.metadata_backup,
         mail_store_backup=args.mail_store_backup,
