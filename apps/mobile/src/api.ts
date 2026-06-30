@@ -36,6 +36,25 @@ export type MailboxSnapshot = {
   messages: MailMessage[];
 };
 
+export type MailboxSearch = {
+  email: string;
+  folder: string;
+  query: string;
+  messages: MailMessage[];
+};
+
+export type MailContact = {
+  name: string;
+  email: string;
+  messageCount: number;
+};
+
+export type MailboxContacts = {
+  email: string;
+  folder: string;
+  contacts: MailContact[];
+};
+
 export type ComposeMessage = {
   recipients: string[];
   subject: string;
@@ -69,6 +88,18 @@ export async function loadMailboxSnapshot(session: MailboxSession, folder = "INB
   return response.json();
 }
 
+export async function searchMailbox(session: MailboxSession, folder: string, query: string): Promise<MailboxSearch> {
+  const path = `/api/v1/mailbox/search?folder=${encodeURIComponent(folder)}&query=${encodeURIComponent(query)}&limit=25`;
+  const response = await request(session.apiBaseUrl, path, { headers: mailboxHeaders(session) });
+  return response.json();
+}
+
+export async function loadMailboxContacts(session: MailboxSession, folder: string): Promise<MailboxContacts> {
+  const path = `/api/v1/mailbox/contacts?folder=${encodeURIComponent(folder)}&limit=100`;
+  const response = await request(session.apiBaseUrl, path, { headers: mailboxHeaders(session) });
+  return response.json();
+}
+
 export async function loadMailboxMessage(
   session: MailboxSession,
   folder: string,
@@ -77,6 +108,19 @@ export async function loadMailboxMessage(
   const path = `/api/v1/mailbox/message?folder=${encodeURIComponent(folder)}&message_id=${encodeURIComponent(messageId)}`;
   const response = await request(session.apiBaseUrl, path, { headers: mailboxHeaders(session) });
   return response.json();
+}
+
+export async function loadMailboxAttachment(
+  session: MailboxSession,
+  folder: string,
+  messageId: string,
+  attachmentId: string,
+): Promise<Blob> {
+  const path =
+    `/api/v1/mailbox/message/attachment?folder=${encodeURIComponent(folder)}` +
+    `&message_id=${encodeURIComponent(messageId)}&attachment_id=${encodeURIComponent(attachmentId)}`;
+  const response = await request(session.apiBaseUrl, path, { headers: mailboxHeaders(session) });
+  return response.blob();
 }
 
 export async function sendMailboxMessage(session: MailboxSession, message: ComposeMessage): Promise<void> {
@@ -88,6 +132,18 @@ export async function sendMailboxMessage(session: MailboxSession, message: Compo
     },
     body: JSON.stringify(message),
   });
+}
+
+export async function createMailboxFolder(session: MailboxSession, folder: string): Promise<void> {
+  await mutateMailboxFolder(session, "POST", { folder });
+}
+
+export async function renameMailboxFolder(session: MailboxSession, folder: string, targetFolder: string): Promise<void> {
+  await mutateMailboxFolder(session, "PATCH", { folder, targetFolder });
+}
+
+export async function deleteMailboxFolder(session: MailboxSession, folder: string): Promise<void> {
+  await mutateMailboxFolder(session, "DELETE", { folder });
 }
 
 export function normalizedApiBaseUrl(apiBaseUrl: string): string {
@@ -104,4 +160,19 @@ async function request(apiBaseUrl: string, path: string, init: RequestInit): Pro
     throw new Error(await response.text());
   }
   return response;
+}
+
+async function mutateMailboxFolder(
+  session: MailboxSession,
+  method: "POST" | "PATCH" | "DELETE",
+  payload: Record<string, string>,
+): Promise<void> {
+  await request(session.apiBaseUrl, "/api/v1/mailbox/folder", {
+    method,
+    headers: {
+      ...mailboxHeaders(session),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
 }

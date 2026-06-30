@@ -31,6 +31,12 @@ jobs:
         run: python scripts/qa_web_browser.py
       - name: Mobile static QA
         run: python scripts/qa_mobile_static.py
+      - name: Mobile dependency install
+        run: npm ci --prefix apps/mobile
+      - name: Mobile typecheck
+        run: npm run --prefix apps/mobile typecheck
+      - name: Mobile dependency audit
+        run: npm audit --prefix apps/mobile --audit-level=moderate
       - name: Upload coverage to Codecov
         if: ${{ env.CODECOV_TOKEN != '' }}
         uses: codecov/codecov-action@v5

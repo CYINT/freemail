@@ -26,7 +26,7 @@ This repository is at the implementation baseline. It contains:
 
 - A FastAPI admin/runtime API with persistent SQLite-backed domain, user, mailbox, alias, and audit-log surfaces.
 - A static webmail preview shell with inbox, search, message reader, compose, folder navigation, and responsive layout QA.
-- An Expo/React Native mobile client scaffold with secure session storage and static QA.
+- An Expo/React Native mobile client scaffold with secure session storage, mailbox workflows, and static QA.
 - A Docker Compose stack with VPN-only loopback bindings by default.
 - A Stalwart mail-core candidate profile for the first architecture spike.
 - CI for linting, tests, dependency audit, Compose validation, and image build.
@@ -110,9 +110,14 @@ Run mobile static QA with:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\qa_mobile_static.py
+Push-Location apps\mobile
+npm ci
+npm run typecheck
+npm audit --audit-level=moderate
+Pop-Location
 ```
 
-The mobile scaffold lives in `apps\mobile`, uses Expo/React Native, defaults to `https://freemail.kuzuryu.ai`, and persists bearer sessions through `expo-secure-store` rather than browser-style storage.
+The mobile scaffold lives in `apps\mobile`, uses Expo/React Native, defaults to `https://freemail.kuzuryu.ai`, and persists bearer sessions through `expo-secure-store` rather than browser-style storage. It currently covers sign-in, inbox/folder snapshots, message reading, compose/send, reply/forward drafts, folder-scoped search, contacts, non-core folder management, and attachment metadata/availability checks.
 
 The webmail preview can load live mailbox folders and message headers from the API. Start `admin-api`, `mail-core`, and `web`, open `http://127.0.0.1:18091`, enter a mailbox address/password, and keep the API field pointed at `http://127.0.0.1:18090`. The browser client exchanges the mailbox password for a bearer session at `POST /api/v1/mailbox/session`, stores only the bearer token in `localStorage`, and revokes it with `DELETE /api/v1/mailbox/session` on sign out. The API stores mailbox passwords only as encrypted session material using `FREEMAIL_SESSION_SECRET`. For a different local web origin, set `FREEMAIL_WEB_CORS_ORIGINS`.
 

@@ -195,7 +195,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "adminApi": "ready",
                 "mailCore": "candidate-spike",
                 "webmail": "scaffolded",
-                "mobile": "planned",
+                "mobile": "foundation",
             },
         }
 

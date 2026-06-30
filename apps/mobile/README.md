@@ -2,15 +2,18 @@
 
 FreeMail Mobile is the iOS and Android client lane for the FreeMail platform. It is an Expo/React Native app scaffold that consumes the same mailbox API used by the webmail client.
 
-The current mobile implementation is a source-level foundation, not a production app-store build. It defines project metadata, API client, secure session storage, and the first mailbox screen flow so contributors can build native UI without inventing new server contracts.
+The current mobile implementation is a source-level foundation, not a production app-store build. It defines project metadata, API client, secure session storage, and the first mailbox screen flows so contributors can build native UI without inventing new server contracts.
 
 ## Scope
 
 - iOS and Android client.
 - VPN-only self-hosted API target.
 - Secure bearer-session persistence through `expo-secure-store`.
-- Inbox snapshot, message read, compose/send, and sign-out workflows.
-- Future attachment, folder, contacts, search, push, and offline cache workflows.
+- Inbox snapshot, message read, compose/send, reply, forward, and sign-out workflows.
+- Folder navigation plus create, rename, and delete controls for non-core folders.
+- Folder-scoped search and contacts loaded from mailbox headers.
+- Attachment metadata display with an authenticated attachment availability check.
+- Future offline cache, push, richer attachment handling, and native release workflows.
 
 ## Development
 
@@ -18,6 +21,7 @@ The current mobile implementation is a source-level foundation, not a production
 cd apps\mobile
 npm install
 npm run typecheck
+npm audit --audit-level=moderate
 npm run start
 ```
 
@@ -37,4 +41,4 @@ Static mobile QA runs from the repository root and does not require a native too
 .\.venv\Scripts\python.exe scripts\qa_mobile_static.py
 ```
 
-The static gate checks that the mobile client uses provider-neutral FreeMail language, references the expected mailbox API endpoints, defaults to the VPN hostname, and does not persist mailbox passwords or bearer sessions in insecure browser-style storage.
+The static gate checks that the mobile client uses provider-neutral FreeMail language, references the expected mailbox API endpoints for sessions, snapshots, search, contacts, folders, message details, attachments, and send, defaults to the VPN hostname, and does not persist mailbox passwords or bearer sessions in insecure browser-style storage.

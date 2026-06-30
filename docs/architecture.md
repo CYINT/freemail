@@ -81,7 +81,10 @@ The current mobile foundation covers:
 - VPN-only default API target at `https://freemail.kuzuryu.ai`
 - mailbox session creation and revocation
 - SecureStore-backed bearer-session persistence
-- inbox snapshot, message read, and compose/send API calls
+- inbox snapshot, message read, compose/send, reply, and forward workflows
+- folder navigation and non-core folder create/rename/delete controls
+- folder-scoped search and contacts
+- attachment metadata display and authenticated availability checks
 - static QA that forbids provider trade-dress references and insecure browser-style credential storage
 
-Native build, app-store signing, push notifications, offline cache, attachment UX, and folder/search/contacts screens remain future mobile milestones.
+Native build, app-store signing, push notifications, offline cache, and richer attachment UX remain future mobile milestones.
