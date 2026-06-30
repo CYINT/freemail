@@ -47,22 +47,7 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
         if command[:3] == ["gh", "run", "list"]:
             return '[{"databaseId":1,"status":"completed","conclusion":"success","workflowName":"CI","url":"url"}]'
         if command[:3] == ["gh", "run", "view"]:
-            return json.dumps(
-                {
-                    "jobs": [
-                        {
-                            "name": "test",
-                            "steps": [
-                                {
-                                    "name": "Upload coverage to Codecov",
-                                    "status": "completed",
-                                    "conclusion": "success",
-                                }
-                            ],
-                        }
-                    ]
-                }
-            )
+            return json.dumps(valid_ci_jobs())
         raise AssertionError(command)
 
     def fake_fetch(url):
@@ -120,6 +105,7 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
         "repo-secret-scan",
         "license-policy-scan",
         "github-ci",
+        "ci-required-steps",
         "codecov-upload",
         "metadata-backup",
         "mail-store-backup",
@@ -175,7 +161,7 @@ def test_release_gate_reports_failed_codecov_upload(tmp_path, monkeypatch):
         if command[:3] == ["gh", "run", "list"]:
             return '[{"databaseId":1,"status":"completed","conclusion":"success","workflowName":"CI","url":"url"}]'
         if command[:3] == ["gh", "run", "view"]:
-            return json.dumps({"jobs": [{"name": "test", "steps": []}]})
+            return json.dumps(valid_ci_jobs(step_overrides={"Upload coverage to Codecov": {"conclusion": "failure"}}))
         raise AssertionError(command)
 
     monkeypatch.setattr(release_gate, "_command", fake_command)
@@ -193,7 +179,49 @@ def test_release_gate_reports_failed_codecov_upload(tmp_path, monkeypatch):
     checks_by_name = {check["name"]: check for check in result["checks"]}
     assert result["passed"] is False
     assert checks_by_name["github-ci"]["status"] == "pass"
+    assert checks_by_name["ci-required-steps"]["status"] == "pass"
     assert checks_by_name["codecov-upload"]["status"] == "fail"
+
+
+def test_release_gate_reports_missing_required_ci_steps(tmp_path, monkeypatch):
+    def fake_command(command):
+        if command == ["git", "rev-parse", "HEAD"]:
+            return "abc123"
+        if command == ["git", "status", "--short"]:
+            return ""
+        if command == ["git", "ls-remote", "origin", "refs/heads/main"]:
+            return "abc123\trefs/heads/main"
+        if command == ["docker", "compose", "config", "--quiet"]:
+            return ""
+        if command == ["docker", "compose", "--profile", "web", "--profile", "mail-core", "config", "--format", "json"]:
+            return json.dumps(valid_compose_config())
+        if command[1:] == ["scripts/qa_repo_secrets.py"]:
+            return "repo secret QA passed"
+        if command[1:] == ["scripts/qa_license_policy.py"]:
+            return "license policy QA passed"
+        if command[:3] == ["gh", "run", "list"]:
+            return '[{"databaseId":1,"status":"completed","conclusion":"success","workflowName":"CI","url":"url"}]'
+        if command[:3] == ["gh", "run", "view"]:
+            return json.dumps(valid_ci_jobs(omit_steps={"Mobile native prebuild drill"}))
+        raise AssertionError(command)
+
+    monkeypatch.setattr(release_gate, "_command", fake_command)
+
+    result = run_release_gate(
+        ReleaseGateOptions(
+            skip_codecov_upload=True,
+            skip_backup_evidence=True,
+            skip_mobile_evidence=True,
+            skip_private_beta_evidence=True,
+            skip_release_notes=True,
+            skip_runtime=True,
+        )
+    )
+
+    checks_by_name = {check["name"]: check for check in result["checks"]}
+    assert result["passed"] is False
+    assert checks_by_name["ci-required-steps"]["status"] == "fail"
+    assert checks_by_name["ci-required-steps"]["details"]["missingSteps"] == ["Mobile native prebuild drill"]
 
 
 def test_release_gate_can_skip_codecov_upload_when_ci_is_still_required(tmp_path, monkeypatch):
@@ -215,7 +243,7 @@ def test_release_gate_can_skip_codecov_upload_when_ci_is_still_required(tmp_path
         if command[:3] == ["gh", "run", "list"]:
             return '[{"databaseId":1,"status":"completed","conclusion":"success","workflowName":"CI","url":"url"}]'
         if command[:3] == ["gh", "run", "view"]:
-            raise AssertionError("codecov run view should not execute")
+            return json.dumps(valid_ci_jobs())
         raise AssertionError(command)
 
     monkeypatch.setattr(release_gate, "_command", fake_command)
@@ -542,6 +570,19 @@ def fake_basic_release_command(command):
     if command == ["docker", "compose", "--profile", "web", "--profile", "mail-core", "config", "--format", "json"]:
         return json.dumps(valid_compose_config())
     raise AssertionError(command)
+
+
+def valid_ci_jobs(*, omit_steps=None, step_overrides=None):
+    omitted = set(omit_steps or set())
+    overrides = step_overrides or {}
+    steps = []
+    for name in [*release_gate.REQUIRED_CI_STEPS, "Upload coverage to Codecov"]:
+        if name in omitted:
+            continue
+        step = {"name": name, "status": "completed", "conclusion": "success"}
+        step.update(overrides.get(name, {}))
+        steps.append(step)
+    return {"jobs": [{"name": "test", "steps": steps}]}
 
 
 def valid_compose_config():

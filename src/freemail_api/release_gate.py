@@ -14,6 +14,24 @@ class ReleaseGateError(RuntimeError):
     pass
 
 
+REQUIRED_CI_STEPS = (
+    "Lint",
+    "Repository secret scan",
+    "License policy scan",
+    "Tests",
+    "Browser webmail QA",
+    "Mobile static QA",
+    "Mobile dependency install",
+    "Mobile config validation",
+    "Mobile native prebuild drill",
+    "Mobile typecheck",
+    "Mobile dependency audit",
+    "Dependency audit",
+    "Compose config validation",
+    "Container build validation",
+)
+
+
 @dataclass(frozen=True)
 class ReleaseGateOptions:
     repo: str = "CYINT/freemail"
@@ -32,6 +50,7 @@ class ReleaseGateOptions:
     release_notes: Path | None = None
     release_version: str | None = None
     skip_github_ci: bool = False
+    skip_ci_step_provenance: bool = False
     skip_codecov_upload: bool = False
     skip_repo_secret_scan: bool = False
     skip_license_policy_scan: bool = False
@@ -57,6 +76,8 @@ def run_release_gate(options: ReleaseGateOptions) -> dict[str, Any]:
         checks.append(_check_license_policy_scan())
     if not options.skip_github_ci:
         checks.append(_check_github_ci(options.repo, commit))
+        if not options.skip_ci_step_provenance:
+            checks.append(_check_ci_required_steps(options.repo, commit))
         if not options.skip_codecov_upload:
             checks.append(_check_codecov_upload(options.repo, commit))
     if not options.skip_backup_evidence:
@@ -174,26 +195,44 @@ def _check_codecov_upload(repo: str, commit: str) -> dict[str, Any]:
     latest = _latest_ci_run(repo, commit)
     if not latest or latest.get("status") != "completed" or latest.get("conclusion") != "success":
         return _check("codecov-upload", False, {"error": "passing CI run is required", "latestRun": latest})
-    output = _command(["gh", "run", "view", str(latest["databaseId"]), "--repo", repo, "--json", "jobs"])
-    payload = json.loads(output)
-    jobs = payload.get("jobs") if isinstance(payload, dict) else None
     matching_steps: list[dict[str, Any]] = []
-    if isinstance(jobs, list):
-        for job in jobs:
-            if not isinstance(job, dict):
-                continue
-            for step in job.get("steps", []):
-                if isinstance(step, dict) and step.get("name") == "Upload coverage to Codecov":
-                    matching_steps.append(
-                        {
-                            "job": job.get("name"),
-                            "name": step.get("name"),
-                            "status": step.get("status"),
-                            "conclusion": step.get("conclusion"),
-                        }
-                    )
+    for job in _ci_run_jobs(repo, latest["databaseId"]):
+        for step in _job_steps(job):
+            if step.get("name") == "Upload coverage to Codecov":
+                matching_steps.append(_step_details(job, step))
     passed = any(step.get("status") == "completed" and step.get("conclusion") == "success" for step in matching_steps)
     return _check("codecov-upload", passed, {"latestRun": latest, "steps": matching_steps})
+
+
+def _check_ci_required_steps(repo: str, commit: str) -> dict[str, Any]:
+    latest = _latest_ci_run(repo, commit)
+    if not latest or latest.get("status") != "completed" or latest.get("conclusion") != "success":
+        return _check("ci-required-steps", False, {"error": "passing CI run is required", "latestRun": latest})
+    observed_steps = {
+        str(step.get("name")): _step_details(job, step)
+        for job in _ci_run_jobs(repo, latest["databaseId"])
+        for step in _job_steps(job)
+    }
+    missing = [name for name in REQUIRED_CI_STEPS if name not in observed_steps]
+    failed = [
+        name
+        for name in REQUIRED_CI_STEPS
+        if name in observed_steps
+        and (
+            observed_steps[name].get("status") != "completed"
+            or observed_steps[name].get("conclusion") != "success"
+        )
+    ]
+    return _check(
+        "ci-required-steps",
+        not missing and not failed,
+        {
+            "latestRun": latest,
+            "requiredSteps": list(REQUIRED_CI_STEPS),
+            "missingSteps": missing,
+            "failedSteps": failed,
+        },
+    )
 
 
 def _latest_ci_run(repo: str, commit: str) -> dict[str, Any] | None:
@@ -215,6 +254,27 @@ def _latest_ci_run(repo: str, commit: str) -> dict[str, Any] | None:
     runs = json.loads(output)
     ci_runs = [run for run in runs if run.get("workflowName") == "CI"]
     return ci_runs[0] if ci_runs else None
+
+
+def _ci_run_jobs(repo: str, run_id: object) -> list[dict[str, Any]]:
+    output = _command(["gh", "run", "view", str(run_id), "--repo", repo, "--json", "jobs"])
+    payload = json.loads(output)
+    jobs = payload.get("jobs") if isinstance(payload, dict) else None
+    return [job for job in jobs if isinstance(job, dict)] if isinstance(jobs, list) else []
+
+
+def _job_steps(job: dict[str, Any]) -> list[dict[str, Any]]:
+    steps = job.get("steps")
+    return [step for step in steps if isinstance(step, dict)] if isinstance(steps, list) else []
+
+
+def _step_details(job: dict[str, Any], step: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "job": job.get("name"),
+        "name": step.get("name"),
+        "status": step.get("status"),
+        "conclusion": step.get("conclusion"),
+    }
 
 
 def _check_repo_secret_scan() -> dict[str, Any]:
