@@ -52,13 +52,13 @@ Current spike evidence:
 - Stalwart reports healthy after first boot.
 - The configured Stalwart profile starts protocol listeners for SMTP, implicit-TLS submission, implicit-TLS IMAP, and JMAP/admin.
 - `scripts/qa_mail_core.py --strict` distinguishes TCP reachability from protocol readiness and passes only when all expected protocol surfaces respond.
+- `scripts/qa_mail_flow.py` proves actual SMTP receive, authenticated submission, and IMAP message access for a provisioned mailbox. Stalwart's default spam posture can file unauthenticated inbound mail into `Junk Mail`, so the smoke searches all selectable IMAP folders.
 
 Remaining spike work:
 
 - configure one controlled production domain and mailbox
-- prove SMTP receive on the loopback-bound SMTP port
-- prove authenticated submission on the loopback-bound submission port
-- prove IMAP or JMAP mailbox access
+- decide and document the production spam/deliverability policy before private beta
+- move from disposable `example.com` smoke metadata to a controlled production test domain
 
 ## Stalwart Provisioning Plan
 

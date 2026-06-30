@@ -100,6 +100,14 @@ The Stalwart profile mounts `ops\stalwart\config.json` at `/etc/stalwart/config.
 
 `scripts\qa_mail_core.py` exits successfully when the configured mail-core ports are reachable and reports whether each protocol is actually ready. Add `--strict` when the Stalwart setup is expected to pass SMTP, submission, IMAP, and JMAP checks.
 
+After a domain and mailbox are provisioned into Stalwart, run an end-to-end message smoke:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\qa_mail_flow.py --email admin@example.com --secrets-json secrets\mail-core-users.json --inbound-recipient hello@example.com
+```
+
+The smoke sends unauthenticated inbound SMTP, sends authenticated submission over implicit TLS, and verifies both messages through implicit-TLS IMAP. Stalwart's default spam posture may place unauthenticated inbound mail in `Junk Mail`; the smoke searches every selectable IMAP folder and treats that as delivered.
+
 FreeMail can export a Stalwart `apply` plan from admin metadata:
 
 ```powershell
