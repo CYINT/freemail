@@ -84,10 +84,10 @@ The current mobile foundation covers:
 - inbox snapshot, message read, compose/send, reply, and forward workflows
 - folder navigation and non-core folder create/rename/delete controls
 - folder-scoped search and contacts
-- attachment metadata display and authenticated availability checks
+- attachment metadata display and authenticated download/share handling
 - bounded document-picker compose attachments encoded for the mailbox send API
 - SecureStore-backed offline metadata cache for last loaded folder, message header, and contact snapshots
 - bearer-authenticated push-device registration, listing, and revocation contract with hashed provider tokens
 - static QA that forbids provider trade-dress references and insecure browser-style credential storage
 
-Native build, app-store signing, provider-specific push delivery, and richer attachment download/save UX remain future mobile milestones.
+Native build, app-store signing, and provider-specific push delivery remain future mobile milestones.

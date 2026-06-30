@@ -40,7 +40,7 @@ def validate_mobile(root: Path) -> list[str]:
     if scripts.get("config:check") != "expo config --type public":
         failures.append("mobile package must expose config:check for Expo config validation")
     dependencies = package.get("dependencies", {})
-    for dependency in ["expo", "react-native", "expo-secure-store", "expo-document-picker", "expo-file-system"]:
+    for dependency in ["expo", "react-native", "expo-secure-store", "expo-document-picker", "expo-file-system", "expo-sharing"]:
         if dependency not in dependencies:
             failures.append(f"missing mobile dependency: {dependency}")
     expo_config = app_config.get("expo", {})
@@ -72,6 +72,12 @@ def validate_mobile(root: Path) -> list[str]:
         "renameMailboxFolder",
         "deleteMailboxFolder",
         "loadMailboxAttachment",
+        "Sharing.shareAsync",
+        "FileSystem.writeAsStringAsync",
+        "FileSystem.cacheDirectory",
+        "Download",
+        "Attachment downloaded to app cache",
+        "Attachment ready to save",
         "registerMailboxPushDevice",
         "loadMailboxPushDevices",
         "revokeMailboxPushDevice",

@@ -20,14 +20,16 @@ export type MailMessage = {
   unread: boolean;
 };
 
+export type MailAttachment = {
+  attachmentId: string;
+  filename: string;
+  contentType: string;
+  size: number;
+};
+
 export type MailMessageDetail = MailMessage & {
   body: string;
-  attachments: Array<{
-    attachmentId: string;
-    filename: string;
-    contentType: string;
-    size: number;
-  }>;
+  attachments: MailAttachment[];
 };
 
 export type MailboxSnapshot = {

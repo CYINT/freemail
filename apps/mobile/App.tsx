@@ -1,6 +1,7 @@
 import { StatusBar } from "expo-status-bar";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -26,6 +27,7 @@ import {
   loadMailboxMessage,
   loadMailboxPushDevices,
   loadMailboxSnapshot,
+  MailAttachment,
   MailboxSession,
   MailContact,
   MailFolder,
@@ -369,15 +371,24 @@ export default function App() {
     setComposeAttachments((current) => current.filter((attachment) => attachment.id !== id));
   }
 
-  async function inspectAttachment(attachmentId: string, filename: string) {
+  async function downloadAndShareAttachment(attachment: MailAttachment) {
     if (!session || !selectedMessage) {
       return;
     }
     setLoading(true);
-    setStatus(`Checking attachment ${filename}...`);
+    setStatus(`Downloading attachment ${attachment.filename}...`);
     try {
-      const blob = await loadMailboxAttachment(session, selectedMessage.folder, selectedMessage.messageId, attachmentId);
-      setStatus(`Attachment available: ${filename} (${blob.size} bytes).`);
+      const blob = await loadMailboxAttachment(session, selectedMessage.folder, selectedMessage.messageId, attachment.attachmentId);
+      const localUri = await writeAttachmentToCache(attachment, blob);
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(localUri, {
+          dialogTitle: `Save ${attachment.filename}`,
+          mimeType: attachment.contentType,
+        });
+        setStatus(`Attachment ready to save: ${attachment.filename}.`);
+      } else {
+        setStatus(`Attachment downloaded to app cache: ${attachment.filename} (${formatBytes(blob.size)}).`);
+      }
     } catch (error) {
       setStatus(readableError(error));
     } finally {
@@ -504,16 +515,17 @@ export default function App() {
                 </View>
               ) : null}
               {selectedMessage?.attachments?.map((attachment) => (
-                <Pressable
-                  key={attachment.attachmentId}
-                  style={styles.attachmentRow}
-                  onPress={() => inspectAttachment(attachment.attachmentId, attachment.filename)}
-                >
-                  <Text style={styles.subject}>{attachment.filename}</Text>
-                  <Text style={styles.meta}>
-                    {attachment.contentType} - {attachment.size} bytes
-                  </Text>
-                </Pressable>
+                <View key={attachment.attachmentId} style={styles.attachmentRow}>
+                  <View style={styles.attachmentDetails}>
+                    <Text style={styles.subject}>{attachment.filename}</Text>
+                    <Text style={styles.meta}>
+                      {attachment.contentType} - {formatBytes(attachment.size)}
+                    </Text>
+                  </View>
+                  <Pressable style={styles.secondaryButton} onPress={() => downloadAndShareAttachment(attachment)}>
+                    <Text>Download</Text>
+                  </Pressable>
+                </View>
               ))}
             </View>
 
@@ -643,6 +655,35 @@ async function composeAttachmentFromAsset(asset: DocumentPicker.DocumentPickerAs
   };
 }
 
+async function writeAttachmentToCache(attachment: MailAttachment, blob: Blob): Promise<string> {
+  if (!FileSystem.cacheDirectory) {
+    throw new Error("Attachment cache is unavailable on this device.");
+  }
+  const attachmentId = safeCacheFilename(attachment.attachmentId);
+  const filename = safeCacheFilename(attachment.filename || attachment.attachmentId);
+  const localUri = `${FileSystem.cacheDirectory}freemail-${attachmentId}-${filename}`;
+  await FileSystem.writeAsStringAsync(localUri, await blobToBase64(blob), {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+  return localUri;
+}
+
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Attachment download could not be prepared."));
+    reader.onloadend = () => {
+      const dataUrl = String(reader.result || "");
+      resolve(dataUrl.includes(",") ? dataUrl.split(",", 2)[1] : dataUrl);
+    };
+    reader.readAsDataURL(blob);
+  });
+}
+
+function safeCacheFilename(filename: string): string {
+  return filename.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 96) || "attachment";
+}
+
 function formatCachedAt(cachedAt: string): string {
   if (!cachedAt) {
     return "offline cache";
@@ -690,7 +731,17 @@ const styles = StyleSheet.create({
   folderCount: { color: "#697386", fontSize: 12, marginTop: 2 },
   messageRow: { borderBottomColor: "#d8dee9", borderBottomWidth: 1, paddingVertical: 10, gap: 3 },
   contactRow: { borderBottomColor: "#eef2f7", borderBottomWidth: 1, paddingVertical: 8, gap: 2 },
-  attachmentRow: { borderColor: "#cbd5e1", borderRadius: 8, borderWidth: 1, padding: 10, gap: 2 },
+  attachmentRow: {
+    alignItems: "center",
+    borderColor: "#cbd5e1",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "space-between",
+    padding: 10,
+  },
+  attachmentDetails: { flex: 1 },
   composeAttachmentRow: {
     alignItems: "center",
     borderColor: "#cbd5e1",

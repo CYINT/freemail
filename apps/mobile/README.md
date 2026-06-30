@@ -12,7 +12,7 @@ The current mobile implementation is a source-level foundation, not a production
 - Inbox snapshot, message read, compose/send, reply, forward, and sign-out workflows.
 - Folder navigation plus create, rename, and delete controls for non-core folders.
 - Folder-scoped search and contacts loaded from mailbox headers.
-- Attachment metadata display, authenticated attachment availability checks, and bounded document-picker compose attachments.
+- Attachment metadata display, authenticated download/share handling, and bounded document-picker compose attachments.
 - Secure offline metadata cache for the last loaded folder, messages, and contacts.
 - Bearer-authenticated push-device registration, listing, and revocation contract.
 - Future provider-specific push delivery, richer attachment handling, and native release workflows.
@@ -44,7 +44,7 @@ Static mobile QA runs from the repository root and does not require a native too
 .\.venv\Scripts\python.exe scripts\qa_mobile_static.py
 ```
 
-The static gate checks that the mobile client uses provider-neutral FreeMail language, references the expected mailbox API endpoints for sessions, snapshots, search, contacts, folders, message details, attachments, push-device registration, and send, defaults to the VPN hostname, and does not persist mailbox passwords or bearer sessions in insecure browser-style storage. It also guards the document-picker/base64 compose attachment path. The offline cache stores mailbox metadata only and the static gate fails if credential markers are added to that cache path.
+The static gate checks that the mobile client uses provider-neutral FreeMail language, references the expected mailbox API endpoints for sessions, snapshots, search, contacts, folders, message details, attachments, push-device registration, and send, defaults to the VPN hostname, and does not persist mailbox passwords or bearer sessions in insecure browser-style storage. It also guards the document-picker/base64 compose attachment path plus the authenticated attachment download/share path. The offline cache stores mailbox metadata only and the static gate fails if credential markers are added to that cache path.
 
 Push-provider delivery is a contract surface at this stage. The mobile client can register and revoke a provider token through the FreeMail API, and the API stores only a hashed token. Provider-specific APNS/FCM delivery remains a future optional integration so the AGPL core stays provider-neutral.
 
