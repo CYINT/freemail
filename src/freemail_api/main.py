@@ -1,5 +1,6 @@
 from collections.abc import Iterator
 from contextlib import asynccontextmanager
+import imaplib
 import sqlite3
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status
@@ -7,6 +8,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, status
 from . import database
 from . import dkim
 from .mail_core import probe_mail_core
+from .mailbox_imap import list_mailbox_snapshot
 from .schemas import (
     AliasCreate,
     AliasRecord,
@@ -22,6 +24,7 @@ from .schemas import (
     DomainRecord,
     MailboxCreate,
     MailboxRecord,
+    MailboxSnapshotRecord,
     UserCreate,
     UserRecord,
 )
@@ -120,6 +123,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             imap_port=active_settings.imap_port,
             jmap_port=active_settings.jmap_port,
         )
+
+    @app.get("/api/v1/mailbox/snapshot", response_model=MailboxSnapshotRecord)
+    def mailbox_snapshot(
+        folder: str = "INBOX",
+        limit: int = 25,
+        x_freemail_mailbox_email: str | None = Header(default=None),
+        x_freemail_mailbox_password: str | None = Header(default=None),
+    ) -> dict[str, object]:
+        if not x_freemail_mailbox_email or not x_freemail_mailbox_password:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Mailbox credentials required")
+        if limit < 1 or limit > 100:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="limit must be between 1 and 100")
+        try:
+            snapshot = list_mailbox_snapshot(
+                email=x_freemail_mailbox_email,
+                password=x_freemail_mailbox_password,
+                host=active_settings.mail_core_host,
+                port=active_settings.imap_port,
+                folder=folder,
+                limit=limit,
+            )
+        except OSError as error:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+        except imaplib.IMAP4.error as error:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Mailbox authentication failed") from error
+        return snapshot.as_dict()
 
     @app.post("/api/v1/bootstrap/admin", response_model=BootstrapAdminRecord, status_code=status.HTTP_201_CREATED)
     def bootstrap_admin(

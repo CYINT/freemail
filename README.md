@@ -94,6 +94,12 @@ docker compose --profile web up -d web
 .\.venv\Scripts\python.exe scripts\qa_web_static.py
 ```
 
+The first read-only mailbox API uses per-request IMAP credentials and does not store mailbox passwords:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\qa_mailbox_snapshot_api.py --email admin@example.com --secrets-json secrets\mail-core-users.json
+```
+
 The mail-core spike profile starts the Stalwart candidate with ports still bound to loopback:
 
 ```powershell

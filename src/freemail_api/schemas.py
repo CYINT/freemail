@@ -124,3 +124,25 @@ class AuditRecord(ApiModel):
     created_at: str
 
     model_config = ConfigDict(alias_generator=to_camel, from_attributes=True, populate_by_name=True)
+
+
+class MailboxFolderSummary(ApiModel):
+    name: str
+    message_count: int
+    unread_count: int
+
+
+class MailboxMessageSummary(ApiModel):
+    folder: str
+    message_id: str
+    subject: str
+    sender: str
+    recipients: str
+    date: str
+    unread: bool
+
+
+class MailboxSnapshotRecord(ApiModel):
+    email: EmailStr
+    folders: list[MailboxFolderSummary]
+    messages: list[MailboxMessageSummary]

@@ -209,3 +209,53 @@ def test_admin_can_generate_dkim_key_and_dns_guidance(tmp_path):
         assert any(record["name"] == "example.com" and record["value"] == "v=spf1 mx -all" for record in records)
         assert any(record["name"] == "_dmarc.example.com" for record in records)
         assert any(record["name"] == "mail._domainkey.example.com" for record in records)
+
+
+def test_mailbox_snapshot_requires_mailbox_credentials(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.get("/api/v1/mailbox/snapshot")
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Mailbox credentials required"
+
+
+def test_mailbox_snapshot_returns_imap_adapter_payload(tmp_path, monkeypatch):
+    class Snapshot:
+        def as_dict(self):
+            return {
+                "email": "admin@example.com",
+                "folders": [{"name": "INBOX", "messageCount": 1, "unreadCount": 0}],
+                "messages": [
+                    {
+                        "folder": "INBOX",
+                        "messageId": "1",
+                        "subject": "Hello",
+                        "sender": "sender@example.net",
+                        "recipients": "admin@example.com",
+                        "date": "",
+                        "unread": False,
+                    }
+                ],
+            }
+
+    def fake_snapshot(**kwargs):
+        assert kwargs["email"] == "admin@example.com"
+        assert kwargs["password"] == "secret"
+        assert kwargs["folder"] == "INBOX"
+        assert kwargs["limit"] == 1
+        return Snapshot()
+
+    monkeypatch.setattr("freemail_api.main.list_mailbox_snapshot", fake_snapshot)
+
+    with make_client(tmp_path) as client:
+        response = client.get(
+            "/api/v1/mailbox/snapshot?limit=1",
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["folders"][0]["name"] == "INBOX"
+    assert response.json()["messages"][0]["subject"] == "Hello"
