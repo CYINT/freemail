@@ -221,6 +221,17 @@ class MutatedMailboxFolder:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class EmptiedMailboxFolder:
+    folder: str
+    action: str
+    success: bool
+    deleted_count: int
+
+    def as_dict(self) -> dict[str, object]:
+        return asdict(self)
+
+
 def list_mailbox_snapshot(
     *,
     email: str,
@@ -530,6 +541,23 @@ def delete_mailbox_folder(
     return MutatedMailboxFolder(folder=folder, action="delete", success=True)
 
 
+def empty_mailbox_folder(
+    *,
+    email: str,
+    password: str,
+    host: str,
+    port: int,
+    folder: str,
+    timeout_seconds: float = 10.0,
+    verify_tls: bool = False,
+) -> EmptiedMailboxFolder:
+    tls_context = _tls_context(verify_tls=verify_tls)
+    with imaplib.IMAP4_SSL(host, port, ssl_context=tls_context, timeout=timeout_seconds) as imap:
+        imap.login(email, password)
+        deleted_count = _empty_folder(imap, folder)
+    return EmptiedMailboxFolder(folder=folder, action="empty", success=True, deleted_count=deleted_count)
+
+
 def _archive_message(imap: imaplib.IMAP4_SSL, *, folder: str, message_id: str, archive_folder: str) -> None:
     _move_message(imap, folder=folder, message_id=message_id, target_folder=archive_folder)
 
@@ -671,6 +699,28 @@ def _delete_folder(imap: imaplib.IMAP4_SSL, folder: str) -> None:
     delete_status, _delete_data = imap.delete(f'"{folder}"')
     if delete_status != "OK":
         raise imaplib.IMAP4.error(f"Mailbox folder could not be deleted: {folder}")
+
+
+def _empty_folder(imap: imaplib.IMAP4_SSL, folder: str) -> int:
+    status, _data = imap.select(f'"{folder}"', readonly=False)
+    if status != "OK":
+        raise imaplib.IMAP4.error(f"Mailbox folder not found: {folder}")
+    search_status, search_data = imap.search(None, "ALL")
+    if search_status != "OK" or not search_data:
+        raise imaplib.IMAP4.error(f"Mailbox folder could not be searched: {folder}")
+    message_ids = search_data[0].split()
+    if not message_ids:
+        return 0
+    deleted_count = 0
+    for message_id in message_ids:
+        store_status, _store_data = imap.store(message_id, "+FLAGS", r"(\Deleted)")
+        if store_status != "OK":
+            raise imaplib.IMAP4.error("Mailbox folder message could not be deleted")
+        deleted_count += 1
+    expunge_status, _expunge_data = imap.expunge()
+    if expunge_status != "OK":
+        raise imaplib.IMAP4.error("Mailbox folder expunge failed")
+    return deleted_count
 
 
 def _list_folders(imap: imaplib.IMAP4_SSL) -> list[MailboxFolder]:

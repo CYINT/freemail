@@ -474,6 +474,18 @@ export async function deleteMailboxFolder(session: MailboxSession, folder: strin
   await mutateMailboxFolder(session, "DELETE", { folder });
 }
 
+export async function emptyMailboxFolder(session: MailboxSession, folder: string): Promise<{ deletedCount: number }> {
+  const response = await request(session.apiBaseUrl, "/api/v1/mailbox/folder/empty", {
+    method: "POST",
+    headers: {
+      ...mailboxHeaders(session),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ folder }),
+  });
+  return response.json();
+}
+
 export function normalizedApiBaseUrl(apiBaseUrl: string): string {
   return apiBaseUrl.trim().replace(/\/+$/, "");
 }

@@ -29,6 +29,7 @@ from freemail_api.mailbox_imap import (
     _count_from_select,
     _create_folder,
     _delete_folder,
+    _empty_folder,
     _ensure_folder,
     _flags_from_fetch,
     _get_attachment,
@@ -663,6 +664,36 @@ def test_delete_folder_calls_imap_delete():
     _delete_folder(imap, "Customers")
 
     assert imap.deleted_folders == ['"Customers"']
+
+
+def test_empty_folder_marks_every_message_deleted_and_expunges_once():
+    imap = FakeImap()
+
+    deleted_count = _empty_folder(imap, "Deleted Items")
+
+    assert deleted_count == 3
+    assert imap.selected_folders == [('"Deleted Items"', False)]
+    assert imap.search_calls == [(None, ("ALL",))]
+    assert imap.stored_flags == [
+        (b"1", "+FLAGS", r"(\Deleted)"),
+        (b"2", "+FLAGS", r"(\Deleted)"),
+        (b"3", "+FLAGS", r"(\Deleted)"),
+    ]
+    assert imap.expunge_called is True
+
+
+def test_empty_folder_returns_zero_without_expunge_for_empty_folder():
+    class EmptyImap(FakeImap):
+        def search(self, charset, *criteria):
+            self.search_calls.append((charset, criteria))
+            return "OK", [b""]
+
+    imap = EmptyImap()
+
+    deleted_count = _empty_folder(imap, "Deleted Items")
+
+    assert deleted_count == 0
+    assert imap.expunge_called is False
 
 
 def test_body_from_message_prefers_plain_text_part():

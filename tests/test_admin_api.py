@@ -1623,6 +1623,56 @@ def test_mailbox_folder_delete_returns_adapter_payload(tmp_path, monkeypatch):
     assert response.json() == {"folder": "Customers", "targetFolder": None, "action": "delete", "success": True}
 
 
+def test_mailbox_folder_empty_requires_mailbox_credentials(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.post("/api/v1/mailbox/folder/empty", json={"folder": "Deleted Items"})
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Mailbox credentials required"
+
+
+def test_mailbox_folder_empty_rejects_protected_folders(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.post(
+            "/api/v1/mailbox/folder/empty",
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+            json={"folder": "INBOX"},
+        )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "This mailbox folder cannot be emptied"
+
+
+def test_mailbox_folder_empty_returns_adapter_payload(tmp_path, monkeypatch):
+    class Emptied:
+        def as_dict(self):
+            return {"folder": "Deleted Items", "action": "empty", "success": True, "deleted_count": 3}
+
+    def fake_empty(**kwargs):
+        assert kwargs["email"] == "admin@example.com"
+        assert kwargs["password"] == "secret"
+        assert kwargs["folder"] == "Deleted Items"
+        return Emptied()
+
+    monkeypatch.setattr("freemail_api.main.empty_mailbox_folder", fake_empty)
+
+    with make_client(tmp_path) as client:
+        response = client.post(
+            "/api/v1/mailbox/folder/empty",
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+            json={"folder": "Deleted Items"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"folder": "Deleted Items", "action": "empty", "success": True, "deletedCount": 3}
+
+
 def test_mailbox_move_requires_mailbox_credentials(tmp_path):
     with make_client(tmp_path) as client:
         response = client.post(

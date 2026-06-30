@@ -5,6 +5,7 @@ import * as Sharing from "expo-sharing";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -26,6 +27,7 @@ import {
   createMailboxSession,
   deleteMailboxContact,
   deleteMailboxFolder,
+  emptyMailboxFolder,
   loadMailboxAttachment,
   loadMailboxContacts,
   loadMailboxMessage,
@@ -67,6 +69,7 @@ const maxComposeAttachments = 5;
 const maxComposeAttachmentBytes = 1_048_576;
 const allowedComposeAttachmentTypes = new Set(["text/plain", "text/csv", "application/pdf", "image/png", "image/jpeg"]);
 const protectedFolders = new Set(["INBOX", "Archive", "Deleted Items", "Junk Mail", "Sent Items", "Drafts"]);
+const emptyProtectedFolders = new Set(["INBOX", "Archive", "Sent Items", "Drafts"]);
 
 type SelectedComposeAttachment = ComposeAttachment & {
   id: string;
@@ -130,6 +133,7 @@ export default function App() {
 
   const selectedSubject = useMemo(() => selectedMessage?.subject || "Select a message", [selectedMessage]);
   const canMutateFolder = !protectedFolders.has(folder);
+  const canEmptyFolder = !emptyProtectedFolders.has(folder);
 
   async function signIn() {
     setLoading(true);
@@ -559,6 +563,33 @@ export default function App() {
     }
   }
 
+  async function emptyCurrentFolder() {
+    if (!session || !canEmptyFolder) {
+      return;
+    }
+    setLoading(true);
+    setStatus(`Emptying ${folder}...`);
+    try {
+      const result = await emptyMailboxFolder(session, folder);
+      await refreshMailbox(session, folder);
+      setStatus(`Emptied ${folder}; deleted ${result.deletedCount || 0} messages.`);
+    } catch (error) {
+      setStatus(readableError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function confirmEmptyCurrentFolder() {
+    if (!canEmptyFolder) {
+      return;
+    }
+    Alert.alert("Empty folder", `Permanently delete every message in ${folder}?`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Empty", style: "destructive", onPress: emptyCurrentFolder },
+    ]);
+  }
+
   function replyToSelectedMessage() {
     if (!selectedMessage) {
       return;
@@ -837,6 +868,9 @@ export default function App() {
                 />
                 <Pressable style={[styles.secondaryButton, !canMutateFolder ? styles.disabledButton : null]} onPress={renameCurrentFolder}>
                   <Text>Rename</Text>
+                </Pressable>
+                <Pressable style={[styles.secondaryButton, !canEmptyFolder ? styles.disabledButton : null]} onPress={confirmEmptyCurrentFolder}>
+                  <Text>Empty</Text>
                 </Pressable>
                 <Pressable style={[styles.dangerButton, !canMutateFolder ? styles.disabledButton : null]} onPress={deleteCurrentFolder}>
                   <Text style={styles.dangerButtonText}>Delete</Text>

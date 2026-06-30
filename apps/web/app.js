@@ -3,6 +3,7 @@ const folderNav = document.querySelector("#folder-nav");
 const folderTools = document.querySelector("#folder-tools");
 const folderNameInput = document.querySelector("#folder-name");
 const folderRenameAction = document.querySelector("#folder-rename-action");
+const folderEmptyAction = document.querySelector("#folder-empty-action");
 const folderDeleteAction = document.querySelector("#folder-delete-action");
 const messageList = document.querySelector("#message-list");
 const bulkToolbar = document.querySelector(".bulk-toolbar");
@@ -68,6 +69,7 @@ const adminResults = document.querySelector("#admin-results");
 const mailboxSessionStorageKey = "freemail.mailboxSession";
 const adminSessionStorageKey = "freemail.adminSession";
 const protectedFolders = ["inbox", "sent items", "drafts", "junk mail", "deleted items", "archive"];
+const emptyProtectedFolders = ["inbox", "sent items", "drafts", "archive"];
 const mailboxPageSize = 25;
 
 let mailboxSession = {
@@ -142,6 +144,10 @@ folderTools?.addEventListener("submit", async (event) => {
 
 folderRenameAction?.addEventListener("click", async () => {
   await renameMailboxFolder(String(folderNameInput?.value || "").trim());
+});
+
+folderEmptyAction?.addEventListener("click", async () => {
+  await emptyMailboxFolder(mailboxSession.folder);
 });
 
 folderDeleteAction?.addEventListener("click", async () => {
@@ -941,6 +947,28 @@ async function deleteMailboxFolder(folder) {
   }
 }
 
+async function emptyMailboxFolder(folder) {
+  if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
+    setStatus("Sign in before emptying folders.", "error");
+    return;
+  }
+  if (emptyProtectedFolder(folder)) {
+    setStatus("This mailbox folder cannot be emptied.", "error");
+    return;
+  }
+  if (!window.confirm(`Permanently delete every message in "${folder}"?`)) {
+    return;
+  }
+  setStatus(`Emptying ${folder}...`, "loading");
+  try {
+    const result = await mutateMailboxFolderEmpty(folder);
+    await loadMailboxSnapshot(folder);
+    setStatus(`Emptied ${folder}; deleted ${result.deletedCount || 0} message${result.deletedCount === 1 ? "" : "s"}.`, "ready");
+  } catch (error) {
+    setStatus(`Empty folder failed: ${readableError(error)}`, "error");
+  }
+}
+
 async function mutateMailboxFolder(method, payload) {
   const response = await fetch(new URL("/api/v1/mailbox/folder", mailboxSession.apiBaseUrl), {
     method,
@@ -949,6 +977,21 @@ async function mutateMailboxFolder(method, payload) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+  return response.json();
+}
+
+async function mutateMailboxFolderEmpty(folder) {
+  const response = await fetch(new URL("/api/v1/mailbox/folder/empty", mailboxSession.apiBaseUrl), {
+    method: "POST",
+    headers: {
+      ...mailboxHeaders(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ folder }),
   });
   if (!response.ok) {
     throw new Error(await response.text());
@@ -1237,6 +1280,9 @@ function renderFolderTools(activeFolder) {
   if (folderRenameAction) {
     folderRenameAction.disabled = disabled;
   }
+  if (folderEmptyAction) {
+    folderEmptyAction.disabled = emptyProtectedFolder(activeFolder);
+  }
   if (folderDeleteAction) {
     folderDeleteAction.disabled = disabled;
   }
@@ -1248,6 +1294,10 @@ function validFolderName(folder) {
 
 function protectedFolder(folder) {
   return protectedFolders.includes(String(folder || "").trim().toLowerCase());
+}
+
+function emptyProtectedFolder(folder) {
+  return emptyProtectedFolders.includes(String(folder || "").trim().toLowerCase());
 }
 
 function prefillReply(message) {

@@ -39,6 +39,7 @@ def test_static_web_validation_flags_credential_storage():
         '<form id="folder-tools"><input id="folder-name">'
         '<button id="folder-create-action">Create</button>'
         '<button id="folder-rename-action">Rename</button>'
+        '<button id="folder-empty-action">Empty</button>'
         '<button id="folder-delete-action">Delete</button></form>'
         '<div id="message-body"></div>'
         '<div id="message-attachments"></div>'
@@ -71,7 +72,7 @@ def test_static_web_validation_flags_credential_storage():
         "fetch('/api/v1/mailbox/thread'); loadMailboxThread({}); load-thread-action; Conversation; "
         "fetch('/api/v1/mailbox/contacts'); "
         "fetch('/api/v1/mailbox/saved-contacts'); saveMailboxContact({}); deleteMailboxContact(1); saved-contact; "
-        "fetch('/api/v1/mailbox/folder'); "
+        "fetch('/api/v1/mailbox/folder'); fetch('/api/v1/mailbox/folder/empty'); "
         "fetch('/api/v1/mailbox/message/attachment'); fetch('/api/v1/mailbox/message/archive'); "
         "fetch('/api/v1/mailbox/message/move'); "
         "fetch('/api/v1/mailbox/message/read-state'); "
@@ -88,7 +89,8 @@ def test_static_web_validation_flags_credential_storage():
         "renderMailboxPreferences(); Preferences saved; withSignature('body'); "
         "fetch('/api/v1/mailbox/draft'); saveMailboxDraft({}); Draft saved; composePayload(); "
         "searchMailboxMessages('term'); loadMailboxContacts(); renderContacts([]); "
-        "createMailboxFolder('x'); renameMailboxFolder('y'); deleteMailboxFolder('z'); mutateMailboxFolder('POST', {}); "
+        "createMailboxFolder('x'); renameMailboxFolder('y'); emptyMailboxFolder('Deleted Items'); "
+        "deleteMailboxFolder('z'); mutateMailboxFolder('POST', {}); "
         "restoreMailboxSession(); persistMailboxSession({}); forgetMailboxSession(); clearSearch(); "
         "prefillReply({}); prefillForward({}); prefillSavedDraft({}); Draft loaded into compose; "
         "isDraftMessage({}); quoteMessage({}, 'reply'); "

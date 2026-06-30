@@ -304,11 +304,22 @@ class MailboxFolderDelete(ApiModel):
     folder: str = Field(min_length=1, max_length=160, pattern=r'^[^"/\\\r\n]+$')
 
 
+class MailboxFolderEmpty(ApiModel):
+    folder: str = Field(min_length=1, max_length=160, pattern=r'^[^"/\\\r\n]+$')
+
+
 class MailboxFolderMutationRecord(ApiModel):
     folder: str
     action: str
     success: bool
     target_folder: str | None = None
+
+
+class MailboxFolderEmptyRecord(ApiModel):
+    folder: str
+    action: str
+    success: bool
+    deleted_count: int
 
 
 class MailboxSnapshotRecord(ApiModel):

@@ -23,6 +23,7 @@ from .mailbox_imap import archive_mailbox_message
 from .mailbox_imap import bulk_mailbox_message_action
 from .mailbox_imap import create_mailbox_folder
 from .mailbox_imap import delete_mailbox_folder
+from .mailbox_imap import empty_mailbox_folder
 from .mailbox_imap import get_mailbox_attachment
 from .mailbox_imap import get_mailbox_message
 from .mailbox_imap import list_mailbox_contacts
@@ -72,6 +73,8 @@ from .schemas import (
     MailboxDraftRecord,
     MailboxFolderCreate,
     MailboxFolderDelete,
+    MailboxFolderEmpty,
+    MailboxFolderEmptyRecord,
     MailboxFolderMutationRecord,
     MailboxFolderRename,
     MailboxMessageDetailRecord,
@@ -172,7 +175,7 @@ COMPONENT_READINESS = {
     "webmail": {
         "status": "beta-ready",
         "evidence": [
-            "mailbox session login, paginated and thread-aware folder navigation and search, conversation lookup, contacts, message read, read/unread state, star state, compose, attachments, archive, move, and delete controls",
+            "mailbox session login, paginated and thread-aware folder navigation and search, conversation lookup, contacts, message read, read/unread state, star state, compose, attachments, archive, move, delete, and empty-folder controls",
             "bulk message actions for read/unread, star/unstar, archive, spam, delete, and move",
             "persistent mailbox preferences with default compose signatures and saved address-book contacts",
             "server-side Drafts persistence and compose reopen support for saved drafts",
@@ -187,7 +190,7 @@ COMPONENT_READINESS = {
     "mobile": {
         "status": "source-ready",
         "evidence": [
-            "Expo/React Native client with VPN API target, mailbox sessions, paginated and thread-aware message workflows, conversation lookup, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder controls, extracted and saved contacts, attachments, offline metadata cache, and push-device flows",
+            "Expo/React Native client with VPN API target, mailbox sessions, paginated and thread-aware message workflows, conversation lookup, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder and empty-folder controls, extracted and saved contacts, attachments, offline metadata cache, and push-device flows",
             "bulk read/star/archive/spam/delete/move client controls over the shared mailbox API",
             "mobile preference controls for default compose signatures",
             "compose/send path uses the shared mailbox API contract with Sent Items persistence status",
@@ -205,6 +208,7 @@ COMPONENT_READINESS = {
 def create_app(settings: Settings | None = None) -> FastAPI:
     active_settings = settings or get_settings()
     protected_folders = {"inbox", "sent items", "drafts", "junk mail", "deleted items", "archive"}
+    empty_protected_folders = {"inbox", "sent items", "drafts", "archive"}
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
@@ -334,6 +338,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=f"Core mailbox folders cannot be {action}",
+            )
+
+    def reject_empty_protected_folder(folder: str) -> None:
+        if folder.strip().lower() in empty_protected_folders:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="This mailbox folder cannot be emptied",
             )
 
     @app.get("/health")
@@ -954,6 +965,35 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except imaplib.IMAP4.error as error:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)) from error
         return deleted.as_dict()
+
+    @app.post("/api/v1/mailbox/folder/empty", response_model=MailboxFolderEmptyRecord)
+    def mailbox_folder_empty(
+        payload: MailboxFolderEmpty,
+        authorization: str | None = Header(default=None),
+        x_freemail_mailbox_email: str | None = Header(default=None),
+        x_freemail_mailbox_password: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=x_freemail_mailbox_email,
+            x_freemail_mailbox_password=x_freemail_mailbox_password,
+            connection=connection,
+        )
+        reject_empty_protected_folder(payload.folder)
+        try:
+            emptied = empty_mailbox_folder(
+                email=credentials.email,
+                password=credentials.password,
+                host=active_settings.mail_core_host,
+                port=active_settings.imap_port,
+                folder=payload.folder,
+            )
+        except OSError as error:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+        except imaplib.IMAP4.error as error:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)) from error
+        return emptied.as_dict()
 
     @app.get("/api/v1/mailbox/message/attachment")
     def mailbox_attachment(

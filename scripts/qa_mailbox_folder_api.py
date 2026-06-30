@@ -33,6 +33,7 @@ def main() -> int:
             {"folder": folder, "targetFolder": renamed_folder},
         )
         renamed_visible = _snapshot_has_folder(args.base_url, args.email, password, renamed_folder)
+        emptied = _empty_folder(args.base_url, args.email, password, renamed_folder)
         deleted = _mutate_folder(args.base_url, args.email, password, "DELETE", {"folder": renamed_folder})
         deleted_absent = not _snapshot_has_folder(args.base_url, args.email, password, renamed_folder)
     except (RuntimeError, error.URLError) as exc:
@@ -41,13 +42,16 @@ def main() -> int:
 
     redacted = {
         "created": bool(created.get("success")),
+        "emptied": bool(emptied.get("success")),
+        "emptyDeletedCount": emptied.get("deletedCount"),
         "deleted": bool(deleted.get("success")),
         "deletedAbsent": deleted_absent,
         "renamed": bool(renamed.get("success")),
         "renamedVisible": renamed_visible,
     }
     print(json.dumps(redacted, indent=2, sort_keys=True))
-    return 0 if all(redacted.values()) else 1
+    checks = [redacted["created"], redacted["emptied"], redacted["emptyDeletedCount"] == 0, redacted["deleted"], redacted["deletedAbsent"], redacted["renamed"], redacted["renamedVisible"]]
+    return 0 if all(checks) else 1
 
 
 def _snapshot_has_folder(base_url: str, email: str, password: str, folder: str) -> bool:
@@ -64,6 +68,17 @@ def _mutate_folder(
     payload: dict[str, object],
 ) -> dict[str, object]:
     return _json_request(base_url, "/api/v1/mailbox/folder", email, password, method=method, payload=payload)
+
+
+def _empty_folder(base_url: str, email: str, password: str, folder: str) -> dict[str, object]:
+    return _json_request(
+        base_url,
+        "/api/v1/mailbox/folder/empty",
+        email,
+        password,
+        method="POST",
+        payload={"folder": folder},
+    )
 
 
 def _json_request(
