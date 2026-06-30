@@ -6,6 +6,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, status
 
 from . import database
 from . import dkim
+from .mail_core import probe_mail_core
 from .schemas import (
     AliasCreate,
     AliasRecord,
@@ -109,6 +110,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "publicInternet": False,
             "requiredBoundary": "Dragonscale/VPN clients only",
         }
+
+    @app.get("/api/v1/mail-core/readiness")
+    def mail_core_readiness() -> dict[str, object]:
+        return probe_mail_core(
+            host=active_settings.mail_core_host,
+            smtp_port=active_settings.smtp_port,
+            submission_port=active_settings.submission_port,
+            imap_port=active_settings.imap_port,
+            jmap_port=active_settings.jmap_port,
+        )
 
     @app.post("/api/v1/bootstrap/admin", response_model=BootstrapAdminRecord, status_code=status.HTTP_201_CREATED)
     def bootstrap_admin(

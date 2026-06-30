@@ -50,6 +50,7 @@ Current spike evidence:
 - Mail-core ports remain host-loopback-bound by Compose.
 - Stalwart reports healthy after first boot.
 - The first boot enters Stalwart bootstrap/setup mode; this is acceptable for the spike but is not a production-ready mail-domain configuration.
+- `scripts/qa_mail_core.py` distinguishes TCP reachability from protocol readiness so bootstrap mode cannot be mistaken for completed SMTP/submission/IMAP proof.
 
 Remaining spike work:
 

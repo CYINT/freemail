@@ -91,9 +91,12 @@ The mail-core spike profile starts the Stalwart candidate with ports still bound
 
 ```powershell
 docker compose --profile mail-core up --build -d
+.\.venv\Scripts\python.exe scripts\qa_mail_core.py
 ```
 
 Do not publish FreeMail directly to the public internet during the current phase. Local deployment target is `freemail.kuzuryu.ai` over the private Dragonscale/VPN path only.
+
+`scripts\qa_mail_core.py` exits successfully when the configured mail-core ports are reachable and reports whether each protocol is actually ready. Add `--strict` when the Stalwart setup is expected to pass SMTP, submission, IMAP, and JMAP checks.
 
 ## VPN-Only Deployment
 

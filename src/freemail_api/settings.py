@@ -13,6 +13,11 @@ class Settings(BaseSettings):
     database_path: str = Field(default="data/freemail.sqlite", validation_alias="FREEMAIL_DB_PATH")
     admin_api_token: str | None = Field(default=None, validation_alias="FREEMAIL_ADMIN_API_TOKEN")
     bootstrap_token: str | None = Field(default=None, validation_alias="FREEMAIL_BOOTSTRAP_TOKEN")
+    mail_core_host: str = Field(default="127.0.0.1", validation_alias="FREEMAIL_MAIL_CORE_HOST")
+    smtp_port: int = Field(default=2525, validation_alias="FREEMAIL_SMTP_PORT")
+    submission_port: int = Field(default=2587, validation_alias="FREEMAIL_SUBMISSION_PORT")
+    imap_port: int = Field(default=2143, validation_alias="FREEMAIL_IMAP_PORT")
+    jmap_port: int = Field(default=18092, validation_alias="FREEMAIL_JMAP_PORT")
     vpn_only: bool = True
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore", populate_by_name=True)
