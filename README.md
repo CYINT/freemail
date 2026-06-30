@@ -453,11 +453,10 @@ Create a top-level release evidence manifest after the private-beta packet, back
 Before running the hard release gate, inspect the local release packet inventory:
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\release_packet_status.py `
-  --manifest .freemail-qa\release\release-evidence-manifest.json
+.\.venv\Scripts\python.exe scripts\release_packet_status.py
 ```
 
-Packet status is read-only. It validates restore-drill, mobile release, private-beta, and release-notes evidence locally, but it does not replace the hard release gate's GitHub Actions, Docker Compose, VPN runtime, product-readiness, metadata-readiness, or mail-core-readiness checks.
+Packet status is read-only. By default it uses `.freemail-qa\release\release-evidence-manifest.json` when that ignored manifest exists, always checks the committed `docs\release-notes\v0.1.0-private-beta.md`, and validates restore-drill, mobile release, private-beta, and release-notes evidence locally. It does not replace the hard release gate's GitHub Actions, Docker Compose, VPN runtime, product-readiness, metadata-readiness, or mail-core-readiness checks.
 
 Explicit artifact flags can override manifest entries when evidence is stored in a different location:
 

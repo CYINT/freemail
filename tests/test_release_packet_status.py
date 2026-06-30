@@ -1,9 +1,14 @@
 import hashlib
 import json
+import os
 import subprocess
 import sys
+from pathlib import Path
 
 from freemail_api.release_packet_status import ReleasePacketStatusOptions, summarize_release_packet
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_release_packet_status_reports_missing_artifacts(tmp_path):
@@ -167,6 +172,65 @@ def test_release_packet_status_script_exits_nonzero_until_packet_ready(tmp_path)
     assert "--metadata-backup" in payload["missingArtifacts"]
 
 
+def test_release_packet_status_script_uses_default_release_notes():
+    completed = subprocess.run(
+        [sys.executable, "scripts/release_packet_status.py"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 1
+    payload = json.loads(completed.stdout)
+    artifacts = {artifact["flag"]: artifact for artifact in payload["artifacts"]}
+    release_notes_check = next(check for check in payload["checks"] if check["name"] == "release-notes")
+    assert "--release-notes" not in payload["missingArtifacts"]
+    assert artifacts["--release-notes"]["path"] == "docs\\release-notes\\v0.1.0-private-beta.md"
+    assert release_notes_check["status"] == "pass"
+
+
+def test_release_packet_status_script_discovers_default_manifest(tmp_path):
+    workspace = tmp_path / "workspace"
+    release_dir = workspace / ".freemail-qa" / "release"
+    release_dir.mkdir(parents=True)
+    copy_script_tree(workspace)
+    artifacts = create_packet_files(workspace)
+    manifest = release_dir / "release-evidence-manifest.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "releaseVersion": "v0.1.0-private-beta",
+                "requireMobileStoreSubmission": True,
+                "releaseGateInputs": {
+                    "--metadata-backup": "../backups/metadata.json",
+                    "--mail-store-backup": "../backups/stalwart-mail-store.tar.gz",
+                    "--restore-drill-evidence": "../backups/restore-drill-evidence.json",
+                    "--mobile-release-evidence": "../mobile-release-evidence.json",
+                    "--mobile-app-config": "../../apps/mobile/app.json",
+                    "--private-beta-evidence": "../private-beta-gate-example.com.json",
+                    "--release-notes": "../../docs/release-notes/v0.1.0-private-beta.md",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    completed = subprocess.run(
+        [sys.executable, "scripts/release_packet_status.py"],
+        cwd=workspace,
+        capture_output=True,
+        env={**os.environ, "PYTHONPATH": str(ROOT / "src")},
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0
+    payload = json.loads(completed.stdout)
+    assert payload["ready"] is True
+    assert payload["missingArtifacts"] == []
+    assert artifacts["metadata_backup"].read_text(encoding="utf-8") == "{}"
+
+
 def valid_mobile_app_config():
     return {
         "expo": {
@@ -296,3 +360,41 @@ def write_release_notes(path):
 
 def write_json(path, payload):
     path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def copy_script_tree(workspace):
+    (workspace / "scripts").mkdir()
+    script = ROOT / "scripts" / "release_packet_status.py"
+    (workspace / "scripts" / "release_packet_status.py").write_text(script.read_text(encoding="utf-8"), encoding="utf-8")
+
+
+def create_packet_files(workspace):
+    backups = workspace / ".freemail-qa" / "backups"
+    backups.mkdir(parents=True)
+    mobile_app = workspace / "apps" / "mobile" / "app.json"
+    mobile_app.parent.mkdir(parents=True)
+    notes = workspace / "docs" / "release-notes" / "v0.1.0-private-beta.md"
+    notes.parent.mkdir(parents=True)
+
+    metadata_backup = backups / "metadata.json"
+    mail_store_backup = backups / "stalwart-mail-store.tar.gz"
+    restore_drill_evidence = backups / "restore-drill-evidence.json"
+    mobile_release_evidence = workspace / ".freemail-qa" / "mobile-release-evidence.json"
+    private_beta_evidence = workspace / ".freemail-qa" / "private-beta-gate-example.com.json"
+
+    metadata_backup.write_text("{}", encoding="utf-8")
+    mail_store_backup.write_bytes(b"archive")
+    write_json(restore_drill_evidence, valid_restore_drill_evidence())
+    write_json(mobile_app, valid_mobile_app_config())
+    write_json(mobile_release_evidence, valid_mobile_release_evidence())
+    write_json(private_beta_evidence, valid_private_beta_evidence())
+    write_release_notes(notes)
+    return {
+        "metadata_backup": metadata_backup,
+        "mail_store_backup": mail_store_backup,
+        "restore_drill_evidence": restore_drill_evidence,
+        "mobile_release_evidence": mobile_release_evidence,
+        "mobile_app_config": mobile_app,
+        "private_beta_evidence": private_beta_evidence,
+        "release_notes": notes,
+    }

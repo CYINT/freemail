@@ -50,8 +50,7 @@ The restore-drill evidence JSON is credential-free. It proves metadata restore, 
 Before the hard gate, inspect the local release packet without touching Docker, GitHub, or live runtime URLs:
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\release_packet_status.py `
-  --manifest .freemail-qa\release\release-evidence-manifest.json
+.\.venv\Scripts\python.exe scripts\release_packet_status.py
 ```
 
 Explicit artifact flags override manifest values when an artifact has been relocated:
@@ -69,7 +68,7 @@ Explicit artifact flags override manifest values when an artifact has been reloc
   --release-version v0.1.0-private-beta
 ```
 
-The packet status command is read-only. It reports missing, empty, and invalid artifacts, runs the local restore-drill, mobile, private-beta, and release-notes evidence checks, and records SHA-256 checksums for present artifacts. Passing packet status does not replace the full release gate because it intentionally excludes Git, GitHub Actions, Docker Compose, runtime health, deployment-boundary, product-readiness, metadata-readiness, and mail-core-readiness checks.
+The packet status command is read-only. By default it discovers `.freemail-qa\release\release-evidence-manifest.json` when present and checks the committed `docs\release-notes\v0.1.0-private-beta.md`; pass `--manifest` when using a different manifest path. It reports missing, empty, and invalid artifacts, runs the local restore-drill, mobile, private-beta, and release-notes evidence checks, and records SHA-256 checksums for present artifacts. Passing packet status does not replace the full release gate because it intentionally excludes Git, GitHub Actions, Docker Compose, runtime health, deployment-boundary, product-readiness, metadata-readiness, and mail-core-readiness checks.
 
 Mobile release evidence can also be inspected directly before adding it to the release packet:
 
