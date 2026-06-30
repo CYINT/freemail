@@ -33,6 +33,8 @@ jobs:
         run: python scripts/qa_mobile_static.py
       - name: Mobile dependency install
         run: npm ci --prefix apps/mobile
+      - name: Mobile config validation
+        run: npm run --prefix apps/mobile config:check
       - name: Mobile typecheck
         run: npm run --prefix apps/mobile typecheck
       - name: Mobile dependency audit

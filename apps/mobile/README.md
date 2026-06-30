@@ -22,6 +22,7 @@ The current mobile implementation is a source-level foundation, not a production
 ```powershell
 cd apps\mobile
 npm install
+npm run config:check
 npm run typecheck
 npm audit --audit-level=moderate
 npm run start
@@ -46,3 +47,7 @@ Static mobile QA runs from the repository root and does not require a native too
 The static gate checks that the mobile client uses provider-neutral FreeMail language, references the expected mailbox API endpoints for sessions, snapshots, search, contacts, folders, message details, attachments, push-device registration, and send, defaults to the VPN hostname, and does not persist mailbox passwords or bearer sessions in insecure browser-style storage. It also guards the document-picker/base64 compose attachment path. The offline cache stores mailbox metadata only and the static gate fails if credential markers are added to that cache path.
 
 Push-provider delivery is a contract surface at this stage. The mobile client can register and revoke a provider token through the FreeMail API, and the API stores only a hashed token. Provider-specific APNS/FCM delivery remains a future optional integration so the AGPL core stays provider-neutral.
+
+## Native Release Readiness
+
+Native releases must follow `docs/mobile-release.md`. The repository intentionally does not contain Apple certificates, provisioning profiles, Android keystores, store API keys, or generated `ios/` and `android/` native projects. Generate native projects only for a release branch or local build drill, then keep signing material outside Git.

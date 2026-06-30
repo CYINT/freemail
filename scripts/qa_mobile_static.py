@@ -17,6 +17,7 @@ def main() -> int:
 def validate_mobile(root: Path) -> list[str]:
     mobile = root / "apps" / "mobile"
     files = {
+        "docs/mobile-release.md": root / "docs" / "mobile-release.md",
         "README.md": mobile / "README.md",
         "package.json": mobile / "package.json",
         "app.json": mobile / "app.json",
@@ -35,12 +36,20 @@ def validate_mobile(root: Path) -> list[str]:
 
     if package.get("license") != "AGPL-3.0-or-later":
         failures.append("mobile package must declare AGPL-3.0-or-later")
+    scripts = package.get("scripts", {})
+    if scripts.get("config:check") != "expo config --type public":
+        failures.append("mobile package must expose config:check for Expo config validation")
     dependencies = package.get("dependencies", {})
     for dependency in ["expo", "react-native", "expo-secure-store", "expo-document-picker", "expo-file-system"]:
         if dependency not in dependencies:
             failures.append(f"missing mobile dependency: {dependency}")
-    if app_config.get("expo", {}).get("extra", {}).get("apiBaseUrl") != "https://freemail.kuzuryu.ai":
+    expo_config = app_config.get("expo", {})
+    if expo_config.get("extra", {}).get("apiBaseUrl") != "https://freemail.kuzuryu.ai":
         failures.append("mobile app must default to the VPN hostname")
+    if expo_config.get("ios", {}).get("bundleIdentifier") != "technology.cyint.freemail":
+        failures.append("mobile iOS bundle identifier must be technology.cyint.freemail")
+    if expo_config.get("android", {}).get("package") != "technology.cyint.freemail":
+        failures.append("mobile Android package must be technology.cyint.freemail")
 
     for marker in [
         "/api/v1/mailbox/session",
@@ -85,9 +94,23 @@ def validate_mobile(root: Path) -> list[str]:
         "Contacts",
         "Folders",
         "https://freemail.kuzuryu.ai",
+        "docs/mobile-release.md",
+        "Mobile Release",
+        "Native Build Drill",
+        "Signing Material",
+        "npm run config:check",
+        "expo config --type public",
+        "technology.cyint.freemail",
+        "npx expo prebuild --clean --no-install",
     ]:
         if marker not in combined:
             failures.append(f"missing mobile marker: {marker}")
+
+    if (mobile / "ios").exists() or (mobile / "android").exists():
+        failures.append("generated mobile native project directories must not be committed yet")
+    for pattern in ["*.mobileprovision", "*.p12", "*.keystore", "*.jks"]:
+        for forbidden_file in mobile.glob(pattern):
+            failures.append(f"mobile signing material must not be committed: {forbidden_file.relative_to(root)}")
 
     for marker in ["Gmail", "Google", "AsyncStorage", "localStorage", "sessionStorage", "document.cookie"]:
         if marker.lower() in combined.lower():
