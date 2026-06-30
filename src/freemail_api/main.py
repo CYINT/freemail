@@ -159,7 +159,7 @@ COMPONENT_READINESS = {
         "status": "beta-ready",
         "evidence": [
             "mailbox session login, folder navigation, search, contacts, message read, read/unread state, compose, attachments, archive, move, and delete controls",
-            "server-side Drafts persistence for compose drafts",
+            "server-side Drafts persistence and compose reopen support for saved drafts",
             "server-side Sent Items persistence for accepted outbound messages",
             "token-gated admin console for bootstrap, users, domains, mailboxes, aliases, DKIM, DNS guidance, status actions, sync status, and audit logs",
             "browser and static QA in CI",
@@ -171,7 +171,7 @@ COMPONENT_READINESS = {
     "mobile": {
         "status": "source-ready",
         "evidence": [
-            "Expo/React Native client with VPN API target, mailbox sessions, message workflows, draft saving, read/unread state, archive/spam/delete actions, folder controls, contacts, attachments, offline metadata cache, and push-device flows",
+            "Expo/React Native client with VPN API target, mailbox sessions, message workflows, draft saving/editing, read/unread state, archive/spam/delete actions, folder controls, contacts, attachments, offline metadata cache, and push-device flows",
             "compose/send path uses the shared mailbox API contract with Sent Items persistence status",
             "mobile static QA, config validation, native prebuild drill, typecheck, and dependency audit in CI",
         ],

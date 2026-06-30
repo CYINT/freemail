@@ -391,6 +391,21 @@ export default function App() {
     setComposeBody(`\n\nForwarded message\nFrom: ${selectedMessage.sender}\nTo: ${selectedMessage.recipients}\n\n${selectedMessage.body}`);
   }
 
+  function editSelectedDraft() {
+    if (!selectedMessage || !isDraftMessage(selectedMessage)) {
+      return;
+    }
+    setComposeTo(selectedMessage.recipients);
+    setComposeSubject(selectedMessage.subject === "(no subject)" ? "" : selectedMessage.subject);
+    setComposeBody(selectedMessage.body || "");
+    setComposeAttachments([]);
+    setStatus(
+      selectedMessage.attachments?.length
+        ? "Draft loaded into compose. Reattach files before saving or sending."
+        : "Draft loaded into compose.",
+    );
+  }
+
   async function pickComposeAttachments() {
     const remainingSlots = maxComposeAttachments - composeAttachments.length;
     if (remainingSlots <= 0) {
@@ -619,6 +634,11 @@ export default function App() {
                   <Pressable style={styles.secondaryButton} onPress={forwardSelectedMessage}>
                     <Text>Forward</Text>
                   </Pressable>
+                  {isDraftMessage(selectedMessage) ? (
+                    <Pressable style={styles.secondaryButton} onPress={editSelectedDraft}>
+                      <Text>Edit draft</Text>
+                    </Pressable>
+                  ) : null}
                   <Pressable style={styles.secondaryButton} onPress={() => setSelectedMessageReadState(true)}>
                     <Text>Mark read</Text>
                   </Pressable>
@@ -761,6 +781,10 @@ function readableError(error: unknown): string {
 
 function prefixedSubject(prefix: string, subject: string): string {
   return subject.startsWith(prefix) ? subject : `${prefix} ${subject || "(no subject)"}`;
+}
+
+function isDraftMessage(message: MailMessage | MailMessageDetail | null): boolean {
+  return message?.folder === "Drafts";
 }
 
 function quoteBody(body: string): string {

@@ -17,6 +17,7 @@ const searchQuery = document.querySelector("#search-query");
 const logoutAction = document.querySelector("#mailbox-logout");
 const replyAction = document.querySelector("#reply-action");
 const forwardAction = document.querySelector("#forward-action");
+const editDraftAction = document.querySelector("#edit-draft-action");
 const markReadAction = document.querySelector("#mark-read-action");
 const markUnreadAction = document.querySelector("#mark-unread-action");
 const archiveAction = document.querySelector("#archive-action");
@@ -121,6 +122,14 @@ forwardAction?.addEventListener("click", () => {
     return;
   }
   prefillForward(selectedMessageDetail);
+});
+
+editDraftAction?.addEventListener("click", () => {
+  if (!selectedMessageDetail || !isDraftMessage(selectedMessageDetail)) {
+    setStatus("Select a saved draft before editing.", "error");
+    return;
+  }
+  prefillSavedDraft(selectedMessageDetail);
 });
 
 markReadAction?.addEventListener("click", async () => {
@@ -402,6 +411,7 @@ async function archiveMailboxMessage(message) {
     }
     setStatus("Message archived.", "ready");
     selectedMessageDetail = null;
+    renderDraftActions(null);
     await loadMailboxSnapshot(mailboxSession.folder);
   } catch (error) {
     setStatus(`Archive failed: ${readableError(error)}`, "error");
@@ -433,6 +443,7 @@ async function moveMailboxMessage(message, targetFolder, successMessage) {
     }
     setStatus(successMessage, "ready");
     selectedMessageDetail = null;
+    renderDraftActions(null);
     await loadMailboxSnapshot(mailboxSession.folder);
   } catch (error) {
     setStatus(`Move failed: ${readableError(error)}`, "error");
@@ -710,6 +721,7 @@ function renderMessages(messages) {
     readerMeta.textContent = "Select another folder or refresh the mailbox.";
     renderMessageBody("This folder is empty.");
     renderMessageAttachments(null);
+    renderDraftActions(null);
     return;
   }
   const rows = messages.map((message, index) => messageRow(message, index === 0));
@@ -752,10 +764,12 @@ async function selectMessage(message, row) {
     readerMeta.textContent = `From ${detail.sender || "Unknown sender"} to ${detail.recipients || mailboxSession.email}`;
     renderMessageBody(detail.body || "(No plain text body)");
     renderMessageAttachments(detail);
+    renderDraftActions(detail);
   } catch (error) {
     selectedMessageDetail = null;
     renderMessageBody(`Message load failed: ${readableError(error)}`);
     renderMessageAttachments(null);
+    renderDraftActions(null);
   }
 }
 
@@ -825,6 +839,37 @@ function fillCompose({ to, subject, body }) {
     composeBody.value = body;
     composeBody.focus();
   }
+}
+
+function prefillSavedDraft(message) {
+  fillCompose({
+    to: draftRecipients(message),
+    subject: message.subject === "(no subject)" ? "" : message.subject || "",
+    body: message.body || "",
+  });
+  if (composeAttachments) {
+    composeAttachments.value = "";
+  }
+  const attachmentNote = message.attachments?.length ? " Reattach files before saving or sending." : "";
+  setStatus(`Draft loaded into compose.${attachmentNote}`, "ready");
+}
+
+function renderDraftActions(message) {
+  if (editDraftAction) {
+    editDraftAction.hidden = !isDraftMessage(message);
+  }
+}
+
+function isDraftMessage(message) {
+  return String(message?.folder || "").trim().toLowerCase() === "drafts";
+}
+
+function draftRecipients(message) {
+  return String(message?.recipients || "")
+    .split(",")
+    .map((recipient) => recipient.trim())
+    .filter(Boolean)
+    .join(", ");
 }
 
 function prefixedSubject(prefix, subject) {
@@ -981,6 +1026,7 @@ function forgetMailboxSession() {
   window.localStorage.removeItem(mailboxSessionStorageKey);
   mailboxSession = { email: "", token: "", apiBaseUrl: "", folder: "INBOX" };
   selectedMessageDetail = null;
+  renderDraftActions(null);
   clearSearch();
 }
 

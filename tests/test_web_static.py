@@ -46,6 +46,7 @@ def test_static_web_validation_flags_credential_storage():
         '<button id="save-draft-action">Save draft</button></form>'
         '<button id="contacts-action">Load</button><div id="contacts-list"></div>'
         '<button id="reply-action">Reply</button><button id="forward-action">Forward</button>'
+        '<button id="edit-draft-action">Edit draft</button>'
         '<button id="mark-read-action">Mark read</button><button id="mark-unread-action">Mark unread</button>'
         '<button id="archive-action">Archive</button>'
         '<button id="spam-action">Spam</button><button id="delete-action">Delete</button>'
@@ -70,7 +71,8 @@ def test_static_web_validation_flags_credential_storage():
         "searchMailboxMessages('term'); loadMailboxContacts(); renderContacts([]); "
         "createMailboxFolder('x'); renameMailboxFolder('y'); deleteMailboxFolder('z'); mutateMailboxFolder('POST', {}); "
         "restoreMailboxSession(); persistMailboxSession({}); forgetMailboxSession(); clearSearch(); "
-        "prefillReply({}); prefillForward({}); quoteMessage({}, 'reply'); "
+        "prefillReply({}); prefillForward({}); prefillSavedDraft({}); Draft loaded into compose; "
+        "isDraftMessage({}); quoteMessage({}, 'reply'); "
         "fetch('/api/v1/mailbox/send', {method: \"POST\", "
         'headers: {"Content-Type": "application/json"}}); localStorage.setItem("password", "secret");',
     )
