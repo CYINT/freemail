@@ -79,6 +79,17 @@ CREATE TABLE IF NOT EXISTS mailbox_sessions (
 
 CREATE INDEX IF NOT EXISTS idx_mailbox_sessions_expires_at ON mailbox_sessions(expires_at);
 
+CREATE TABLE IF NOT EXISTS admin_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token_hash TEXT NOT NULL UNIQUE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    email TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires_at ON admin_sessions(expires_at);
+
 CREATE TABLE IF NOT EXISTS outbound_send_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     mailbox_email TEXT NOT NULL,
@@ -164,6 +175,7 @@ REQUIRED_TABLE_COLUMNS = {
         "created_at",
     },
     "mailbox_sessions": {"id", "token_hash", "email", "encrypted_password", "expires_at", "created_at"},
+    "admin_sessions": {"id", "token_hash", "user_id", "email", "expires_at", "created_at"},
     "outbound_send_events": {"id", "mailbox_email", "recipient_count", "created_at"},
     "mailbox_push_devices": {
         "id",
@@ -246,6 +258,16 @@ def list_rows(connection: sqlite3.Connection, table: str) -> list[sqlite3.Row]:
 def has_admin_user(connection: sqlite3.Connection) -> bool:
     row = connection.execute("SELECT 1 FROM users WHERE is_admin = 1 LIMIT 1").fetchone()
     return row is not None
+
+
+def get_active_admin_user_by_email(connection: sqlite3.Connection, email: str) -> sqlite3.Row | None:
+    return connection.execute(
+        """
+        SELECT * FROM users
+        WHERE email = ? AND is_admin = 1 AND status != 'suspended'
+        """,
+        [email.lower()],
+    ).fetchone()
 
 
 def bootstrap_admin(
@@ -417,6 +439,52 @@ def get_mailbox_session(connection: sqlite3.Connection, token_hash: str, now: in
         [token_hash, now],
     ).fetchone()
     return row
+
+
+def create_admin_session(
+    connection: sqlite3.Connection,
+    *,
+    token_hash: str,
+    user_id: int,
+    email: str,
+    expires_at: int,
+) -> sqlite3.Row:
+    row_id = _execute_insert(
+        connection,
+        """
+        INSERT INTO admin_sessions (token_hash, user_id, email, expires_at)
+        VALUES (?, ?, ?, ?)
+        """,
+        [token_hash, user_id, email.lower(), expires_at],
+    )
+    connection.commit()
+    return _get_row(connection, "admin_sessions", row_id)
+
+
+def get_admin_session(connection: sqlite3.Connection, token_hash: str, now: int) -> sqlite3.Row | None:
+    delete_expired_admin_sessions(connection, now)
+    return connection.execute(
+        """
+        SELECT admin_sessions.*
+        FROM admin_sessions
+        JOIN users ON users.id = admin_sessions.user_id
+        WHERE admin_sessions.token_hash = ?
+          AND admin_sessions.expires_at > ?
+          AND users.is_admin = 1
+          AND users.status != 'suspended'
+        """,
+        [token_hash, now],
+    ).fetchone()
+
+
+def revoke_admin_session(connection: sqlite3.Connection, token_hash: str) -> None:
+    connection.execute("DELETE FROM admin_sessions WHERE token_hash = ?", [token_hash])
+    connection.commit()
+
+
+def delete_expired_admin_sessions(connection: sqlite3.Connection, now: int) -> None:
+    connection.execute("DELETE FROM admin_sessions WHERE expires_at <= ?", [now])
+    connection.commit()
 
 
 def is_mailbox_access_allowed(connection: sqlite3.Connection, email: str) -> bool:
@@ -646,6 +714,20 @@ def _execute_insert(connection: sqlite3.Connection, statement: str, values: Iter
 
 
 def _migrate_schema(connection: sqlite3.Connection) -> None:
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS admin_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            token_hash TEXT NOT NULL UNIQUE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            email TEXT NOT NULL,
+            expires_at INTEGER NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires_at ON admin_sessions(expires_at)")
+    connection.commit()
     columns = {row["name"] for row in connection.execute("PRAGMA table_info(mailbox_push_devices)")}
     if "encrypted_push_token" not in columns:
         connection.execute("ALTER TABLE mailbox_push_devices ADD COLUMN encrypted_push_token TEXT")

@@ -50,11 +50,13 @@ def test_metadata_backup_round_trip_preserves_core_metadata_and_key_material(tmp
 
     assert backup["schemaVersion"] == 1
     assert backup["excludedTables"] == [
+        "admin_sessions",
         "mailbox_sessions",
         "outbound_send_events",
         "mailbox_push_devices",
         "mailbox_push_notifications",
     ]
+    assert "admin_sessions" not in backup["tables"]
     assert "mailbox_sessions" not in backup["tables"]
     assert "mailbox_push_devices" not in backup["tables"]
     assert "mailbox_push_notifications" not in backup["tables"]
@@ -70,6 +72,7 @@ def test_metadata_backup_round_trip_preserves_core_metadata_and_key_material(tmp
         assert [dict(row) for row in database.list_rows(connection, "aliases")] == backup["tables"]["aliases"]
         assert [dict(row) for row in database.list_rows(connection, "dkim_keys")] == backup["tables"]["dkim_keys"]
         assert [dict(row) for row in database.list_rows(connection, "audit_log")] == backup["tables"]["audit_log"]
+        assert connection.execute("SELECT COUNT(*) FROM admin_sessions").fetchone()[0] == 0
         assert connection.execute("SELECT COUNT(*) FROM mailbox_sessions").fetchone()[0] == 0
         assert connection.execute("SELECT COUNT(*) FROM outbound_send_events").fetchone()[0] == 0
         assert connection.execute("SELECT COUNT(*) FROM mailbox_push_devices").fetchone()[0] == 0

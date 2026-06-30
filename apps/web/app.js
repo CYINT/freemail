@@ -27,9 +27,12 @@ const composeBody = document.querySelector("#compose-body");
 const composeAttachments = document.querySelector("#compose-attachments");
 const adminAuthForm = document.querySelector("#admin-auth");
 const adminApiBaseUrl = document.querySelector("#admin-api-base-url");
+const adminEmailInput = document.querySelector("#admin-email");
+const adminPasswordInput = document.querySelector("#admin-password");
 const adminTokenInput = document.querySelector("#admin-token");
 const bootstrapTokenInput = document.querySelector("#bootstrap-token");
 const adminStatus = document.querySelector("#admin-status");
+const adminLogoutAction = document.querySelector("#admin-logout");
 const adminRefreshAction = document.querySelector("#admin-refresh-action");
 const bootstrapAdminForm = document.querySelector("#bootstrap-admin-form");
 const adminDomainForm = document.querySelector("#admin-domain-form");
@@ -52,6 +55,8 @@ let mailboxSession = {
 let adminSession = {
   apiBaseUrl: "",
   adminToken: "",
+  adminBearerToken: "",
+  adminEmail: "",
   bootstrapToken: "",
 };
 let selectedMessageDetail = null;
@@ -151,16 +156,20 @@ logoutAction?.addEventListener("click", async () => {
   await revokeMailboxSession();
 });
 
-adminAuthForm?.addEventListener("submit", (event) => {
+adminAuthForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = new FormData(adminAuthForm);
-  adminSession = {
+  await saveAdminSession({
     apiBaseUrl: String(form.get("apiBaseUrl") || "").trim().replace(/\/+$/, ""),
+    adminEmail: String(form.get("adminEmail") || "").trim(),
+    adminPassword: String(form.get("adminPassword") || ""),
     adminToken: String(form.get("adminToken") || ""),
     bootstrapToken: String(form.get("bootstrapToken") || ""),
-  };
-  persistAdminSession(adminSession);
-  setAdminStatus("Admin session saved in this browser profile.", "ready");
+  });
+});
+
+adminLogoutAction?.addEventListener("click", async () => {
+  await revokeAdminSession();
 });
 
 adminRefreshAction?.addEventListener("click", async () => {
@@ -889,6 +898,66 @@ function forgetMailboxSession() {
   clearSearch();
 }
 
+async function saveAdminSession({ apiBaseUrl, adminEmail, adminPassword, adminToken, bootstrapToken }) {
+  if (!apiBaseUrl) {
+    setAdminStatus("Enter an API URL before saving admin access.", "error");
+    return;
+  }
+  adminSession = {
+    apiBaseUrl,
+    adminToken,
+    adminBearerToken: "",
+    adminEmail,
+    bootstrapToken,
+  };
+  if (adminEmail || adminPassword) {
+    if (!adminEmail || !adminPassword) {
+      setAdminStatus("Enter both admin email and password to sign in.", "error");
+      return;
+    }
+    setAdminStatus("Signing in as administrator...", "loading");
+    try {
+      const response = await fetch(new URL("/api/v1/admin/session", apiBaseUrl), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: adminEmail, password: adminPassword }),
+      });
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+      const session = await response.json();
+      adminSession.adminBearerToken = session.token;
+      adminSession.adminEmail = session.email || adminEmail;
+      if (adminPasswordInput) {
+        adminPasswordInput.value = "";
+      }
+    } catch (error) {
+      forgetAdminSession();
+      setAdminStatus(`Admin sign in failed: ${readableError(error)}`, "error");
+      return;
+    }
+  }
+  persistAdminSession(adminSession);
+  setAdminStatus(hasAdminCredential() ? "Admin session saved in this browser profile." : "Admin settings saved.", "ready");
+}
+
+async function revokeAdminSession() {
+  const token = adminSession.adminBearerToken;
+  const apiBaseUrl = adminSession.apiBaseUrl;
+  forgetAdminSession();
+  if (token && apiBaseUrl) {
+    try {
+      await fetch(new URL("/api/v1/admin/session", apiBaseUrl), {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch (_error) {
+      // Local cleanup is enough for this browser; server expiry cleans stale sessions.
+    }
+  }
+  setAdminStatus("Admin signed out.", "idle");
+}
+
 async function bootstrapAdministrator(payload) {
   if (!adminSession.apiBaseUrl || !adminSession.bootstrapToken) {
     setAdminStatus("Save API and bootstrap token before bootstrapping.", "error");
@@ -917,8 +986,8 @@ async function bootstrapAdministrator(payload) {
 }
 
 async function createAdminRecord(path, payload, successMessage) {
-  if (!adminSession.apiBaseUrl || !adminSession.adminToken) {
-    setAdminStatus("Save API and admin token before making admin changes.", "error");
+  if (!adminSession.apiBaseUrl || !hasAdminCredential()) {
+    setAdminStatus("Save an admin login session or admin token before making admin changes.", "error");
     return;
   }
   setAdminStatus("Saving admin change...", "loading");
@@ -941,8 +1010,8 @@ async function createAdminRecord(path, payload, successMessage) {
 }
 
 async function loadAdminOverview({ quiet = false } = {}) {
-  if (!adminSession.apiBaseUrl || !adminSession.adminToken) {
-    setAdminStatus("Save API and admin token before loading admin metadata.", "error");
+  if (!adminSession.apiBaseUrl || !hasAdminCredential()) {
+    setAdminStatus("Save an admin login session or admin token before loading admin metadata.", "error");
     return;
   }
   if (!quiet) {
@@ -979,10 +1048,17 @@ async function fetchAdminJson(path) {
 }
 
 function adminHeaders() {
-  return {
-    "Content-Type": "application/json",
-    "X-FreeMail-Admin-Token": adminSession.adminToken,
-  };
+  const headers = { "Content-Type": "application/json" };
+  if (adminSession.adminBearerToken) {
+    headers.Authorization = `Bearer ${adminSession.adminBearerToken}`;
+  } else {
+    headers["X-FreeMail-Admin-Token"] = adminSession.adminToken;
+  }
+  return headers;
+}
+
+function hasAdminCredential() {
+  return Boolean(adminSession.adminBearerToken || adminSession.adminToken);
 }
 
 function renderAdminOverview({ domains, users, mailboxes, aliases, dkimKeys, auditLog }) {
@@ -1101,8 +1177,8 @@ function domainDnsAction(row) {
 }
 
 async function updateAdminStatus(basePath, recordId, statusValue) {
-  if (!adminSession.apiBaseUrl || !adminSession.adminToken) {
-    setAdminStatus("Save API and admin token before changing status.", "error");
+  if (!adminSession.apiBaseUrl || !hasAdminCredential()) {
+    setAdminStatus("Save an admin login session or admin token before changing status.", "error");
     return;
   }
   setAdminStatus(`Updating status to ${statusValue}...`, "loading");
@@ -1125,8 +1201,8 @@ async function updateAdminStatus(basePath, recordId, statusValue) {
 }
 
 async function loadDomainDnsGuidance(domainId) {
-  if (!adminSession.apiBaseUrl || !adminSession.adminToken) {
-    setAdminStatus("Save API and admin token before loading DNS guidance.", "error");
+  if (!adminSession.apiBaseUrl || !hasAdminCredential()) {
+    setAdminStatus("Save an admin login session or admin token before loading DNS guidance.", "error");
     return;
   }
   setAdminStatus("Loading DNS guidance...", "loading");
@@ -1166,10 +1242,15 @@ function restoreAdminSession() {
     adminSession = {
       apiBaseUrl: String(stored.apiBaseUrl).replace(/\/+$/, ""),
       adminToken: String(stored.adminToken || ""),
+      adminBearerToken: String(stored.adminBearerToken || ""),
+      adminEmail: String(stored.adminEmail || ""),
       bootstrapToken: String(stored.bootstrapToken || ""),
     };
     if (adminApiBaseUrl) {
       adminApiBaseUrl.value = adminSession.apiBaseUrl;
+    }
+    if (adminEmailInput) {
+      adminEmailInput.value = adminSession.adminEmail;
     }
     if (adminTokenInput) {
       adminTokenInput.value = adminSession.adminToken;
@@ -1188,6 +1269,8 @@ function persistAdminSession(session) {
     JSON.stringify({
       apiBaseUrl: session.apiBaseUrl,
       adminToken: session.adminToken,
+      adminBearerToken: session.adminBearerToken,
+      adminEmail: session.adminEmail,
       bootstrapToken: session.bootstrapToken,
     }),
   );
@@ -1195,7 +1278,7 @@ function persistAdminSession(session) {
 
 function forgetAdminSession() {
   window.localStorage.removeItem(adminSessionStorageKey);
-  adminSession = { apiBaseUrl: "", adminToken: "", bootstrapToken: "" };
+  adminSession = { apiBaseUrl: "", adminToken: "", adminBearerToken: "", adminEmail: "", bootstrapToken: "" };
 }
 
 function clearSearch() {

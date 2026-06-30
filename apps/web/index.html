@@ -132,9 +132,12 @@
 
           <form class="admin-auth" id="admin-auth" aria-label="Admin API settings">
             <label>API <input id="admin-api-base-url" name="apiBaseUrl" type="url" value="http://127.0.0.1:18090" required></label>
+            <label>Admin email <input id="admin-email" name="adminEmail" type="email" autocomplete="username"></label>
+            <label>Admin password <input id="admin-password" name="adminPassword" type="password" autocomplete="current-password"></label>
             <label>Admin token <input id="admin-token" name="adminToken" type="password" autocomplete="off"></label>
             <label>Bootstrap token <input id="bootstrap-token" name="bootstrapToken" type="password" autocomplete="off"></label>
             <button type="submit">Save admin session</button>
+            <button id="admin-logout" type="button">Sign out admin</button>
             <p class="form-status" id="admin-status" role="status">Admin tokens are operator-provided and never bundled with FreeMail.</p>
           </form>
 

@@ -63,10 +63,12 @@ Run repository hygiene scans before publishing changes:
 
 ## Admin API
 
-Admin endpoints require `X-FreeMail-Admin-Token` and remain disabled until `FREEMAIL_ADMIN_API_TOKEN` is set. Do not commit a real token. The webmail preview includes an operator admin console for bootstrap, domain, user, mailbox, alias, DKIM, DNS-guidance, suspension/reactivation, and audit-log workflows; it requires the operator to provide the API URL and tokens at runtime. Bootstrap and user creation accept one-time `initialPassword` values and hash them server-side with Argon2id before storage.
+Admin endpoints accept either a bearer token from `POST /api/v1/admin/session` or the legacy `X-FreeMail-Admin-Token` operator token. Static admin-token access remains disabled until `FREEMAIL_ADMIN_API_TOKEN` is set; do not commit a real token. The webmail preview includes an operator admin console for bootstrap, admin email/password sign-in, static-token fallback, domain, user, mailbox, alias, DKIM, DNS-guidance, suspension/reactivation, and audit-log workflows. Bootstrap and user creation accept one-time `initialPassword` values and hash them server-side with Argon2id before storage.
 
 Initial endpoints:
 
+- `POST /api/v1/admin/session`
+- `DELETE /api/v1/admin/session`
 - `POST /api/v1/bootstrap/admin`
 - `POST /api/v1/admin/domains`
 - `GET /api/v1/admin/domains`
@@ -90,6 +92,8 @@ Initial endpoints:
 The current metadata store is SQLite at `FREEMAIL_DB_PATH`, defaulting to `data/freemail.sqlite` locally and a Docker volume path in Compose. PostgreSQL is not yet a supported metadata backend; see `docs/architecture.md` for the adapter, migration, backup, and release-gate work required before production/private-beta PostgreSQL use. Mail-store persistence remains part of the Stalwart mail-core spike.
 
 The bootstrap endpoint requires `X-FreeMail-Bootstrap-Token`, refuses to run unless `FREEMAIL_BOOTSTRAP_TOKEN` is configured, and refuses to create a second administrator after the first admin exists.
+
+Admin password login verifies active administrator users against the stored Argon2id hash, creates a hashed bearer session, and stores no password material in the session table. Suspending an administrator invalidates existing bearer sessions because session resolution rechecks the user record.
 
 DNS guidance returns the MX, SPF, DMARC, and DKIM records expected for a domain. The DNS verification endpoint accepts observed DNS values and returns a check list plus a `ready` boolean; it is intended as the repeatable gate before controlled-domain mail-flow tests.
 
@@ -308,7 +312,7 @@ The exporter matches DKIM signatures by selector to avoid duplicate Stalwart sig
 
 ## Backup And Restore
 
-Read `docs/backup-restore.md` before relying on backups. The metadata backup tools export API metadata, audit logs, and DKIM key material; they intentionally exclude mailbox sessions, outbound rate-limit counters, push-device registrations, and Stalwart mail-store data.
+Read `docs/backup-restore.md` before relying on backups. The metadata backup tools export API metadata, audit logs, and DKIM key material; they intentionally exclude admin sessions, mailbox sessions, outbound rate-limit counters, push-device registrations, and Stalwart mail-store data.
 
 Export metadata:
 

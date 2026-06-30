@@ -26,6 +26,20 @@ class CreatedMailboxSession:
     expires_at: int
 
 
+@dataclass(frozen=True)
+class AdminPrincipal:
+    user_id: int
+    email: str
+    actor: str
+
+
+@dataclass(frozen=True)
+class CreatedAdminSession:
+    token: str
+    email: str
+    expires_at: int
+
+
 class SessionConfigurationError(RuntimeError):
     pass
 
@@ -78,6 +92,45 @@ def resolve_mailbox_session(
     except SecretBoxDecryptionError as error:
         raise InvalidSessionError("Mailbox session could not be decrypted") from error
     return MailboxCredentials(email=str(row["email"]), password=password)
+
+
+def create_admin_session(
+    connection: sqlite3.Connection,
+    *,
+    user_id: int,
+    email: str,
+    ttl_seconds: int,
+    now: int | None = None,
+) -> CreatedAdminSession:
+    active_now = int(time.time()) if now is None else now
+    token = secrets.token_urlsafe(32)
+    expires_at = active_now + max(300, ttl_seconds)
+    database.create_admin_session(
+        connection,
+        token_hash=hash_session_token(token),
+        user_id=user_id,
+        email=email,
+        expires_at=expires_at,
+    )
+    return CreatedAdminSession(token=token, email=email.lower(), expires_at=expires_at)
+
+
+def resolve_admin_session(
+    connection: sqlite3.Connection,
+    *,
+    token: str,
+    now: int | None = None,
+) -> AdminPrincipal:
+    active_now = int(time.time()) if now is None else now
+    row = database.get_admin_session(connection, hash_session_token(token), active_now)
+    if row is None:
+        raise InvalidSessionError("Admin session not found")
+    email = str(row["email"]).lower()
+    return AdminPrincipal(user_id=int(row["user_id"]), email=email, actor=f"admin:{email}")
+
+
+def revoke_admin_session(connection: sqlite3.Connection, token: str) -> None:
+    database.revoke_admin_session(connection, hash_session_token(token))
 
 
 def revoke_mailbox_session(connection: sqlite3.Connection, token: str) -> None:

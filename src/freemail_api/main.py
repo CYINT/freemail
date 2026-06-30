@@ -36,9 +36,13 @@ from .outbound_policy import OutboundRateLimitExceeded
 from .outbound_policy import OutboundRatePolicy
 from .outbound_policy import record_outbound_send
 from .passwords import hash_initial_password
+from .passwords import verify_password_hash
 from .push_delivery import dispatch_push_notification
 from .push_delivery import PushDeliveryConfig
 from .schemas import (
+    AdminSessionCreate,
+    AdminSessionDeleteRecord,
+    AdminSessionRecord,
     AdminStatusUpdate,
     AliasCreate,
     AliasRecord,
@@ -82,10 +86,13 @@ from .schemas import (
     UserRecord,
 )
 from .sessions import bearer_token
+from .sessions import create_admin_session
 from .sessions import create_mailbox_session
 from .sessions import InvalidSessionError
 from .sessions import MailboxCredentials
+from .sessions import resolve_admin_session
 from .sessions import resolve_mailbox_session
+from .sessions import revoke_admin_session
 from .sessions import revoke_mailbox_session
 from .sessions import SessionConfigurationError
 from .secret_box import decrypt_text
@@ -120,16 +127,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             allow_headers=[
                 "Authorization",
                 "Content-Type",
+                "X-FreeMail-Admin-Token",
+                "X-FreeMail-Bootstrap-Token",
                 "X-FreeMail-Mailbox-Email",
                 "X-FreeMail-Mailbox-Password",
             ],
         )
 
-    def require_admin(x_freemail_admin_token: str | None = Header(default=None)) -> str:
+    def get_connection() -> Iterator[sqlite3.Connection]:
+        with database.connect(active_settings.database_path) as connection:
+            yield connection
+
+    def require_admin(
+        authorization: str | None = Header(default=None),
+        x_freemail_admin_token: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> str:
+        token = bearer_token(authorization)
+        if token:
+            try:
+                return resolve_admin_session(connection, token=token).actor
+            except InvalidSessionError as error:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin session") from error
         if not active_settings.admin_api_token:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Admin API token is not configured",
+                detail="Admin API token is not configured and no valid admin session was provided",
             )
         if x_freemail_admin_token != active_settings.admin_api_token:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin API token")
@@ -144,10 +167,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if x_freemail_bootstrap_token != active_settings.bootstrap_token:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid bootstrap token")
         return "bootstrap-api"
-
-    def get_connection() -> Iterator[sqlite3.Connection]:
-        with database.connect(active_settings.database_path) as connection:
-            yield connection
 
     def attachment_policy() -> AttachmentPolicy:
         return AttachmentPolicy(
@@ -270,6 +289,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             imap_port=active_settings.imap_port,
             jmap_port=active_settings.jmap_port,
         )
+
+    @app.post("/api/v1/admin/session", response_model=AdminSessionRecord)
+    def admin_session_create(
+        payload: AdminSessionCreate,
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        user = database.get_active_admin_user_by_email(connection, str(payload.email))
+        if user is None or not verify_password_hash(str(user["password_hash"]), payload.password):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Admin authentication failed")
+        created = create_admin_session(
+            connection,
+            user_id=int(user["id"]),
+            email=str(user["email"]),
+            ttl_seconds=active_settings.session_ttl_seconds,
+        )
+        return {"token": created.token, "email": created.email, "expires_at": created.expires_at}
+
+    @app.delete("/api/v1/admin/session", response_model=AdminSessionDeleteRecord)
+    def admin_session_delete(
+        authorization: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, bool]:
+        token = bearer_token(authorization)
+        if token:
+            revoke_admin_session(connection, token)
+        return {"revoked": True}
 
     @app.post("/api/v1/mailbox/session", response_model=MailboxSessionRecord)
     def mailbox_session_create(

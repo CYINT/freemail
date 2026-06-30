@@ -22,7 +22,7 @@
 - DNS guidance for MX, SPF, DKIM, and DMARC.
 - Audit logs.
 
-Current progress: persistent token-gated APIs exist for administrator bootstrap, domains, invite-created users, mailboxes, aliases, DKIM keys, generated MX/SPF/DKIM/DMARC DNS guidance, and audit logs. Bootstrap and user creation accept one-time initial passwords and hash them server-side with Argon2id before storage. The webmail preview now includes a token-gated admin console for bootstrap, domain, user, mailbox, alias, DKIM, DNS-guidance, suspension/reactivation, and audit-log workflows. The remaining work is production auth/session integration and mail-core synchronization.
+Current progress: persistent APIs exist for administrator bootstrap, admin email/password bearer sessions, static admin-token fallback, domains, invite-created users, mailboxes, aliases, DKIM keys, generated MX/SPF/DKIM/DMARC DNS guidance, and audit logs. Bootstrap and user creation accept one-time initial passwords and hash them server-side with Argon2id before storage. Admin password login verifies active administrators against those hashes, stores only hashed bearer sessions, and rejects suspended admins. The webmail preview now includes an admin console for bootstrap, admin sign-in, domain, user, mailbox, alias, DKIM, DNS-guidance, suspension/reactivation, and audit-log workflows. The remaining work is granular role permissions and mail-core synchronization.
 
 ## M3 - Webmail MVP
 
@@ -50,7 +50,7 @@ Current progress: DKIM signing is locally verified in the mail-flow smoke for th
 - Release provenance.
 - Automated release gates.
 
-Current progress: API metadata export and restore tooling exists for domains, users, mailboxes, aliases, DKIM keys, and audit logs. The backup format intentionally excludes browser mailbox sessions and outbound rate-limit counters, and the restore path refuses to replace existing metadata unless forced. Mail-store archive and restore scripts now cover the Stalwart Docker volume through a helper container, require explicit restore force, and document drill-volume validation before active-volume replacement. Release gate tooling now checks clean Git state, remote SHA, GitHub Actions CI for the exact commit, Compose config, backup evidence, release-notes evidence, VPN-only health/deployment metadata, and mail-core readiness. Private-beta gate tooling now records runtime boundary plus controlled-domain DNS posture evidence. Remaining work is production release-candidate evidence after controlled-domain validation.
+Current progress: API metadata export and restore tooling exists for domains, users, mailboxes, aliases, DKIM keys, and audit logs. The backup format intentionally excludes admin bearer sessions, browser mailbox sessions, outbound rate-limit counters, and push runtime tables, and the restore path refuses to replace existing metadata unless forced. Mail-store archive and restore scripts now cover the Stalwart Docker volume through a helper container, require explicit restore force, and document drill-volume validation before active-volume replacement. Release gate tooling now checks clean Git state, remote SHA, GitHub Actions CI for the exact commit, Compose config, backup evidence, release-notes evidence, VPN-only health/deployment metadata, and mail-core readiness. Private-beta gate tooling now records runtime boundary plus controlled-domain DNS posture evidence. Remaining work is production release-candidate evidence after controlled-domain validation.
 
 ## M6 - Private Beta
 

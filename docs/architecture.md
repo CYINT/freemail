@@ -16,7 +16,9 @@ The implementation should not become one mail-server blob. Keep the mail-core ca
 
 The admin API owns FreeMail metadata for domains, users, mailboxes, aliases, and audit logs. The current implementation uses SQLite through explicit repository functions so the early product can keep a small dependency surface while still proving persistence and API contracts.
 
-Admin endpoints require the `X-FreeMail-Admin-Token` header and are unavailable until `FREEMAIL_ADMIN_API_TOKEN` is configured. The first-admin bootstrap endpoint separately requires `X-FreeMail-Bootstrap-Token` and refuses to run once an administrator exists. This keeps the open-source default from shipping an active hardcoded credential.
+Admin endpoints accept bearer tokens from `POST /api/v1/admin/session` or the legacy `X-FreeMail-Admin-Token` header. Static admin-token access remains unavailable until `FREEMAIL_ADMIN_API_TOKEN` is configured. The first-admin bootstrap endpoint separately requires `X-FreeMail-Bootstrap-Token` and refuses to run once an administrator exists. This keeps the open-source default from shipping an active hardcoded credential while still supporting day-to-day administrator email/password login after bootstrap.
+
+Admin password login verifies active administrator users against stored Argon2id password hashes, creates a hashed bearer session, and stores no admin password material in runtime session tables. Suspending an administrator prevents existing bearer sessions from resolving because the session lookup rechecks the user record.
 
 The first persistence boundary is:
 
@@ -26,6 +28,7 @@ The first persistence boundary is:
 - `aliases`: forwarding aliases
 - `dkim_keys`: generated DKIM private keys and public DNS TXT values
 - `audit_log`: administrative changes
+- `admin_sessions`: runtime-only hashed administrator bearer sessions, excluded from metadata backups
 
 Future migrations can move this store to PostgreSQL without changing the external API contract.
 

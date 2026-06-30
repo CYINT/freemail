@@ -64,6 +64,21 @@ class UserRecord(ApiModel):
     model_config = ConfigDict(alias_generator=to_camel, from_attributes=True, populate_by_name=True)
 
 
+class AdminSessionCreate(ApiModel):
+    email: EmailStr
+    password: str = Field(min_length=1, max_length=512)
+
+
+class AdminSessionRecord(ApiModel):
+    token: str
+    email: EmailStr
+    expires_at: int
+
+
+class AdminSessionDeleteRecord(ApiModel):
+    revoked: bool
+
+
 class MailboxCreate(ApiModel):
     user_id: int = Field(gt=0)
     local_part: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9._%+-]+$")

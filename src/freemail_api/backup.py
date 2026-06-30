@@ -25,6 +25,7 @@ def export_metadata_backup(
         "generatedAt": generated_at or datetime.now(UTC).isoformat(timespec="seconds"),
         "tables": {table: _export_table(connection, table) for table in BACKUP_TABLES},
         "excludedTables": [
+            "admin_sessions",
             "mailbox_sessions",
             "outbound_send_events",
             "mailbox_push_devices",

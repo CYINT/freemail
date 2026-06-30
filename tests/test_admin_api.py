@@ -40,7 +40,7 @@ def test_admin_api_requires_configured_token(tmp_path):
         response = client.get("/api/v1/admin/domains")
 
     assert response.status_code == 503
-    assert response.json()["detail"] == "Admin API token is not configured"
+    assert response.json()["detail"] == "Admin API token is not configured and no valid admin session was provided"
 
 
 def test_bootstrap_requires_configured_token(tmp_path):
@@ -153,6 +153,119 @@ def test_admin_user_create_rejects_client_supplied_password_hash(tmp_path):
 
     assert response.status_code == 422
     assert any(error["loc"][-1] == "initialPassword" for error in response.json()["detail"])
+
+
+def test_admin_password_login_allows_bearer_admin_api_without_static_token(tmp_path):
+    settings = Settings(
+        database_path=str(tmp_path / "freemail.sqlite"),
+        bootstrap_token=BOOTSTRAP_TOKEN,
+        release_commit="test",
+    )
+    with TestClient(create_app(settings)) as client:
+        bootstrap = client.post(
+            "/api/v1/bootstrap/admin",
+            headers=bootstrap_headers(),
+            json={
+                "domainName": "example.com",
+                "email": "admin@example.com",
+                "displayName": "Admin User",
+                "initialPassword": "correct horse battery",
+                "mailboxLocalPart": "admin",
+            },
+        )
+        login = client.post(
+            "/api/v1/admin/session",
+            json={"email": "admin@example.com", "password": "correct horse battery"},
+        )
+        domains = client.get("/api/v1/admin/domains", headers={"Authorization": f"Bearer {login.json()['token']}"})
+
+    assert bootstrap.status_code == 201
+    assert login.status_code == 200
+    assert login.json()["email"] == "admin@example.com"
+    assert "token" in login.json()
+    assert domains.status_code == 200
+    assert domains.json()[0]["name"] == "example.com"
+
+
+def test_admin_password_login_rejects_bad_password(tmp_path):
+    with make_client(tmp_path) as client:
+        client.post(
+            "/api/v1/admin/users",
+            headers=admin_headers(),
+            json={
+                "email": "admin@example.com",
+                "displayName": "Admin User",
+                "initialPassword": "correct horse battery",
+                "isAdmin": True,
+            },
+        )
+        response = client.post(
+            "/api/v1/admin/session",
+            json={"email": "admin@example.com", "password": "wrong password"},
+        )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Admin authentication failed"
+
+
+def test_admin_session_revoke_blocks_bearer_admin_api(tmp_path):
+    settings = Settings(
+        database_path=str(tmp_path / "freemail.sqlite"),
+        bootstrap_token=BOOTSTRAP_TOKEN,
+        release_commit="test",
+    )
+    with TestClient(create_app(settings)) as client:
+        client.post(
+            "/api/v1/bootstrap/admin",
+            headers=bootstrap_headers(),
+            json={
+                "domainName": "example.com",
+                "email": "admin@example.com",
+                "displayName": "Admin User",
+                "initialPassword": "correct horse battery",
+                "mailboxLocalPart": "admin",
+            },
+        )
+        login = client.post(
+            "/api/v1/admin/session",
+            json={"email": "admin@example.com", "password": "correct horse battery"},
+        )
+        headers = {"Authorization": f"Bearer {login.json()['token']}"}
+        logout = client.delete("/api/v1/admin/session", headers=headers)
+        response = client.get("/api/v1/admin/domains", headers=headers)
+
+    assert logout.status_code == 200
+    assert logout.json()["revoked"] is True
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid admin session"
+
+
+def test_suspended_admin_blocks_existing_bearer_admin_session(tmp_path):
+    with make_client(tmp_path) as client:
+        user = client.post(
+            "/api/v1/admin/users",
+            headers=admin_headers(),
+            json={
+                "email": "admin@example.com",
+                "displayName": "Admin User",
+                "initialPassword": "correct horse battery",
+                "isAdmin": True,
+            },
+        ).json()
+        login = client.post(
+            "/api/v1/admin/session",
+            json={"email": "admin@example.com", "password": "correct horse battery"},
+        )
+        client.patch(
+            f"/api/v1/admin/users/{user['id']}/status",
+            headers=admin_headers(),
+            json={"status": "suspended"},
+        )
+        response = client.get("/api/v1/admin/users", headers={"Authorization": f"Bearer {login.json()['token']}"})
+
+    assert login.status_code == 200
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid admin session"
 
 
 def test_admin_can_suspend_and_reactivate_domain_user_and_mailbox(tmp_path):
