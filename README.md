@@ -495,6 +495,21 @@ To avoid hand-authoring the JSON packet, create draft evidence templates first:
 
 The generated files are credential-free drafts. They intentionally keep `passed`, `applied`, and `accepted` false until controlled-domain DNS, mail flow, mail-core apply, queue, deliverability, backup, restore-drill, and owner-review evidence are actually recorded.
 
+Provision controlled-domain metadata before collecting DNS and mail-flow evidence:
+
+```powershell
+$env:FREEMAIL_PRIVATE_BETA_ADMIN_PASSWORD='<store in your password manager>'
+.\.venv\Scripts\python.exe scripts\provision_controlled_domain.py `
+  --database data\freemail.sqlite `
+  --domain example.com `
+  --admin-email admin@example.com `
+  --admin-display-name "FreeMail Administrator" `
+  --admin-initial-password-env FREEMAIL_PRIVATE_BETA_ADMIN_PASSWORD `
+  --secrets-json secrets\mail-core-users.json
+```
+
+The provisioning helper creates missing domain, administrator, mailbox, and DKIM metadata, writes the Stalwart account secret to the ignored local `secrets\mail-core-users.json` file, and prints only credential-free DNS guidance and readiness summaries. Re-running it reuses existing records and does not overwrite an existing secret unless `--force-secret` is explicit.
+
 After the controlled mailbox and DNS guidance exist, collect live DNS, mail-flow, queue, and deliverability evidence into the same packet:
 
 ```powershell

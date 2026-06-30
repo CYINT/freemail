@@ -172,6 +172,21 @@ The generated mail-core apply, deliverability, and acceptance templates are inte
 
 The generated manifest provides the expected paths for observed DNS, mail-flow, queue, mail-core apply, deliverability, backup, restore-drill, and acceptance evidence. `scripts\private_beta_gate.py --manifest` loads those paths, and any explicit CLI path flag overrides the corresponding manifest entry.
 
+Provision the controlled-domain metadata before collecting DNS and mail-flow evidence:
+
+```powershell
+$env:FREEMAIL_PRIVATE_BETA_ADMIN_PASSWORD='<store in your password manager>'
+.\.venv\Scripts\python.exe scripts\provision_controlled_domain.py `
+  --database data\freemail.sqlite `
+  --domain example.com `
+  --admin-email admin@example.com `
+  --admin-display-name "FreeMail Administrator" `
+  --admin-initial-password-env FREEMAIL_PRIVATE_BETA_ADMIN_PASSWORD `
+  --secrets-json secrets\mail-core-users.json
+```
+
+The provisioning helper creates missing domain, administrator, mailbox, and DKIM metadata, writes the Stalwart account secret to the ignored local secrets file, and prints only credential-free DNS guidance plus mail-core plan readiness. Re-running it reuses existing records and does not overwrite an existing secret unless `--force-secret` is explicit.
+
 After the controlled mailbox, mailbox-secret JSON, and admin DNS guidance exist, operators can collect the live DNS, mail-flow, queue, and deliverability evidence into the generated packet:
 
 ```powershell
