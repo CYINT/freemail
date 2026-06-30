@@ -53,12 +53,14 @@ Current spike evidence:
 - The configured Stalwart profile starts protocol listeners for SMTP, implicit-TLS submission, implicit-TLS IMAP, and JMAP/admin.
 - `scripts/qa_mail_core.py --strict` distinguishes TCP reachability from protocol readiness and passes only when all expected protocol surfaces respond.
 - `scripts/qa_mail_flow.py` proves actual SMTP receive, authenticated submission, DKIM signing for the mailbox domain, and IMAP message access for a provisioned mailbox. Stalwart's default spam posture can file unauthenticated inbound mail into `Junk Mail`, so the smoke searches all selectable IMAP folders.
+- `scripts/qa_stalwart_queue.py` inspects Stalwart `QueuedMessage` state through the official CLI container. It deliberately uses local Stalwart CLI environment variables instead of FreeMail API configuration so mail-server administrator credentials are not wired into the public API container.
 
 Remaining spike work:
 
 - configure one controlled production domain and mailbox
 - decide and document the production spam/deliverability policy before private beta
 - move from disposable `example.com` smoke metadata to a controlled production test domain
+- exercise outbound retry and bounce behavior against a controlled external target and record queue evidence with `scripts/qa_stalwart_queue.py`
 
 ## Stalwart Provisioning Plan
 

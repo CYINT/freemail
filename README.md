@@ -108,6 +108,17 @@ After a domain and mailbox are provisioned into Stalwart, run an end-to-end mess
 
 The smoke sends unauthenticated inbound SMTP, sends authenticated submission over implicit TLS, verifies both messages through implicit-TLS IMAP, and requires the submitted message to include a DKIM signature for the mailbox domain. Stalwart's default spam posture may place unauthenticated inbound mail in `Junk Mail`; the smoke searches every selectable IMAP folder and treats that as delivered.
 
+To inspect outbound retry/bounce state during controlled-domain tests, use the Stalwart queue gate with local-only Stalwart admin environment variables:
+
+```powershell
+$env:STALWART_URL='http://host.docker.internal:18092'
+$env:STALWART_USER='admin'
+$env:STALWART_PASSWORD='<local ignored Stalwart recovery/admin password>'
+.\.venv\Scripts\python.exe scripts\qa_stalwart_queue.py
+```
+
+The queue gate succeeds only when Stalwart reports no pending queued messages. Use `--allow-pending` when intentionally testing retry state and recording queue evidence.
+
 FreeMail can export a Stalwart `apply` plan from admin metadata:
 
 ```powershell
