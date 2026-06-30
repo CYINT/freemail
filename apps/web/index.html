@@ -3,25 +3,93 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>FreeMail</title>
+    <title>FreeMail Webmail</title>
     <link rel="stylesheet" href="./styles.css">
   </head>
   <body>
-    <main class="shell">
-      <section class="hero">
-        <p class="eyebrow">AGPL mail platform</p>
-        <h1>FreeMail</h1>
-        <p>Server, webmail, admin, and mobile client workstream for self-hosted email.</p>
-      </section>
-      <section class="status">
-        <h2>Implementation lanes</h2>
-        <ul>
-          <li>Mail server: candidate spike</li>
-          <li>Webmail: scaffolded</li>
-          <li>Mobile client: planned</li>
-          <li>Deployment: VPN-only at freemail.kuzuryu.ai</li>
-        </ul>
-      </section>
-    </main>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Mailbox navigation">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">F</span>
+          <div>
+            <strong>FreeMail</strong>
+            <span>freemail.kuzuryu.ai</span>
+          </div>
+        </div>
+        <button class="compose-primary" type="button">Compose</button>
+        <nav class="folder-nav" aria-label="Folders">
+          <a class="active" href="#inbox">Inbox <span>12</span></a>
+          <a href="#starred">Starred <span>3</span></a>
+          <a href="#sent">Sent <span>8</span></a>
+          <a href="#drafts">Drafts <span>1</span></a>
+          <a href="#junk">Junk Mail <span>4</span></a>
+        </nav>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">VPN-only webmail preview</p>
+            <h1>Inbox</h1>
+          </div>
+          <label class="search">
+            <span>Search mail</span>
+            <input type="search" placeholder="sender, subject, or text">
+          </label>
+        </header>
+
+        <section class="mail-layout" aria-label="Mailbox">
+          <section class="message-list" id="inbox" aria-label="Inbox messages">
+            <article class="message-row selected" tabindex="0">
+              <span class="sender">Dan Fredriksen</span>
+              <strong>FreeMail local smoke passed</strong>
+              <p>Inbound SMTP, authenticated submission, IMAP access, and DKIM verification are green.</p>
+              <time datetime="2026-06-30T01:31:00">1:31 AM</time>
+            </article>
+            <article class="message-row" tabindex="0">
+              <span class="sender">Operations</span>
+              <strong>Queue gate clear</strong>
+              <p>Stalwart reports no pending or due queued messages after the latest smoke run.</p>
+              <time datetime="2026-06-30T01:30:00">1:30 AM</time>
+            </article>
+            <article class="message-row unread" tabindex="0">
+              <span class="sender">Admin API</span>
+              <strong>DNS guidance ready</strong>
+              <p>MX, SPF, DMARC, and DKIM records are generated from the domain metadata store.</p>
+              <time datetime="2026-06-30T01:24:00">1:24 AM</time>
+            </article>
+          </section>
+
+          <article class="reader" aria-label="Message reader">
+            <header class="reader-header">
+              <div>
+                <p class="eyebrow">Message</p>
+                <h2>FreeMail local smoke passed</h2>
+                <p>From Dan Fredriksen to admin@example.com</p>
+              </div>
+              <div class="reader-actions" aria-label="Message actions">
+                <button type="button">Reply</button>
+                <button type="button">Forward</button>
+                <button type="button">Archive</button>
+              </div>
+            </header>
+            <div class="message-body">
+              <p>The local mail-core proof is now repeatable. Inbound mail arrives through SMTP, submitted mail is DKIM-signed, and both paths are visible through IMAP.</p>
+              <p>Next production work should validate a controlled domain and finalize deliverability policy before private beta.</p>
+            </div>
+            <section class="compose-panel" aria-label="Compose message">
+              <h2>Compose</h2>
+              <label>To <input type="email" value="postmaster@example.com"></label>
+              <label>Subject <input type="text" value="Controlled-domain validation"></label>
+              <label>Message <textarea rows="5">Draft the next smoke plan for a controlled FreeMail domain.</textarea></label>
+              <div class="compose-actions">
+                <button type="button">Attach</button>
+                <button class="send" type="button">Send</button>
+              </div>
+            </section>
+          </article>
+        </section>
+      </main>
+    </div>
   </body>
 </html>

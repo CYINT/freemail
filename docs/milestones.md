@@ -31,6 +31,8 @@ Current progress: persistent token-gated APIs exist for administrator bootstrap,
 - Responsive UI.
 - Browser QA.
 
+Current progress: static webmail preview shell exists with inbox, message reader, compose, folder navigation, responsive CSS, and Python static QA. Remaining work is authenticated web sessions plus live message read/compose/reply/forward/attachment integration.
+
 ## M4 - Deliverability And Abuse Controls
 
 - DKIM signing verified.

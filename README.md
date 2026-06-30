@@ -25,7 +25,7 @@ The FreeMail program includes:
 This repository is at the implementation baseline. It contains:
 
 - A FastAPI admin/runtime API with persistent SQLite-backed domain, user, mailbox, alias, and audit-log surfaces.
-- A static web shell placeholder.
+- A static webmail preview shell with inbox, message reader, compose, folder navigation, and responsive layout QA.
 - A mobile client lane placeholder.
 - A Docker Compose stack with VPN-only loopback bindings by default.
 - A Stalwart mail-core candidate profile for the first architecture spike.
@@ -85,6 +85,13 @@ The default stack binds to loopback only:
 ```powershell
 Copy-Item .env.example .env
 docker compose up --build -d
+```
+
+The static webmail preview can be started with the `web` profile:
+
+```powershell
+docker compose --profile web up -d web
+.\.venv\Scripts\python.exe scripts\qa_web_static.py
 ```
 
 The mail-core spike profile starts the Stalwart candidate with ports still bound to loopback:

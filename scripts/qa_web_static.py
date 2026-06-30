@@ -1,0 +1,88 @@
+from html.parser import HTMLParser
+from pathlib import Path
+import sys
+
+
+class StaticWebParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.tags: list[str] = []
+        self.classes: set[str] = set()
+        self.text: list[str] = []
+        self.attributes: dict[str, list[str]] = {}
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self.tags.append(tag)
+        for name, value in attrs:
+            if value is None:
+                continue
+            self.attributes.setdefault(name, []).append(value)
+            if name == "class":
+                self.classes.update(value.split())
+
+    def handle_data(self, data: str) -> None:
+        value = data.strip()
+        if value:
+            self.text.append(value)
+
+
+def main() -> int:
+    root = Path(__file__).resolve().parents[1]
+    html = root / "apps" / "web" / "index.html"
+    css = root / "apps" / "web" / "styles.css"
+    parser = StaticWebParser()
+    parser.feed(html.read_text(encoding="utf-8"))
+    css_text = css.read_text(encoding="utf-8")
+
+    failures = _validate(parser, css_text)
+    if failures:
+        for failure in failures:
+            print(failure, file=sys.stderr)
+        return 1
+    print("static web QA passed")
+    return 0
+
+
+def _validate(parser: StaticWebParser, css_text: str) -> list[str]:
+    failures = []
+    required_classes = {
+        "app-shell",
+        "sidebar",
+        "workspace",
+        "message-list",
+        "message-row",
+        "reader",
+        "compose-panel",
+    }
+    missing_classes = sorted(required_classes - parser.classes)
+    if missing_classes:
+        failures.append(f"missing classes: {', '.join(missing_classes)}")
+
+    required_text = ["Inbox", "Compose", "Reply", "Forward", "Attach", "Send", "Junk Mail"]
+    page_text = " ".join(parser.text)
+    for text in required_text:
+        if text not in page_text:
+            failures.append(f"missing text: {text}")
+
+    forbidden_text = ["Gmail", "Google", "Trello"]
+    for text in forbidden_text:
+        if text.lower() in page_text.lower():
+            failures.append(f"forbidden provider/trade-dress text found: {text}")
+
+    for tag in ["aside", "main", "nav", "header", "section", "article"]:
+        if tag not in parser.tags:
+            failures.append(f"missing semantic tag: {tag}")
+
+    if "@media" not in css_text:
+        failures.append("missing responsive media queries")
+    if "min-height: 38px" not in css_text:
+        failures.append("missing minimum button target sizing")
+    if "outline:" not in css_text:
+        failures.append("missing visible focus styling")
+    if "border-radius: 8px" not in css_text:
+        failures.append("missing bounded 8px radius")
+    return failures
+
+
+if __name__ == "__main__":
+    sys.exit(main())
