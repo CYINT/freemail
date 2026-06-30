@@ -59,3 +59,9 @@ Remaining spike work:
 - prove SMTP receive on the loopback-bound SMTP port
 - prove authenticated submission on the loopback-bound submission port
 - prove IMAP or JMAP mailbox access
+
+## Stalwart Provisioning Plan
+
+FreeMail exports Stalwart `apply` NDJSON through `scripts/export_stalwart_apply_plan.py`. The exporter emits idempotent domain, DKIM signature, account, and alias/list operations from the FreeMail metadata store.
+
+The exporter intentionally requires a separate ignored secrets JSON file for account secrets. FreeMail stores password hashes only, so it cannot derive plaintext mail-core credentials from the admin database.

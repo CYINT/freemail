@@ -98,6 +98,14 @@ Do not publish FreeMail directly to the public internet during the current phase
 
 `scripts\qa_mail_core.py` exits successfully when the configured mail-core ports are reachable and reports whether each protocol is actually ready. Add `--strict` when the Stalwart setup is expected to pass SMTP, submission, IMAP, and JMAP checks.
 
+FreeMail can export a Stalwart `apply` plan from admin metadata:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\export_stalwart_apply_plan.py --database data\freemail.sqlite --secrets-json secrets\mail-core-users.json > .freemail-qa\stalwart-plan.ndjson
+```
+
+Keep `secrets\mail-core-users.json` ignored and local. It maps mailbox email addresses to Stalwart account secrets because FreeMail stores password hashes only and cannot recover user passwords for mail-core provisioning.
+
 ## VPN-Only Deployment
 
 Read `docs/deployment-vpn.md`. The intended local hostname is:
