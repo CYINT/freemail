@@ -28,6 +28,7 @@ def main() -> int:
     parser.add_argument("--release-notes", type=Path)
     parser.add_argument("--release-version")
     parser.add_argument("--skip-github-ci", action="store_true")
+    parser.add_argument("--skip-codecov-upload", action="store_true")
     parser.add_argument("--skip-repo-secret-scan", action="store_true")
     parser.add_argument("--skip-license-policy-scan", action="store_true")
     parser.add_argument("--skip-backup-evidence", action="store_true")
@@ -69,6 +70,7 @@ def _options_from_args(args: argparse.Namespace, manifest: ReleaseGateOptions | 
         release_notes=args.release_notes or _manifest_value(manifest, "release_notes"),
         release_version=args.release_version or _manifest_value(manifest, "release_version"),
         skip_github_ci=args.skip_github_ci,
+        skip_codecov_upload=args.skip_codecov_upload,
         skip_repo_secret_scan=args.skip_repo_secret_scan,
         skip_license_policy_scan=args.skip_license_policy_scan,
         skip_backup_evidence=args.skip_backup_evidence,

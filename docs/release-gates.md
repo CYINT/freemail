@@ -108,6 +108,7 @@ The gate verifies:
 - clean local Git worktree
 - `origin/main` points at the current commit
 - GitHub Actions `CI` completed successfully for the current commit
+- the `Upload coverage to Codecov` step completed successfully in that exact CI run
 - tracked repository files pass the secret/signing-material scan
 - direct runtime dependencies pass the AGPL-compatible license policy scan
 - `docker compose config --quiet`
@@ -125,7 +126,7 @@ The gate verifies:
 For offline development only, individual external checks can be skipped:
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\release_gate.py --skip-github-ci --skip-repo-secret-scan --skip-license-policy-scan --skip-runtime --skip-backup-evidence --skip-mobile-evidence --skip-private-beta-evidence --skip-release-notes
+.\.venv\Scripts\python.exe scripts\release_gate.py --skip-github-ci --skip-codecov-upload --skip-repo-secret-scan --skip-license-policy-scan --skip-runtime --skip-backup-evidence --skip-mobile-evidence --skip-private-beta-evidence --skip-release-notes
 ```
 
 Do not use skipped gates as release evidence.

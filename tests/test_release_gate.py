@@ -46,6 +46,23 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
             return "license policy QA passed"
         if command[:3] == ["gh", "run", "list"]:
             return '[{"databaseId":1,"status":"completed","conclusion":"success","workflowName":"CI","url":"url"}]'
+        if command[:3] == ["gh", "run", "view"]:
+            return json.dumps(
+                {
+                    "jobs": [
+                        {
+                            "name": "test",
+                            "steps": [
+                                {
+                                    "name": "Upload coverage to Codecov",
+                                    "status": "completed",
+                                    "conclusion": "success",
+                                }
+                            ],
+                        }
+                    ]
+                }
+            )
         raise AssertionError(command)
 
     def fake_fetch(url):
@@ -103,6 +120,7 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
         "repo-secret-scan",
         "license-policy-scan",
         "github-ci",
+        "codecov-upload",
         "metadata-backup",
         "mail-store-backup",
         "restore-drill-evidence",
@@ -136,6 +154,87 @@ def test_release_gate_fails_without_backup_evidence(tmp_path, monkeypatch):
 
     assert result["passed"] is False
     assert result["checks"][-1]["name"] == "backup-evidence"
+
+
+def test_release_gate_reports_failed_codecov_upload(tmp_path, monkeypatch):
+    def fake_command(command):
+        if command == ["git", "rev-parse", "HEAD"]:
+            return "abc123"
+        if command == ["git", "status", "--short"]:
+            return ""
+        if command == ["git", "ls-remote", "origin", "refs/heads/main"]:
+            return "abc123\trefs/heads/main"
+        if command == ["docker", "compose", "config", "--quiet"]:
+            return ""
+        if command == ["docker", "compose", "--profile", "web", "--profile", "mail-core", "config", "--format", "json"]:
+            return json.dumps(valid_compose_config())
+        if command[1:] == ["scripts/qa_repo_secrets.py"]:
+            return "repo secret QA passed"
+        if command[1:] == ["scripts/qa_license_policy.py"]:
+            return "license policy QA passed"
+        if command[:3] == ["gh", "run", "list"]:
+            return '[{"databaseId":1,"status":"completed","conclusion":"success","workflowName":"CI","url":"url"}]'
+        if command[:3] == ["gh", "run", "view"]:
+            return json.dumps({"jobs": [{"name": "test", "steps": []}]})
+        raise AssertionError(command)
+
+    monkeypatch.setattr(release_gate, "_command", fake_command)
+
+    result = run_release_gate(
+        ReleaseGateOptions(
+            skip_backup_evidence=True,
+            skip_mobile_evidence=True,
+            skip_private_beta_evidence=True,
+            skip_release_notes=True,
+            skip_runtime=True,
+        )
+    )
+
+    checks_by_name = {check["name"]: check for check in result["checks"]}
+    assert result["passed"] is False
+    assert checks_by_name["github-ci"]["status"] == "pass"
+    assert checks_by_name["codecov-upload"]["status"] == "fail"
+
+
+def test_release_gate_can_skip_codecov_upload_when_ci_is_still_required(tmp_path, monkeypatch):
+    def fake_command(command):
+        if command == ["git", "rev-parse", "HEAD"]:
+            return "abc123"
+        if command == ["git", "status", "--short"]:
+            return ""
+        if command == ["git", "ls-remote", "origin", "refs/heads/main"]:
+            return "abc123\trefs/heads/main"
+        if command == ["docker", "compose", "config", "--quiet"]:
+            return ""
+        if command == ["docker", "compose", "--profile", "web", "--profile", "mail-core", "config", "--format", "json"]:
+            return json.dumps(valid_compose_config())
+        if command[1:] == ["scripts/qa_repo_secrets.py"]:
+            return "repo secret QA passed"
+        if command[1:] == ["scripts/qa_license_policy.py"]:
+            return "license policy QA passed"
+        if command[:3] == ["gh", "run", "list"]:
+            return '[{"databaseId":1,"status":"completed","conclusion":"success","workflowName":"CI","url":"url"}]'
+        if command[:3] == ["gh", "run", "view"]:
+            raise AssertionError("codecov run view should not execute")
+        raise AssertionError(command)
+
+    monkeypatch.setattr(release_gate, "_command", fake_command)
+
+    result = run_release_gate(
+        ReleaseGateOptions(
+            skip_codecov_upload=True,
+            skip_backup_evidence=True,
+            skip_mobile_evidence=True,
+            skip_private_beta_evidence=True,
+            skip_release_notes=True,
+            skip_runtime=True,
+        )
+    )
+
+    check_names = {check["name"] for check in result["checks"]}
+    assert result["passed"] is True
+    assert "github-ci" in check_names
+    assert "codecov-upload" not in check_names
 
 
 def test_release_gate_fails_without_mobile_release_evidence(tmp_path, monkeypatch):

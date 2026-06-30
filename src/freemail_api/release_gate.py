@@ -32,6 +32,7 @@ class ReleaseGateOptions:
     release_notes: Path | None = None
     release_version: str | None = None
     skip_github_ci: bool = False
+    skip_codecov_upload: bool = False
     skip_repo_secret_scan: bool = False
     skip_license_policy_scan: bool = False
     skip_backup_evidence: bool = False
@@ -56,6 +57,8 @@ def run_release_gate(options: ReleaseGateOptions) -> dict[str, Any]:
         checks.append(_check_license_policy_scan())
     if not options.skip_github_ci:
         checks.append(_check_github_ci(options.repo, commit))
+        if not options.skip_codecov_upload:
+            checks.append(_check_codecov_upload(options.repo, commit))
     if not options.skip_backup_evidence:
         checks.extend(
             _check_backup_evidence(options.metadata_backup, options.mail_store_backup, options.restore_drill_evidence)
@@ -162,6 +165,38 @@ def _is_loopback_host_ip(value: object) -> bool:
 
 
 def _check_github_ci(repo: str, commit: str) -> dict[str, Any]:
+    latest = _latest_ci_run(repo, commit)
+    passed = bool(latest and latest.get("status") == "completed" and latest.get("conclusion") == "success")
+    return _check("github-ci", passed, {"latestRun": latest})
+
+
+def _check_codecov_upload(repo: str, commit: str) -> dict[str, Any]:
+    latest = _latest_ci_run(repo, commit)
+    if not latest or latest.get("status") != "completed" or latest.get("conclusion") != "success":
+        return _check("codecov-upload", False, {"error": "passing CI run is required", "latestRun": latest})
+    output = _command(["gh", "run", "view", str(latest["databaseId"]), "--repo", repo, "--json", "jobs"])
+    payload = json.loads(output)
+    jobs = payload.get("jobs") if isinstance(payload, dict) else None
+    matching_steps: list[dict[str, Any]] = []
+    if isinstance(jobs, list):
+        for job in jobs:
+            if not isinstance(job, dict):
+                continue
+            for step in job.get("steps", []):
+                if isinstance(step, dict) and step.get("name") == "Upload coverage to Codecov":
+                    matching_steps.append(
+                        {
+                            "job": job.get("name"),
+                            "name": step.get("name"),
+                            "status": step.get("status"),
+                            "conclusion": step.get("conclusion"),
+                        }
+                    )
+    passed = any(step.get("status") == "completed" and step.get("conclusion") == "success" for step in matching_steps)
+    return _check("codecov-upload", passed, {"latestRun": latest, "steps": matching_steps})
+
+
+def _latest_ci_run(repo: str, commit: str) -> dict[str, Any] | None:
     output = _command(
         [
             "gh",
@@ -179,9 +214,7 @@ def _check_github_ci(repo: str, commit: str) -> dict[str, Any]:
     )
     runs = json.loads(output)
     ci_runs = [run for run in runs if run.get("workflowName") == "CI"]
-    latest = ci_runs[0] if ci_runs else None
-    passed = bool(latest and latest.get("status") == "completed" and latest.get("conclusion") == "success")
-    return _check("github-ci", passed, {"latestRun": latest})
+    return ci_runs[0] if ci_runs else None
 
 
 def _check_repo_secret_scan() -> dict[str, Any]:
