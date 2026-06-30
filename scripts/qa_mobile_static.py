@@ -36,7 +36,7 @@ def validate_mobile(root: Path) -> list[str]:
     if package.get("license") != "AGPL-3.0-or-later":
         failures.append("mobile package must declare AGPL-3.0-or-later")
     dependencies = package.get("dependencies", {})
-    for dependency in ["expo", "react-native", "expo-secure-store"]:
+    for dependency in ["expo", "react-native", "expo-secure-store", "expo-document-picker", "expo-file-system"]:
         if dependency not in dependencies:
             failures.append(f"missing mobile dependency: {dependency}")
     if app_config.get("expo", {}).get("extra", {}).get("apiBaseUrl") != "https://freemail.kuzuryu.ai":
@@ -52,6 +52,11 @@ def validate_mobile(root: Path) -> list[str]:
         "/api/v1/mailbox/message",
         "/api/v1/mailbox/message/attachment",
         "/api/v1/mailbox/send",
+        "DocumentPicker.getDocumentAsync",
+        "FileSystem.readAsStringAsync",
+        "contentBase64",
+        "Add attachments",
+        "Remove",
         "loadMailboxContacts",
         "searchMailbox",
         "createMailboxFolder",

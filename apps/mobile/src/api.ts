@@ -70,6 +70,13 @@ export type ComposeMessage = {
   recipients: string[];
   subject: string;
   body: string;
+  attachments?: ComposeAttachment[];
+};
+
+export type ComposeAttachment = {
+  filename: string;
+  contentType: string;
+  contentBase64: string;
 };
 
 export async function createMailboxSession(apiBaseUrl: string, email: string, password: string): Promise<MailboxSession> {

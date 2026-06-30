@@ -117,7 +117,7 @@ npm audit --audit-level=moderate
 Pop-Location
 ```
 
-The mobile scaffold lives in `apps\mobile`, uses Expo/React Native, defaults to `https://freemail.kuzuryu.ai`, and persists bearer sessions through `expo-secure-store` rather than browser-style storage. It currently covers sign-in, inbox/folder snapshots, message reading, compose/send, reply/forward drafts, folder-scoped search, contacts, non-core folder management, attachment metadata/availability checks, secure offline metadata caching for the last loaded mailbox views, and a bearer-authenticated push-device registration contract.
+The mobile scaffold lives in `apps\mobile`, uses Expo/React Native, defaults to `https://freemail.kuzuryu.ai`, and persists bearer sessions through `expo-secure-store` rather than browser-style storage. It currently covers sign-in, inbox/folder snapshots, message reading, compose/send with bounded document-picker attachments, reply/forward drafts, folder-scoped search, contacts, non-core folder management, attachment metadata/availability checks, secure offline metadata caching for the last loaded mailbox views, and a bearer-authenticated push-device registration contract.
 
 Push-provider delivery is intentionally not wired to a third-party service yet. The current contract stores only hashed provider tokens for mailbox/device registration and gives native clients stable register/list/revoke APIs:
 

@@ -1,4 +1,6 @@
 import { StatusBar } from "expo-status-bar";
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system/legacy";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -15,6 +17,7 @@ import {
 } from "react-native";
 
 import {
+  ComposeAttachment,
   createMailboxFolder,
   createMailboxSession,
   deleteMailboxFolder,
@@ -40,7 +43,15 @@ import { clearCachedMailboxSnapshots, loadCachedMailboxSnapshot, saveCachedMailb
 import { clearStoredMailboxSession, loadStoredMailboxSession, saveMailboxSession } from "./src/sessionStore";
 
 const defaultApiBaseUrl = "https://freemail.kuzuryu.ai";
+const maxComposeAttachments = 5;
+const maxComposeAttachmentBytes = 1_048_576;
+const allowedComposeAttachmentTypes = new Set(["text/plain", "text/csv", "application/pdf", "image/png", "image/jpeg"]);
 const protectedFolders = new Set(["INBOX", "Archive", "Deleted Items", "Junk Mail", "Sent Items", "Drafts"]);
+
+type SelectedComposeAttachment = ComposeAttachment & {
+  id: string;
+  size: number;
+};
 
 export default function App() {
   const [apiBaseUrl, setApiBaseUrl] = useState(defaultApiBaseUrl);
@@ -61,6 +72,7 @@ export default function App() {
   const [composeTo, setComposeTo] = useState("");
   const [composeSubject, setComposeSubject] = useState("");
   const [composeBody, setComposeBody] = useState("");
+  const [composeAttachments, setComposeAttachments] = useState<SelectedComposeAttachment[]>([]);
   const [status, setStatus] = useState("VPN-only FreeMail mobile preview");
   const [loading, setLoading] = useState(false);
 
@@ -238,10 +250,16 @@ export default function App() {
           .filter(Boolean),
         subject: composeSubject.trim(),
         body: composeBody,
+        attachments: composeAttachments.map(({ filename, contentType, contentBase64 }) => ({
+          filename,
+          contentType,
+          contentBase64,
+        })),
       });
       setComposeTo("");
       setComposeSubject("");
       setComposeBody("");
+      setComposeAttachments([]);
       setStatus("Message sent.");
       await refreshMailbox(session, folder);
     } catch (error) {
@@ -316,6 +334,39 @@ export default function App() {
     setComposeTo("");
     setComposeSubject(prefixedSubject("Fwd:", selectedMessage.subject));
     setComposeBody(`\n\nForwarded message\nFrom: ${selectedMessage.sender}\nTo: ${selectedMessage.recipients}\n\n${selectedMessage.body}`);
+  }
+
+  async function pickComposeAttachments() {
+    const remainingSlots = maxComposeAttachments - composeAttachments.length;
+    if (remainingSlots <= 0) {
+      setStatus(`Attach up to ${maxComposeAttachments} files.`);
+      return;
+    }
+    setLoading(true);
+    setStatus("Selecting attachments...");
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: [...allowedComposeAttachmentTypes],
+        copyToCacheDirectory: true,
+        multiple: true,
+        base64: false,
+      });
+      if (result.canceled) {
+        setStatus("Attachment selection cancelled.");
+        return;
+      }
+      const selected = await Promise.all(result.assets.slice(0, remainingSlots).map(composeAttachmentFromAsset));
+      setComposeAttachments((current) => [...current, ...selected]);
+      setStatus(`Added ${selected.length} attachments.`);
+    } catch (error) {
+      setStatus(readableError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function removeComposeAttachment(id: string) {
+    setComposeAttachments((current) => current.filter((attachment) => attachment.id !== id));
   }
 
   async function inspectAttachment(attachmentId: string, filename: string) {
@@ -522,6 +573,22 @@ export default function App() {
               <TextInput value={composeTo} onChangeText={setComposeTo} style={styles.input} autoCapitalize="none" placeholder="To" />
               <TextInput value={composeSubject} onChangeText={setComposeSubject} style={styles.input} placeholder="Subject" />
               <TextInput value={composeBody} onChangeText={setComposeBody} style={[styles.input, styles.composeBody]} multiline placeholder="Message" />
+              <Pressable style={styles.secondaryButton} onPress={pickComposeAttachments}>
+                <Text>Add attachments</Text>
+              </Pressable>
+              {composeAttachments.map((attachment) => (
+                <View key={attachment.id} style={styles.composeAttachmentRow}>
+                  <View>
+                    <Text style={styles.sender}>{attachment.filename}</Text>
+                    <Text style={styles.meta}>
+                      {attachment.contentType} - {formatBytes(attachment.size)}
+                    </Text>
+                  </View>
+                  <Pressable style={styles.secondaryButton} onPress={() => removeComposeAttachment(attachment.id)}>
+                    <Text>Remove</Text>
+                  </Pressable>
+                </View>
+              ))}
               <Pressable style={styles.primaryButton} onPress={sendDraft}>
                 <Text style={styles.primaryButtonText}>Send</Text>
               </Pressable>
@@ -553,11 +620,44 @@ function quoteBody(body: string): string {
     .join("\n");
 }
 
+async function composeAttachmentFromAsset(asset: DocumentPicker.DocumentPickerAsset): Promise<SelectedComposeAttachment> {
+  const size = asset.size || 0;
+  const contentType = asset.mimeType || "application/octet-stream";
+  if (!allowedComposeAttachmentTypes.has(contentType)) {
+    throw new Error(`Unsupported attachment type: ${contentType}`);
+  }
+  if (size > maxComposeAttachmentBytes) {
+    throw new Error(`Attachment exceeds ${formatBytes(maxComposeAttachmentBytes)}: ${asset.name}`);
+  }
+  const contentBase64 =
+    asset.base64 ||
+    (await FileSystem.readAsStringAsync(asset.uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    }));
+  return {
+    id: `${asset.name}:${size}:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+    filename: asset.name,
+    contentType,
+    contentBase64,
+    size,
+  };
+}
+
 function formatCachedAt(cachedAt: string): string {
   if (!cachedAt) {
     return "offline cache";
   }
   return new Date(cachedAt).toLocaleString();
+}
+
+function formatBytes(size: number): string {
+  if (size < 1024) {
+    return `${size} B`;
+  }
+  if (size < 1024 * 1024) {
+    return `${Math.round(size / 102.4) / 10} KB`;
+  }
+  return `${Math.round(size / 104_857.6) / 10} MB`;
 }
 
 const styles = StyleSheet.create({
@@ -591,6 +691,15 @@ const styles = StyleSheet.create({
   messageRow: { borderBottomColor: "#d8dee9", borderBottomWidth: 1, paddingVertical: 10, gap: 3 },
   contactRow: { borderBottomColor: "#eef2f7", borderBottomWidth: 1, paddingVertical: 8, gap: 2 },
   attachmentRow: { borderColor: "#cbd5e1", borderRadius: 8, borderWidth: 1, padding: 10, gap: 2 },
+  composeAttachmentRow: {
+    alignItems: "center",
+    borderColor: "#cbd5e1",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    padding: 10,
+  },
   pushDeviceRow: {
     alignItems: "center",
     borderBottomColor: "#eef2f7",
