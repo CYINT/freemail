@@ -29,7 +29,7 @@ This repository is at the implementation baseline. It contains:
 - An Expo/React Native mobile client scaffold with secure session storage, mailbox workflows, and static QA.
 - A Docker Compose stack with VPN-only loopback bindings by default.
 - A Stalwart mail-core candidate profile for the first architecture spike.
-- CI for linting, tests, dependency audit, Compose validation, and image build.
+- CI for linting, tests, repository secret scanning, dependency audit, Compose validation, and image build.
 
 ## License
 
@@ -53,6 +53,12 @@ Copy-Item .env.example .env
 ```
 
 Then open `http://127.0.0.1:8080/health`.
+
+Run the tracked-file secret/material scan before publishing changes:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\qa_repo_secrets.py
+```
 
 ## Admin API
 
@@ -157,7 +163,7 @@ Required APNS settings:
 FREEMAIL_PUSH_TOKEN_SECRET=...
 FREEMAIL_APNS_TEAM_ID=...
 FREEMAIL_APNS_KEY_ID=...
-FREEMAIL_APNS_PRIVATE_KEY_PEM=-----BEGIN PRIVATE KEY-----...
+FREEMAIL_APNS_PRIVATE_KEY_PEM=<apns-token-auth-private-key-pem>
 FREEMAIL_APNS_BUNDLE_ID=technology.cyint.freemail
 FREEMAIL_APNS_USE_SANDBOX=false
 ```

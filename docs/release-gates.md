@@ -15,6 +15,7 @@ The gate verifies:
 - clean local Git worktree
 - `origin/main` points at the current commit
 - GitHub Actions `CI` completed successfully for the current commit
+- tracked repository files pass the secret/signing-material scan
 - `docker compose config --quiet`
 - metadata and mail-store backup evidence files exist, are non-empty, and have SHA-256 checksums recorded in the gate output
 - `https://freemail.kuzuryu.ai/health` reports VPN-only health and release metadata
@@ -89,6 +90,7 @@ Release provenance for a candidate consists of:
 - commit SHA
 - GitHub Actions run URL for the passing `CI` workflow
 - Codecov upload completion in that workflow
+- repository secret/signing-material scan completion in that workflow
 - release-gate JSON output, including backup file SHA-256 checksums
 - private-beta gate JSON output for each controlled domain, including backup file SHA-256 checksums
 - deliverability/abuse evidence for each controlled domain
