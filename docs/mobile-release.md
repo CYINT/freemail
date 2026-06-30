@@ -79,7 +79,7 @@ After TestFlight and Play internal-testing submission, require store submission 
 .\.venv\Scripts\python.exe scripts\mobile_release_gate.py --evidence .freemail-qa\mobile-release-evidence.json --require-store-submission
 ```
 
-The evidence must not include API keys, Apple certificates, provisioning profiles, keystores, passwords, private keys, service-account JSON, or raw tokens. It must include both signed build records and the VPN-only private-beta boundary. Build and submission URLs must be HTTPS URLs to credential-free build or store evidence. Artifact `sha256` values must be full 64-character SHA-256 hex strings:
+The evidence must not include API keys, Apple certificates, provisioning profiles, keystores, passwords, private keys, service-account JSON, or raw tokens. It must include both signed build records and the VPN-only private-beta boundary. Build and submission URLs must be HTTPS URLs to credential-free build or store evidence. Store submission `submittedAt` values must be timezone-aware ISO-8601 timestamps. Artifact `sha256` values must be full 64-character SHA-256 hex strings:
 
 ```json
 {

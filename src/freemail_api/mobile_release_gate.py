@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 import json
 from pathlib import Path
 from typing import Any
@@ -175,7 +176,7 @@ def _check_store_submission(evidence: dict[str, Any], *, platform: str) -> dict[
         and submission.get("track") in allowed_tracks
         and submission.get("submitted") is True
         and _is_https_url(submission.get("submissionUrl"))
-        and bool(str(submission.get("submittedAt", "")).strip())
+        and _is_timezone_aware_iso8601(submission.get("submittedAt"))
         and bool(str(submission.get("reviewState", "")).strip())
     )
     return _check(
@@ -209,6 +210,19 @@ def _is_sha256(value: object) -> bool:
 def _is_https_url(value: object) -> bool:
     parsed = urlparse(str(value or "").strip())
     return parsed.scheme == "https" and bool(parsed.netloc)
+
+
+def _is_timezone_aware_iso8601(value: object) -> bool:
+    text = str(value or "").strip()
+    if not text:
+        return False
+    if text.endswith("Z"):
+        text = f"{text[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return False
+    return parsed.tzinfo is not None and parsed.utcoffset() is not None
 
 
 def _check(name: str, passed: bool, details: dict[str, Any]) -> dict[str, Any]:
