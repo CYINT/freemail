@@ -118,7 +118,7 @@ def validate_mobile(root: Path) -> list[str]:
         "technology.cyint.freemail",
         "npx expo prebuild --clean --no-install --platform all",
         "Mobile iOS Native Drill",
-        "macos-latest",
+        "macos-15",
         "scripts/qa_mobile_native_prebuild.py --link-node-modules --platform ios",
         "scripts/mobile_release_gate.py",
         "mobile signed-build release evidence",
