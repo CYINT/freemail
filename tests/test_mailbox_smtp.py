@@ -2,10 +2,12 @@ import imaplib
 import smtplib
 
 from freemail_api.mailbox_smtp import (
+    DraftMessage,
     OutboundAttachment,
     SentMessage,
     _append_sent_message,
     _message,
+    save_mailbox_draft,
     send_mailbox_message,
 )
 
@@ -90,6 +92,18 @@ def test_sent_message_serializes():
     )
 
     assert sent.as_dict()["message_id"] == "<message@example.com>"
+
+
+def test_draft_message_serializes():
+    draft = DraftMessage(
+        message_id="<message@example.com>",
+        sender="admin@example.com",
+        recipients=["hello@example.com"],
+        subject="Hello",
+    )
+
+    assert draft.as_dict()["draft_folder"] == "Drafts"
+    assert draft.as_dict()["saved"] is True
 
 
 def test_message_builds_submission_headers():
@@ -229,6 +243,52 @@ def test_append_sent_message_reports_failure_without_raising(monkeypatch):
     )
 
     assert saved is False
+
+
+def test_save_mailbox_draft_appends_to_drafts_folder(monkeypatch):
+    FakeImap.appended = []
+    FakeImap.created = []
+    FakeImap.existing_folders = {"Drafts"}
+    monkeypatch.setattr("freemail_api.mailbox_smtp.imaplib.IMAP4_SSL", FakeImap)
+
+    draft = save_mailbox_draft(
+        email="admin@example.com",
+        password="secret",
+        host="127.0.0.1",
+        port=2993,
+        recipients=["hello@example.com"],
+        subject="Hello",
+        body="Body",
+        attachments=[OutboundAttachment("report.txt", "text/plain", "cmVwb3J0")],
+    )
+
+    assert draft.saved is True
+    assert draft.draft_folder == "Drafts"
+    assert draft.recipients == ["hello@example.com"]
+    assert FakeImap.appended[0]["folder"] == "Drafts"
+    assert FakeImap.appended[0]["flags"] == r"(\Draft)"
+    assert b"Subject: Hello" in FakeImap.appended[0]["message"]
+    assert b"filename=\"report.txt\"" in FakeImap.appended[0]["message"]
+
+
+def test_save_mailbox_draft_uses_no_subject_fallback(monkeypatch):
+    FakeImap.appended = []
+    FakeImap.created = []
+    FakeImap.existing_folders = {"Drafts"}
+    monkeypatch.setattr("freemail_api.mailbox_smtp.imaplib.IMAP4_SSL", FakeImap)
+
+    draft = save_mailbox_draft(
+        email="admin@example.com",
+        password="secret",
+        host="127.0.0.1",
+        port=2993,
+        recipients=[],
+        subject="",
+        body="",
+    )
+
+    assert draft.subject == "(no subject)"
+    assert b"Subject: (no subject)" in FakeImap.appended[0]["message"]
 
 
 def test_send_mailbox_message_raises_refused_recipients(monkeypatch):

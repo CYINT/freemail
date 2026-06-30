@@ -373,6 +373,14 @@ class MailboxSendCreate(ApiModel):
     attachments: list["MailboxSendAttachmentCreate"] = Field(default_factory=list, max_length=5)
 
 
+class MailboxDraftCreate(ApiModel):
+    recipients: list[EmailStr] = Field(default_factory=list, max_length=50)
+    subject: str = Field(default="", max_length=255)
+    body: str = Field(default="", max_length=20000)
+    attachments: list["MailboxSendAttachmentCreate"] = Field(default_factory=list, max_length=5)
+    draft_folder: str = Field(default="Drafts", min_length=1, max_length=160)
+
+
 class MailboxSendAttachmentCreate(ApiModel):
     filename: str = Field(min_length=1, max_length=180)
     content_type: str = Field(default="application/octet-stream", min_length=1, max_length=120)
@@ -387,3 +395,12 @@ class MailboxSendRecord(ApiModel):
     subject: str
     sent_folder: str
     sent_folder_saved: bool
+
+
+class MailboxDraftRecord(ApiModel):
+    saved: bool
+    message_id: str
+    sender: EmailStr
+    recipients: list[EmailStr]
+    subject: str
+    draft_folder: str

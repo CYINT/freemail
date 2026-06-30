@@ -31,6 +31,7 @@ from .mailbox_imap import rename_mailbox_folder
 from .mailbox_imap import search_mailbox_messages
 from .mailbox_imap import set_mailbox_message_read_state
 from .mailbox_smtp import OutboundAttachment
+from .mailbox_smtp import save_mailbox_draft
 from .mailbox_smtp import send_mailbox_message
 from .outbound_policy import enforce_outbound_rate_limit
 from .outbound_policy import OutboundRateLimitExceeded
@@ -62,6 +63,8 @@ from .schemas import (
     MailboxArchiveRecord,
     MailboxContactsRecord,
     MailboxCreate,
+    MailboxDraftCreate,
+    MailboxDraftRecord,
     MailboxFolderCreate,
     MailboxFolderDelete,
     MailboxFolderMutationRecord,
@@ -156,6 +159,7 @@ COMPONENT_READINESS = {
         "status": "beta-ready",
         "evidence": [
             "mailbox session login, folder navigation, search, contacts, message read, read/unread state, compose, attachments, archive, move, and delete controls",
+            "server-side Drafts persistence for compose drafts",
             "server-side Sent Items persistence for accepted outbound messages",
             "token-gated admin console for bootstrap, users, domains, mailboxes, aliases, DKIM, DNS guidance, status actions, sync status, and audit logs",
             "browser and static QA in CI",
@@ -167,7 +171,7 @@ COMPONENT_READINESS = {
     "mobile": {
         "status": "source-ready",
         "evidence": [
-            "Expo/React Native client with VPN API target, mailbox sessions, message workflows, read/unread state, archive/spam/delete actions, folder controls, contacts, attachments, offline metadata cache, and push-device flows",
+            "Expo/React Native client with VPN API target, mailbox sessions, message workflows, draft saving, read/unread state, archive/spam/delete actions, folder controls, contacts, attachments, offline metadata cache, and push-device flows",
             "compose/send path uses the shared mailbox API contract with Sent Items persistence status",
             "mobile static QA, config validation, native prebuild drill, typecheck, and dependency audit in CI",
         ],
@@ -974,6 +978,48 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except (OSError, smtplib.SMTPException) as error:
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
         return {"accepted": True, **sent.as_dict()}
+
+    @app.post("/api/v1/mailbox/draft", response_model=MailboxDraftRecord)
+    def mailbox_draft_save(
+        payload: MailboxDraftCreate,
+        authorization: str | None = Header(default=None),
+        x_freemail_mailbox_email: str | None = Header(default=None),
+        x_freemail_mailbox_password: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=x_freemail_mailbox_email,
+            x_freemail_mailbox_password=x_freemail_mailbox_password,
+            connection=connection,
+        )
+        try:
+            validate_attachments(payload.attachments, attachment_policy())
+            draft = save_mailbox_draft(
+                email=credentials.email,
+                password=credentials.password,
+                host=active_settings.mail_core_host,
+                port=active_settings.imap_port,
+                recipients=[str(recipient) for recipient in payload.recipients],
+                subject=payload.subject,
+                body=payload.body,
+                attachments=[
+                    OutboundAttachment(
+                        filename=attachment.filename,
+                        content_type=attachment.content_type,
+                        content_base64=attachment.content_base64,
+                    )
+                    for attachment in payload.attachments
+                ],
+                draft_folder=payload.draft_folder,
+            )
+        except AttachmentPolicyError as error:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)) from error
+        except (ValueError, binascii.Error) as error:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Invalid attachment payload") from error
+        except (OSError, imaplib.IMAP4.error) as error:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+        return draft.as_dict()
 
     @app.post("/api/v1/bootstrap/admin", response_model=BootstrapAdminRecord, status_code=status.HTTP_201_CREATED)
     def bootstrap_admin(

@@ -42,7 +42,8 @@ def test_static_web_validation_flags_credential_storage():
         '<button id="folder-delete-action">Delete</button></form>'
         '<div id="message-body"></div>'
         '<div id="message-attachments"></div>'
-        '<form class="compose-panel" id="compose-form"><input id="compose-attachments"></form>'
+        '<form class="compose-panel" id="compose-form"><input id="compose-attachments">'
+        '<button id="save-draft-action">Save draft</button></form>'
         '<button id="contacts-action">Load</button><div id="contacts-list"></div>'
         '<button id="reply-action">Reply</button><button id="forward-action">Forward</button>'
         '<button id="mark-read-action">Mark read</button><button id="mark-unread-action">Mark unread</button>'
@@ -65,6 +66,7 @@ def test_static_web_validation_flags_credential_storage():
         "renderMessageBody('body'); renderMessageAttachments({}); downloadMailboxAttachment({}, {}); "
         "filesToAttachments([]); fileToBase64({}); archiveMailboxMessage({}); moveMailboxMessage({}, 'Trash', 'Done'); "
         "setMailboxMessageReadState({}, true); Message marked read; Message marked unread; "
+        "fetch('/api/v1/mailbox/draft'); saveMailboxDraft({}); Draft saved; composePayload(); "
         "searchMailboxMessages('term'); loadMailboxContacts(); renderContacts([]); "
         "createMailboxFolder('x'); renameMailboxFolder('y'); deleteMailboxFolder('z'); mutateMailboxFolder('POST', {}); "
         "restoreMailboxSession(); persistMailboxSession({}); forgetMailboxSession(); clearSearch(); "

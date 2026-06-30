@@ -44,6 +44,7 @@ import {
   revokeMailboxSession,
   revokeMailboxPushDevice,
   searchMailbox,
+  saveMailboxDraft,
   sendMailboxMessage,
   setMailboxMessageReadState,
 } from "./src/api";
@@ -272,19 +273,7 @@ export default function App() {
     setLoading(true);
     setStatus("Sending message...");
     try {
-      const sent = await sendMailboxMessage(session, {
-        recipients: composeTo
-          .split(",")
-          .map((recipient) => recipient.trim())
-          .filter(Boolean),
-        subject: composeSubject.trim(),
-        body: composeBody,
-        attachments: composeAttachments.map(({ filename, contentType, contentBase64 }) => ({
-          filename,
-          contentType,
-          contentBase64,
-        })),
-      });
+      const sent = await sendMailboxMessage(session, composePayload());
       setComposeTo("");
       setComposeSubject("");
       setComposeBody("");
@@ -300,6 +289,39 @@ export default function App() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function saveDraft() {
+    if (!session) {
+      return;
+    }
+    setLoading(true);
+    setStatus("Saving draft...");
+    try {
+      const draft = await saveMailboxDraft(session, composePayload());
+      setStatus(`Draft saved to ${draft.draftFolder || "Drafts"}.`);
+      await refreshMailbox(session, folder);
+    } catch (error) {
+      setStatus(readableError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function composePayload() {
+    return {
+      recipients: composeTo
+        .split(",")
+        .map((recipient) => recipient.trim())
+        .filter(Boolean),
+      subject: composeSubject.trim(),
+      body: composeBody,
+      attachments: composeAttachments.map(({ filename, contentType, contentBase64 }) => ({
+        filename,
+        contentType,
+        contentBase64,
+      })),
+    };
   }
 
   async function addFolder() {
@@ -714,6 +736,9 @@ export default function App() {
                   </Pressable>
                 </View>
               ))}
+              <Pressable style={styles.secondaryButton} onPress={saveDraft}>
+                <Text>Save draft</Text>
+              </Pressable>
               <Pressable style={styles.primaryButton} onPress={sendDraft}>
                 <Text style={styles.primaryButtonText}>Send</Text>
               </Pressable>

@@ -11,6 +11,7 @@ const readerMeta = document.querySelector("#reader-meta");
 const messageBody = document.querySelector("#message-body");
 const messageAttachments = document.querySelector("#message-attachments");
 const composeForm = document.querySelector("#compose-form");
+const saveDraftAction = document.querySelector("#save-draft-action");
 const searchForm = document.querySelector("#mailbox-search");
 const searchQuery = document.querySelector("#search-query");
 const logoutAction = document.querySelector("#mailbox-logout");
@@ -79,16 +80,11 @@ loginForm?.addEventListener("submit", async (event) => {
 
 composeForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const form = new FormData(composeForm);
-  await sendMailboxMessage({
-    recipients: String(form.get("to") || "")
-      .split(",")
-      .map((recipient) => recipient.trim())
-      .filter(Boolean),
-    subject: String(form.get("subject") || "").trim(),
-    body: String(form.get("body") || ""),
-    attachments: await filesToAttachments(composeAttachments?.files || []),
-  });
+  await sendMailboxMessage(await composePayload());
+});
+
+saveDraftAction?.addEventListener("click", async () => {
+  await saveMailboxDraft(await composePayload());
 });
 
 searchForm?.addEventListener("submit", async (event) => {
@@ -622,6 +618,36 @@ async function sendMailboxMessage(message) {
     await loadMailboxSnapshot(mailboxSession.folder);
   } catch (error) {
     setStatus(`Send failed: ${readableError(error)}`, "error");
+  }
+}
+
+async function saveMailboxDraft(message) {
+  if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
+    setStatus("Load a mailbox before saving drafts.", "error");
+    return;
+  }
+  setStatus("Saving draft...", "loading");
+  try {
+    const url = new URL("/api/v1/mailbox/draft", mailboxSession.apiBaseUrl);
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        ...mailboxHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        ...message,
+        draftFolder: "Drafts",
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const result = await response.json();
+    setStatus(`Draft saved to ${result.draftFolder || "Drafts"}.`, "ready");
+    await loadMailboxSnapshot(mailboxSession.folder);
+  } catch (error) {
+    setStatus(`Draft save failed: ${readableError(error)}`, "error");
   }
 }
 
@@ -1378,6 +1404,19 @@ async function filesToAttachments(files) {
       contentBase64: await fileToBase64(file),
     })),
   );
+}
+
+async function composePayload() {
+  const form = new FormData(composeForm);
+  return {
+    recipients: String(form.get("to") || "")
+      .split(",")
+      .map((recipient) => recipient.trim())
+      .filter(Boolean),
+    subject: String(form.get("subject") || "").trim(),
+    body: String(form.get("body") || ""),
+    attachments: await filesToAttachments(composeAttachments?.files || []),
+  };
 }
 
 function fileToBase64(file) {

@@ -25,8 +25,8 @@ The FreeMail program includes:
 This repository is at the implementation baseline. It contains:
 
 - A FastAPI admin/runtime API with persistent SQLite-backed domain, user, mailbox, alias, and audit-log surfaces.
-- A static webmail preview shell with inbox, search, message reader, read/unread controls, compose, folder navigation, token-gated admin setup, and responsive layout QA.
-- An Expo/React Native mobile client scaffold with secure session storage, mailbox workflows, read/unread controls, archive/spam/delete actions, and static QA.
+- A static webmail preview shell with inbox, search, message reader, read/unread controls, compose, draft saving, folder navigation, token-gated admin setup, and responsive layout QA.
+- An Expo/React Native mobile client scaffold with secure session storage, mailbox workflows, draft saving, read/unread controls, archive/spam/delete actions, and static QA.
 - A Docker Compose stack with VPN-only loopback bindings by default.
 - A Stalwart mail-core candidate profile for the first architecture spike.
 - CI for linting, tests, repository secret scanning, dependency audit, Compose validation, and image build.
@@ -150,7 +150,7 @@ npm audit --audit-level=moderate
 Pop-Location
 ```
 
-The mobile scaffold lives in `apps\mobile`, uses Expo/React Native, defaults to `https://freemail.kuzuryu.ai`, and persists bearer sessions through `expo-secure-store` rather than browser-style storage. It currently covers sign-in, inbox/folder snapshots, message reading, compose/send with bounded document-picker attachments, reply/forward drafts, folder-scoped search, contacts, non-core folder management, attachment metadata plus authenticated download/share handling, secure offline metadata caching for the last loaded mailbox views, bearer-authenticated push-device registration, and provider-neutral push notification delivery status.
+The mobile scaffold lives in `apps\mobile`, uses Expo/React Native, defaults to `https://freemail.kuzuryu.ai`, and persists bearer sessions through `expo-secure-store` rather than browser-style storage. It currently covers sign-in, inbox/folder snapshots, message reading, compose/send and draft saving with bounded document-picker attachments, reply/forward drafts, folder-scoped search, contacts, non-core folder management, attachment metadata plus authenticated download/share handling, secure offline metadata caching for the last loaded mailbox views, bearer-authenticated push-device registration, and provider-neutral push notification delivery status.
 
 Mobile native release posture is documented in `docs\mobile-release.md`. The open-source repo keeps signing credentials, provisioning profiles, keystores, store API keys, and generated native projects out of source control; CI validates the Expo config, Android native prebuild drill, static release checklist, and macOS iOS native prebuild drill.
 Signed mobile builds, app-store submission evidence, and real-device private-beta validation are validated with `scripts\mobile_release_gate.py` from credential-free evidence stored outside Git.
@@ -240,7 +240,17 @@ The mailbox send API uses the same per-request credential posture, submits throu
 .\.venv\Scripts\python.exe scripts\qa_mailbox_send_api.py --email admin@example.com --recipient admin@example.com --secrets-json secrets\mail-core-users.json
 ```
 
-The current webmail preview supports reply and forward as live compose-prefill workflows from the selected message body; sending those drafts uses the same mailbox send API and server-side Sent Items persistence. The Archive action uses IMAP copy/delete semantics, creates the `Archive` folder if it is missing, and refreshes the current folder after success:
+The draft API appends the current compose payload to IMAP `Drafts` without SMTP submission:
+
+```http
+POST /api/v1/mailbox/draft
+```
+
+```powershell
+.\.venv\Scripts\python.exe scripts\qa_mailbox_draft_api.py --email admin@example.com --recipient admin@example.com --secrets-json secrets\mail-core-users.json
+```
+
+The current webmail preview supports reply and forward as live compose-prefill workflows from the selected message body; sending those drafts uses the same mailbox send API and server-side Sent Items persistence, while Save draft uses the draft API. The Archive action uses IMAP copy/delete semantics, creates the `Archive` folder if it is missing, and refreshes the current folder after success:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\qa_mailbox_archive_api.py --email admin@example.com --secrets-json secrets\mail-core-users.json

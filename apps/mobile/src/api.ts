@@ -105,6 +105,15 @@ export type SentMessage = {
   sentFolderSaved: boolean;
 };
 
+export type DraftMessage = {
+  saved: boolean;
+  messageId: string;
+  sender: string;
+  recipients: string[];
+  subject: string;
+  draftFolder: string;
+};
+
 export async function createMailboxSession(apiBaseUrl: string, email: string, password: string): Promise<MailboxSession> {
   const response = await request(apiBaseUrl, "/api/v1/mailbox/session", {
     method: "POST",
@@ -278,6 +287,18 @@ export async function sendMailboxMessage(session: MailboxSession, message: Compo
       "Content-Type": "application/json",
     },
     body: JSON.stringify(message),
+  });
+  return response.json();
+}
+
+export async function saveMailboxDraft(session: MailboxSession, message: ComposeMessage): Promise<DraftMessage> {
+  const response = await request(session.apiBaseUrl, "/api/v1/mailbox/draft", {
+    method: "POST",
+    headers: {
+      ...mailboxHeaders(session),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ ...message, draftFolder: "Drafts" }),
   });
   return response.json();
 }

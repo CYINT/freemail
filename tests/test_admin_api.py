@@ -1696,6 +1696,17 @@ def test_mailbox_send_requires_mailbox_credentials(tmp_path):
     assert response.json()["detail"] == "Mailbox credentials required"
 
 
+def test_mailbox_draft_requires_mailbox_credentials(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.post(
+            "/api/v1/mailbox/draft",
+            json={"recipients": ["admin@example.com"], "subject": "Hello", "body": "Test"},
+        )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Mailbox credentials required"
+
+
 def test_mailbox_archive_requires_mailbox_credentials(tmp_path):
     with make_client(tmp_path) as client:
         response = client.post(
@@ -1793,6 +1804,60 @@ def test_mailbox_send_returns_submission_payload(tmp_path, monkeypatch):
     assert response.json()["messageId"] == "<message@example.com>"
     assert response.json()["sentFolder"] == "Sent Items"
     assert response.json()["sentFolderSaved"] is True
+
+
+def test_mailbox_draft_returns_imap_draft_payload(tmp_path, monkeypatch):
+    class Draft:
+        def as_dict(self):
+            return {
+                "message_id": "<draft@example.com>",
+                "sender": "admin@example.com",
+                "recipients": ["hello@example.com"],
+                "subject": "Hello",
+                "draft_folder": "Drafts",
+                "saved": True,
+            }
+
+    def fake_draft(**kwargs):
+        assert kwargs["email"] == "admin@example.com"
+        assert kwargs["password"] == "secret"
+        assert kwargs["host"] == "127.0.0.1"
+        assert kwargs["port"] == 2993
+        assert kwargs["recipients"] == ["hello@example.com"]
+        assert kwargs["subject"] == "Hello"
+        assert kwargs["body"] == "Body"
+        assert kwargs["draft_folder"] == "Drafts"
+        assert kwargs["attachments"][0].filename == "report.txt"
+        return Draft()
+
+    monkeypatch.setattr("freemail_api.main.save_mailbox_draft", fake_draft)
+
+    with make_client(tmp_path) as client:
+        response = client.post(
+            "/api/v1/mailbox/draft",
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+            json={
+                "recipients": ["hello@example.com"],
+                "subject": "Hello",
+                "body": "Body",
+                "draftFolder": "Drafts",
+                "attachments": [
+                    {
+                        "filename": "report.txt",
+                        "contentType": "text/plain",
+                        "contentBase64": "cmVwb3J0",
+                    }
+                ],
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["saved"] is True
+    assert response.json()["messageId"] == "<draft@example.com>"
+    assert response.json()["draftFolder"] == "Drafts"
 
 
 def test_mailbox_send_rejects_message_rate_limit_before_smtp(tmp_path, monkeypatch):

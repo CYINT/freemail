@@ -23,6 +23,19 @@ class SentMessage:
 
 
 @dataclass(frozen=True)
+class DraftMessage:
+    message_id: str
+    sender: str
+    recipients: list[str]
+    subject: str
+    draft_folder: str = "Drafts"
+    saved: bool = True
+
+    def as_dict(self) -> dict[str, object]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class OutboundAttachment:
     filename: str
     content_type: str
@@ -84,6 +97,50 @@ def send_mailbox_message(
     )
 
 
+def save_mailbox_draft(
+    *,
+    email: str,
+    password: str,
+    host: str,
+    port: int,
+    recipients: list[str],
+    subject: str,
+    body: str,
+    attachments: list[OutboundAttachment] | None = None,
+    draft_folder: str = "Drafts",
+    timeout_seconds: float = 10.0,
+    verify_tls: bool = False,
+) -> DraftMessage:
+    normalized_recipients = [recipient.strip() for recipient in recipients if recipient.strip()]
+    message_id = make_msgid(domain=email.partition("@")[2] or None)
+    message = _message(
+        sender=email,
+        recipients=normalized_recipients,
+        subject=subject or "(no subject)",
+        body=body,
+        attachments=attachments or [],
+        message_id=message_id,
+    )
+    _append_message_to_folder(
+        email=email,
+        password=password,
+        host=host,
+        port=port,
+        folder=draft_folder,
+        flags=r"(\Draft)",
+        message=message,
+        timeout_seconds=timeout_seconds,
+        verify_tls=verify_tls,
+    )
+    return DraftMessage(
+        message_id=message_id,
+        sender=email,
+        recipients=normalized_recipients,
+        subject=subject or "(no subject)",
+        draft_folder=draft_folder,
+    )
+
+
 def _message(
     *,
     sender: str,
@@ -132,15 +189,42 @@ def _append_sent_message(
     timeout_seconds: float,
     verify_tls: bool,
 ) -> bool:
-    tls_context = _tls_context(verify_tls=verify_tls)
     try:
-        with imaplib.IMAP4_SSL(host, port, ssl_context=tls_context, timeout=timeout_seconds) as imap:
-            imap.login(email, password)
-            _ensure_imap_folder(imap, folder)
-            status, _data = imap.append(f'"{folder}"', r"(\Seen)", None, message.as_bytes())
-            return status == "OK"
+        _append_message_to_folder(
+            email=email,
+            password=password,
+            host=host,
+            port=port,
+            folder=folder,
+            flags=r"(\Seen)",
+            message=message,
+            timeout_seconds=timeout_seconds,
+            verify_tls=verify_tls,
+        )
+        return True
     except (OSError, ValueError, imaplib.IMAP4.error):
         return False
+
+
+def _append_message_to_folder(
+    *,
+    email: str,
+    password: str,
+    host: str,
+    port: int,
+    folder: str,
+    flags: str,
+    message: EmailMessage,
+    timeout_seconds: float,
+    verify_tls: bool,
+) -> None:
+    tls_context = _tls_context(verify_tls=verify_tls)
+    with imaplib.IMAP4_SSL(host, port, ssl_context=tls_context, timeout=timeout_seconds) as imap:
+        imap.login(email, password)
+        _ensure_imap_folder(imap, folder)
+        status, _data = imap.append(f'"{folder}"', flags, None, message.as_bytes())
+        if status != "OK":
+            raise imaplib.IMAP4.error(f"Mailbox folder append failed: {folder}")
 
 
 def _ensure_imap_folder(imap: imaplib.IMAP4_SSL, folder: str) -> None:
