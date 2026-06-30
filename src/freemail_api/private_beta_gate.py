@@ -82,7 +82,7 @@ def _check_dns_posture(options: PrivateBetaGateOptions) -> dict[str, Any]:
             {"error": "--domain and --dns-guidance are required unless --skip-dns is set"},
         )
     guidance = _load_json(options.dns_guidance)
-    expected_records = [DnsRecord.model_validate(record) for record in guidance.get("records", [])]
+    expected_records = [DnsRecord.model_validate(record) for record in _dns_guidance_records(guidance)]
     observed_records = _load_observed_dns(options.observed_dns) if options.observed_dns else resolve_observed_dns(expected_records)
     posture = verify_dns_posture(
         domain=options.domain,
@@ -399,6 +399,17 @@ def _load_observed_dns(path: Path | None) -> list[dict[str, object]]:
     records = payload.get("observedRecords", payload.get("observed_records", payload.get("records", payload)))
     if not isinstance(records, list):
         raise ValueError(f"{path} must contain a list of observed DNS records")
+    return records
+
+
+def _dns_guidance_records(payload: dict[str, Any]) -> list[object]:
+    records = payload.get("records")
+    if records is None and isinstance(payload.get("dnsGuidance"), dict):
+        records = payload["dnsGuidance"].get("records")
+    if records is None:
+        return []
+    if not isinstance(records, list):
+        raise ValueError("DNS guidance records must be a list")
     return records
 
 

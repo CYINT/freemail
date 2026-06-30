@@ -62,10 +62,10 @@ def test_build_apply_plan_exports_domains_dkim_accounts_and_aliases(tmp_path):
         "@type": "Text",
         "secret": "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----\n",
     }
-    assert plan[2]["matchOn"] == ["emailAddress"]
+    assert plan[2]["matchOn"] == ["name", "domainId"]
     assert plan[2]["value"]["account-admin-example-com"]["name"] == "admin"
-    assert plan[2]["value"]["account-admin-example-com"]["emailAddress"] == "admin@example.com"
     assert plan[2]["value"]["account-admin-example-com"]["domainId"] == "#domain-example-com"
+    assert "emailAddress" not in plan[2]["value"]["account-admin-example-com"]
     assert plan[2]["value"]["account-admin-example-com"]["credentials"]["0"] == {
         "@type": "Password",
         "secret": "mail-secret",

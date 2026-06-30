@@ -121,6 +121,45 @@ def test_private_beta_gate_accepts_matching_observed_dns(tmp_path):
     assert result["checks"][0]["details"]["posture"]["ready"] is True
 
 
+def test_private_beta_gate_accepts_nested_dns_guidance_records(tmp_path):
+    guidance = tmp_path / "guidance.json"
+    observed = tmp_path / "observed.json"
+    guidance.write_text(
+        json.dumps(
+            {
+                "domain": "example.com",
+                "dnsGuidance": {
+                    "records": [
+                        {
+                            "type": "MX",
+                            "name": "example.com",
+                            "value": "10 freemail.kuzuryu.ai.",
+                            "purpose": "Route inbound mail.",
+                        }
+                    ]
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    observed.write_text(
+        json.dumps({"observedRecords": [{"type": "MX", "name": "example.com", "values": ["10 freemail.kuzuryu.ai."]}]}),
+        encoding="utf-8",
+    )
+
+    result = run_private_beta_gate(
+        PrivateBetaGateOptions(
+            domain="example.com",
+            dns_guidance=guidance,
+            observed_dns=observed,
+            skip_runtime=True,
+            skip_evidence=True,
+        )
+    )
+
+    assert result["passed"] is True
+
+
 def test_resolve_observed_dns_reports_missing_answers(monkeypatch):
     def fake_resolve(_name, _record_type):
         raise private_beta_gate.dns.resolver.NoAnswer

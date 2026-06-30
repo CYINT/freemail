@@ -46,7 +46,7 @@ def build_apply_plan(connection: sqlite3.Connection, options: PlanOptions) -> li
     operations: list[dict[str, object]] = []
     _append_upsert(operations, "Domain", ["name"], _domain_values(connection))
     _append_upsert(operations, "DkimSignature", ["selector"], _dkim_values(connection))
-    _append_upsert(operations, "Account", ["emailAddress"], _account_values(connection, options))
+    _append_upsert(operations, "Account", ["name", "domainId"], _account_values(connection, options))
     return operations
 
 
@@ -109,7 +109,6 @@ def _account_values(connection: sqlite3.Connection, options: PlanOptions) -> dic
         values[_client_ref("account", email)] = {
             "@type": "User",
             "name": local_part,
-            "emailAddress": email,
             "domainId": f"#{_domain_ref(domain)}",
             "description": row["display_name"],
             "aliases": _account_aliases(connection, email),
