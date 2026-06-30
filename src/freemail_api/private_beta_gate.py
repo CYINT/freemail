@@ -210,6 +210,7 @@ def _check_acceptance(path: Path | None) -> dict[str, Any]:
     limitations = payload.get("knownLimitations", [])
     passed = (
         payload.get("accepted") is True
+        and _is_timezone_aware_iso8601(payload.get("acceptedAt"))
         and bool(str(payload.get("decisionOwner", "")).strip())
         and "vpn" in boundary.lower()
         and isinstance(limitations, list)
@@ -222,6 +223,7 @@ def _check_acceptance(path: Path | None) -> dict[str, Any]:
             path,
             {
                 "accepted": payload.get("accepted"),
+                "acceptedAt": payload.get("acceptedAt"),
                 "decisionOwner": payload.get("decisionOwner"),
                 "accessBoundary": payload.get("accessBoundary"),
                 "knownLimitations": len(limitations) if isinstance(limitations, list) else 0,

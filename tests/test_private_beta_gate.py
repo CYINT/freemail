@@ -286,6 +286,68 @@ def test_private_beta_gate_rejects_timezone_free_deliverability_checked_at(tmp_p
     assert check["status"] == "fail"
 
 
+def test_private_beta_gate_rejects_acceptance_without_accepted_at(tmp_path):
+    acceptance = tmp_path / "acceptance.json"
+    acceptance.write_text(
+        json.dumps(
+            {
+                "accepted": True,
+                "decisionOwner": "CEO",
+                "accessBoundary": "Dragonscale/VPN clients only",
+                "knownLimitations": ["private beta only"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    check = private_beta_gate._check_acceptance(acceptance)
+
+    assert check["status"] == "fail"
+    assert check["details"]["acceptedAt"] is None
+
+
+def test_private_beta_gate_rejects_malformed_acceptance_timestamp(tmp_path):
+    acceptance = tmp_path / "acceptance.json"
+    acceptance.write_text(
+        json.dumps(
+            {
+                "accepted": True,
+                "acceptedAt": "after review",
+                "decisionOwner": "CEO",
+                "accessBoundary": "Dragonscale/VPN clients only",
+                "knownLimitations": ["private beta only"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    check = private_beta_gate._check_acceptance(acceptance)
+
+    assert check["status"] == "fail"
+    assert check["details"]["acceptedAt"] == "after review"
+
+
+def test_private_beta_gate_rejects_timezone_free_acceptance_timestamp(tmp_path):
+    acceptance = tmp_path / "acceptance.json"
+    acceptance.write_text(
+        json.dumps(
+            {
+                "accepted": True,
+                "acceptedAt": "2026-06-30T00:00:00",
+                "decisionOwner": "CEO",
+                "accessBoundary": "Dragonscale/VPN clients only",
+                "knownLimitations": ["private beta only"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    check = private_beta_gate._check_acceptance(acceptance)
+
+    assert check["status"] == "fail"
+    assert check["details"]["acceptedAt"] == "2026-06-30T00:00:00"
+
+
 def test_private_beta_gate_requires_beta_evidence_when_enabled():
     result = run_private_beta_gate(
         PrivateBetaGateOptions(
@@ -353,6 +415,7 @@ def test_private_beta_gate_accepts_complete_beta_evidence(tmp_path):
         json.dumps(
             {
                 "accepted": True,
+                "acceptedAt": "2026-06-30T00:00:00Z",
                 "decisionOwner": "CEO",
                 "accessBoundary": "Dragonscale/VPN clients only",
                 "knownLimitations": ["private beta only"],

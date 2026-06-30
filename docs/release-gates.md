@@ -73,11 +73,14 @@ The acceptance JSON must include:
 ```json
 {
   "accepted": true,
+  "acceptedAt": "2026-06-30T00:00:00Z",
   "decisionOwner": "CEO",
   "accessBoundary": "Dragonscale/VPN clients only",
   "knownLimitations": ["private beta only"]
 }
 ```
+
+The `acceptedAt` value must be a timezone-aware ISO-8601 timestamp.
 
 The deliverability evidence JSON must include:
 
