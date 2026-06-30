@@ -49,6 +49,9 @@ def test_static_web_validation_flags_credential_storage():
         '<form id="saved-contact-form"><input id="saved-contact-email"></form>'
         '<form id="mailbox-preferences"><input id="preference-display-name">'
         '<textarea id="preference-signature"></textarea></form>'
+        '<button id="mailbox-sessions-refresh">Refresh</button>'
+        '<div id="mailbox-sessions-list"></div>'
+        '<button id="mailbox-sessions-revoke-all">Sign out everywhere</button>'
         '<button id="reply-action">Reply</button><button id="forward-action">Forward</button>'
         '<button id="load-thread-action">Conversation</button>'
         '<button id="edit-draft-action">Edit draft</button>'
@@ -68,6 +71,8 @@ def test_static_web_validation_flags_credential_storage():
         parser,
         "@media (max-width: 640px) {} button { min-height: 38px; outline: 1px solid; border-radius: 8px; }",
         "fetch('/api/v1/mailbox/session', {headers: {Authorization: 'Bearer token'}}); "
+        "fetch('/api/v1/mailbox/sessions'); loadMailboxSessions(); revokeAllMailboxSessions(); "
+        "mailbox-sessions-refresh; mailbox-sessions-revoke-all; "
         "fetch('/api/v1/mailbox/snapshot'); fetch('/api/v1/mailbox/search'); fetch('/api/v1/mailbox/message'); "
         "fetch('/api/v1/mailbox/thread'); loadMailboxThread({}); load-thread-action; Conversation; "
         "fetch('/api/v1/mailbox/contacts'); "

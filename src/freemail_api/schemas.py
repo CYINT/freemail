@@ -472,6 +472,23 @@ class MailboxSessionDeleteRecord(ApiModel):
     revoked: bool
 
 
+class MailboxSessionSummary(ApiModel):
+    id: int
+    email: EmailStr
+    expires_at: int
+    created_at: str
+    current: bool
+
+
+class MailboxSessionsRecord(ApiModel):
+    email: EmailStr
+    sessions: list[MailboxSessionSummary]
+
+
+class MailboxSessionsDeleteRecord(ApiModel):
+    revoked: int
+
+
 class MailboxPreferencesUpdate(ApiModel):
     display_name: str = Field(default="", max_length=160)
     signature: str = Field(default="", max_length=4000)

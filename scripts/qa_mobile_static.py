@@ -56,6 +56,7 @@ def validate_mobile(root: Path) -> list[str]:
 
     for marker in [
         "/api/v1/mailbox/session",
+        "/api/v1/mailbox/sessions",
         "/api/v1/mailbox/snapshot",
         "/api/v1/mailbox/search",
         "/api/v1/mailbox/thread",
@@ -95,6 +96,10 @@ def validate_mobile(root: Path) -> list[str]:
         "updateMailboxPreferences",
         "Save preferences",
         "Preferences saved",
+        "MailboxSessionSummary",
+        "loadMailboxSessions",
+        "revokeAllMailboxSessions",
+        "Sign out everywhere",
         "withSignature",
         "SentMessage",
         "DraftMessage",

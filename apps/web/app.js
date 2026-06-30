@@ -49,6 +49,9 @@ const savedContactEmail = document.querySelector("#saved-contact-email");
 const preferencesForm = document.querySelector("#mailbox-preferences");
 const preferenceDisplayName = document.querySelector("#preference-display-name");
 const preferenceSignature = document.querySelector("#preference-signature");
+const mailboxSessionsRefresh = document.querySelector("#mailbox-sessions-refresh");
+const mailboxSessionsList = document.querySelector("#mailbox-sessions-list");
+const mailboxSessionsRevokeAll = document.querySelector("#mailbox-sessions-revoke-all");
 const composeTo = document.querySelector("#compose-to");
 const composeSubject = document.querySelector("#compose-subject");
 const composeBody = document.querySelector("#compose-body");
@@ -147,6 +150,14 @@ loadMoreAction?.addEventListener("click", async () => {
 preferencesForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   await saveMailboxPreferences();
+});
+
+mailboxSessionsRefresh?.addEventListener("click", async () => {
+  await loadMailboxSessions();
+});
+
+mailboxSessionsRevokeAll?.addEventListener("click", async () => {
+  await revokeAllMailboxSessions();
 });
 
 searchForm?.addEventListener("submit", async (event) => {
@@ -486,6 +497,7 @@ async function createMailboxSession({ email, password, apiBaseUrl }) {
     persistMailboxSession(mailboxSession);
     await loadMailboxSnapshot(mailboxSession.folder);
     await loadMailboxPreferences({ quiet: true });
+    await loadMailboxSessions({ quiet: true });
   } catch (error) {
     forgetMailboxSession();
     setStatus(`Session start failed: ${readableError(error)}`, "error");
@@ -508,6 +520,7 @@ async function revokeMailboxSession() {
   }
   renderFolders([], "INBOX");
   renderMessages([]);
+  renderMailboxSessions([]);
   setStatus("Signed out.", "idle");
 }
 
@@ -579,6 +592,92 @@ function renderMailboxPreferences() {
   if (preferenceSignature) {
     preferenceSignature.value = mailboxPreferences.signature || "";
   }
+}
+
+async function loadMailboxSessions({ quiet = false } = {}) {
+  if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
+    renderMailboxSessions([]);
+    return;
+  }
+  try {
+    const response = await fetch(new URL("/api/v1/mailbox/sessions", mailboxSession.apiBaseUrl), {
+      headers: mailboxHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const result = await response.json();
+    renderMailboxSessions(result.sessions || []);
+    if (!quiet) {
+      setStatus("Mailbox sessions loaded.", "ready");
+    }
+  } catch (error) {
+    if (!quiet) {
+      setStatus(`Session load failed: ${readableError(error)}`, "error");
+    }
+  }
+}
+
+async function revokeAllMailboxSessions() {
+  if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
+    setStatus("Sign in before revoking sessions.", "error");
+    return;
+  }
+  const apiBaseUrl = mailboxSession.apiBaseUrl;
+  const headers = mailboxHeaders();
+  setStatus("Signing out all sessions...", "loading");
+  try {
+    const response = await fetch(new URL("/api/v1/mailbox/sessions", apiBaseUrl), {
+      method: "DELETE",
+      headers,
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const result = await response.json();
+    forgetMailboxSession();
+    renderFolders([], "INBOX");
+    renderMessages([]);
+    renderMailboxSessions([]);
+    setStatus(`Signed out ${result.revoked || 0} session${result.revoked === 1 ? "" : "s"}.`, "idle");
+  } catch (error) {
+    setStatus(`Sign out everywhere failed: ${readableError(error)}`, "error");
+  }
+}
+
+function renderMailboxSessions(sessions) {
+  if (!mailboxSessionsList) {
+    return;
+  }
+  if (!sessions.length) {
+    const empty = document.createElement("p");
+    empty.textContent = mailboxSession.token ? "No active sessions found." : "Sign in to view active sessions.";
+    mailboxSessionsList.replaceChildren(empty);
+    return;
+  }
+  const list = document.createElement("ul");
+  list.replaceChildren(
+    ...sessions.map((session) => {
+      const item = document.createElement("li");
+      const label = session.current ? "Current session" : "Active session";
+      item.textContent = `${label} - expires ${formatSessionExpiry(session.expiresAt)}`;
+      return item;
+    }),
+  );
+  mailboxSessionsList.replaceChildren(list);
+}
+
+function formatSessionExpiry(value) {
+  const timestamp = Number(value || 0) * 1000;
+  if (!timestamp) {
+    return "unknown";
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(timestamp));
 }
 
 async function loadMailboxSnapshot(folder, { offset = 0, append = false } = {}) {
@@ -1724,6 +1823,7 @@ function restoreMailboxSession() {
     }
     loadMailboxSnapshot(mailboxSession.folder);
     loadMailboxPreferences({ quiet: true });
+    loadMailboxSessions({ quiet: true });
   } catch (_error) {
     forgetMailboxSession();
   }

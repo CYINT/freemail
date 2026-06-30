@@ -211,6 +211,41 @@ textarea:focus-visible,
   padding: 0.25rem 0.55rem;
 }
 
+.sessions-panel {
+  display: grid;
+  gap: 0.55rem;
+  border-top: 1px solid #d6e0e8;
+  padding-top: 0.75rem;
+}
+
+.sessions-panel > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: #3a4856;
+}
+
+.sessions-panel button {
+  min-height: 32px;
+  padding: 0.25rem 0.55rem;
+}
+
+.sessions-panel ul {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sessions-panel li,
+.sessions-panel p {
+  margin: 0;
+  color: #667584;
+  font-size: 0.82rem;
+}
+
 .saved-contact-form {
   display: grid;
   gap: 0.4rem;

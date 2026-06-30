@@ -4,6 +4,19 @@ export type MailboxSession = {
   apiBaseUrl: string;
 };
 
+export type MailboxSessionSummary = {
+  id: number;
+  email: string;
+  expiresAt: number;
+  createdAt: string;
+  current: boolean;
+};
+
+export type MailboxSessions = {
+  email: string;
+  sessions: MailboxSessionSummary[];
+};
+
 export type MailFolder = {
   name: string;
   messageCount: number;
@@ -210,6 +223,22 @@ export async function revokeMailboxSession(session: MailboxSession): Promise<voi
     method: "DELETE",
     headers: mailboxHeaders(session),
   });
+}
+
+export async function loadMailboxSessions(session: MailboxSession): Promise<MailboxSessions> {
+  const response = await request(session.apiBaseUrl, "/api/v1/mailbox/sessions", {
+    headers: mailboxHeaders(session),
+  });
+  return response.json();
+}
+
+export async function revokeAllMailboxSessions(session: MailboxSession): Promise<number> {
+  const response = await request(session.apiBaseUrl, "/api/v1/mailbox/sessions", {
+    method: "DELETE",
+    headers: mailboxHeaders(session),
+  });
+  const payload = await response.json();
+  return Number(payload.revoked || 0);
 }
 
 export async function loadMailboxSnapshot(

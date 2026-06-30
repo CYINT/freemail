@@ -6,6 +6,7 @@ import base64
 import imaplib
 import smtplib
 import sqlite3
+import time
 from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response, status
@@ -110,6 +111,8 @@ from .schemas import (
     MailboxSessionCreate,
     MailboxSessionDeleteRecord,
     MailboxSessionRecord,
+    MailboxSessionsDeleteRecord,
+    MailboxSessionsRecord,
     MailboxSnapshotRecord,
     MailboxStarStateCreate,
     MailboxStarStateRecord,
@@ -126,6 +129,7 @@ from .schemas import (
 from .sessions import bearer_token
 from .sessions import create_admin_session
 from .sessions import create_mailbox_session
+from .sessions import hash_session_token
 from .sessions import InvalidSessionError
 from .sessions import AdminPrincipal
 from .sessions import MailboxCredentials
@@ -191,7 +195,7 @@ COMPONENT_READINESS = {
     "webmail": {
         "status": "beta-ready",
         "evidence": [
-            "mailbox session login, paginated and thread-aware folder navigation and search, conversation lookup, contacts, message read, header inspection, EML import/export, read/unread state, star state, compose, attachments, archive, move, delete, and empty-folder controls",
+            "mailbox session login, session inspection/revoke-all, paginated and thread-aware folder navigation and search, conversation lookup, contacts, message read, header inspection, EML import/export, read/unread state, star state, compose, attachments, archive, move, delete, and empty-folder controls",
             "bulk message actions for read/unread, star/unstar, archive, spam, delete, and move",
             "persistent mailbox preferences with default compose signatures and saved address-book contacts",
             "server-side Drafts persistence and compose reopen support for saved drafts",
@@ -206,7 +210,7 @@ COMPONENT_READINESS = {
     "mobile": {
         "status": "source-ready",
         "evidence": [
-            "Expo/React Native client with VPN API target, mailbox sessions, paginated and thread-aware message workflows, conversation lookup, header inspection, EML import/export/share, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder and empty-folder controls, extracted and saved contacts, attachments, offline metadata cache, and push-device flows",
+            "Expo/React Native client with VPN API target, mailbox sessions, session inspection/revoke-all, paginated and thread-aware message workflows, conversation lookup, header inspection, EML import/export/share, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder and empty-folder controls, extracted and saved contacts, attachments, offline metadata cache, and push-device flows",
             "bulk read/star/archive/spam/delete/move client controls over the shared mailbox API",
             "mobile preference controls for default compose signatures",
             "compose/send path uses the shared mailbox API contract with Sent Items persistence status",
@@ -344,6 +348,33 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Mailbox credentials required")
         ensure_mailbox_access_allowed(connection, x_freemail_mailbox_email)
         return MailboxCredentials(email=x_freemail_mailbox_email, password=x_freemail_mailbox_password)
+
+    def _mailbox_bearer_token_or_raise(authorization: str | None) -> str:
+        token = bearer_token(authorization)
+        if not token:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Mailbox bearer session required")
+        return token
+
+    def _mailbox_credentials_from_token(
+        *,
+        connection: sqlite3.Connection,
+        token: str,
+        secret: str | None,
+    ) -> MailboxCredentials:
+        try:
+            credentials = resolve_mailbox_session(connection, token=token, secret=secret)
+            ensure_mailbox_access_allowed(connection, credentials.email)
+            return credentials
+        except SessionConfigurationError as error:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Mailbox sessions are not configured",
+            ) from error
+        except InvalidSessionError as error:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid mailbox session") from error
+
+    def _current_time() -> int:
+        return int(time.time())
 
     def ensure_mailbox_access_allowed(connection: sqlite3.Connection, email: str) -> None:
         if not database.is_mailbox_access_allowed(connection, email):
@@ -557,6 +588,46 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if token:
             revoke_mailbox_session(connection, token)
         return {"revoked": True}
+
+    @app.get("/api/v1/mailbox/sessions", response_model=MailboxSessionsRecord)
+    def mailbox_sessions_list(
+        authorization: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        token = _mailbox_bearer_token_or_raise(authorization)
+        credentials = _mailbox_credentials_from_token(
+            connection=connection,
+            token=token,
+            secret=active_settings.session_secret,
+        )
+        token_hash = hash_session_token(token)
+        rows = database.list_mailbox_sessions_for_email(connection, email=credentials.email, now=_current_time())
+        return {
+            "email": credentials.email,
+            "sessions": [
+                {
+                    "id": int(row["id"]),
+                    "email": str(row["email"]),
+                    "expires_at": int(row["expires_at"]),
+                    "created_at": str(row["created_at"]),
+                    "current": str(row["token_hash"]) == token_hash,
+                }
+                for row in rows
+            ],
+        }
+
+    @app.delete("/api/v1/mailbox/sessions", response_model=MailboxSessionsDeleteRecord)
+    def mailbox_sessions_delete(
+        authorization: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, int]:
+        token = _mailbox_bearer_token_or_raise(authorization)
+        credentials = _mailbox_credentials_from_token(
+            connection=connection,
+            token=token,
+            secret=active_settings.session_secret,
+        )
+        return {"revoked": database.revoke_mailbox_sessions_for_email(connection, email=credentials.email)}
 
     @app.get("/api/v1/mailbox/preferences", response_model=MailboxPreferencesRecord)
     def mailbox_preferences_get(

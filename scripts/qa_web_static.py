@@ -193,6 +193,7 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
     for marker in [
         "fetch(",
         "/api/v1/mailbox/session",
+        "/api/v1/mailbox/sessions",
         "/api/v1/mailbox/snapshot",
         "/api/v1/mailbox/search",
         "/api/v1/mailbox/thread",
@@ -296,6 +297,10 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         "restoreMailboxSession",
         "persistMailboxSession",
         "forgetMailboxSession",
+        "loadMailboxSessions",
+        "revokeAllMailboxSessions",
+        "mailbox-sessions-refresh",
+        "mailbox-sessions-revoke-all",
         "restoreAdminSession",
         "persistAdminSession",
         "forgetAdminSession",

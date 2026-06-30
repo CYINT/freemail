@@ -37,12 +37,14 @@ import {
   loadMailboxPreferences,
   loadMailboxPushDevices,
   loadMailboxPushNotifications,
+  loadMailboxSessions,
   loadMailboxSnapshot,
   loadMailboxThread,
   loadSavedMailboxContacts,
   MailAttachment,
   MailboxPreferences,
   MailboxSession,
+  MailboxSessionSummary,
   MailContact,
   MailFolder,
   MailMessage,
@@ -53,6 +55,7 @@ import {
   moveMailboxMessage,
   renameMailboxFolder,
   registerMailboxPushDevice,
+  revokeAllMailboxSessions,
   revokeMailboxSession,
   revokeMailboxPushDevice,
   searchMailbox,
@@ -107,6 +110,7 @@ export default function App() {
   const [savedContacts, setSavedContacts] = useState<SavedMailContact[]>([]);
   const [pushDevices, setPushDevices] = useState<MailboxPushDevice[]>([]);
   const [pushNotifications, setPushNotifications] = useState<MailboxPushNotification[]>([]);
+  const [mailboxSessions, setMailboxSessions] = useState<MailboxSessionSummary[]>([]);
   const [selectedMessage, setSelectedMessage] = useState<MailMessageDetail | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [newFolderName, setNewFolderName] = useState("");
@@ -132,6 +136,7 @@ export default function App() {
         setApiBaseUrl(stored.apiBaseUrl);
         setEmail(stored.email);
         refreshMailbox(stored, "INBOX");
+        refreshMailboxSessions(stored);
       }
     });
   }, []);
@@ -149,6 +154,7 @@ export default function App() {
       setSession(created);
       setPassword("");
       await refreshMailbox(created, "INBOX");
+      await refreshMailboxSessions(created);
     } catch (error) {
       setStatus(readableError(error));
     } finally {
@@ -166,6 +172,7 @@ export default function App() {
     setSavedContacts([]);
     setPushDevices([]);
     setPushNotifications([]);
+    setMailboxSessions([]);
     setMailboxPreferences(null);
     setPreferenceDisplayName("");
     setPreferenceSignature("");
@@ -178,6 +185,50 @@ export default function App() {
       await revokeMailboxSession(activeSession).catch(() => undefined);
     }
     setStatus("Signed out.");
+  }
+
+  async function refreshMailboxSessions(activeSession = session) {
+    if (!activeSession) {
+      return;
+    }
+    try {
+      const result = await loadMailboxSessions(activeSession);
+      setMailboxSessions(result.sessions || []);
+    } catch (error) {
+      setStatus(`Session refresh failed: ${readableError(error)}`);
+    }
+  }
+
+  async function signOutEverywhere() {
+    const activeSession = session;
+    if (!activeSession) {
+      return;
+    }
+    setLoading(true);
+    setStatus("Signing out all sessions...");
+    try {
+      const revoked = await revokeAllMailboxSessions(activeSession);
+      setSession(null);
+      setFolders([]);
+      setMessages([]);
+      setMailboxSessions([]);
+      setMailboxPagination({ mode: "folder", query: "", nextOffset: null, hasMore: false });
+      setContacts([]);
+      setSavedContacts([]);
+      setPushDevices([]);
+      setPushNotifications([]);
+      setMailboxPreferences(null);
+      setPreferenceDisplayName("");
+      setPreferenceSignature("");
+      setSelectedMessage(null);
+      await clearStoredMailboxSession();
+      await clearCachedMailboxSnapshots(activeSession.email).catch(() => undefined);
+      setStatus(`Signed out ${revoked} session${revoked === 1 ? "" : "s"}.`);
+    } catch (error) {
+      setStatus(readableError(error));
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function refreshMailbox(activeSession = session, targetFolder = folder, offset = 0, append = false) {
@@ -1204,6 +1255,28 @@ export default function App() {
             </View>
 
             <View style={styles.panel}>
+              <View style={styles.rowHeader}>
+                <Text style={styles.sectionTitle}>Sessions</Text>
+                <Pressable style={styles.secondaryButton} onPress={() => refreshMailboxSessions()}>
+                  <Text>Refresh</Text>
+                </Pressable>
+              </View>
+              <Text style={styles.meta}>
+                {mailboxSessions.length
+                  ? `${mailboxSessions.length} active session${mailboxSessions.length === 1 ? "" : "s"}`
+                  : "No active sessions loaded."}
+              </Text>
+              {mailboxSessions.map((item) => (
+                <Text key={item.id} style={styles.meta}>
+                  {item.current ? "Current session" : "Active session"} - expires {formatSessionExpiry(item.expiresAt)}
+                </Text>
+              ))}
+              <Pressable style={styles.dangerButton} onPress={signOutEverywhere}>
+                <Text style={styles.dangerButtonText}>Sign out everywhere</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.panel}>
               <Text style={styles.sectionTitle}>Compose</Text>
               <TextInput value={composeTo} onChangeText={setComposeTo} style={styles.input} autoCapitalize="none" placeholder="To" />
               <TextInput value={composeSubject} onChangeText={setComposeSubject} style={styles.input} placeholder="Subject" />
@@ -1346,6 +1419,13 @@ function formatCachedAt(cachedAt: string): string {
     return "offline cache";
   }
   return new Date(cachedAt).toLocaleString();
+}
+
+function formatSessionExpiry(expiresAt: number): string {
+  if (!expiresAt) {
+    return "unknown";
+  }
+  return new Date(expiresAt * 1000).toLocaleString();
 }
 
 function formatBytes(size: number): string {

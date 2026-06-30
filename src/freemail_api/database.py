@@ -627,6 +627,26 @@ def get_mailbox_session(connection: sqlite3.Connection, token_hash: str, now: in
     return row
 
 
+def list_mailbox_sessions_for_email(
+    connection: sqlite3.Connection,
+    *,
+    email: str,
+    now: int,
+) -> list[sqlite3.Row]:
+    delete_expired_mailbox_sessions(connection, now)
+    return list(
+        connection.execute(
+            """
+            SELECT id, email, expires_at, created_at, token_hash
+            FROM mailbox_sessions
+            WHERE email = ? AND expires_at > ?
+            ORDER BY created_at DESC, id DESC
+            """,
+            [email.lower(), now],
+        )
+    )
+
+
 def create_admin_session(
     connection: sqlite3.Connection,
     *,
@@ -692,6 +712,12 @@ def is_mailbox_access_allowed(connection: sqlite3.Connection, email: str) -> boo
 def revoke_mailbox_session(connection: sqlite3.Connection, token_hash: str) -> None:
     connection.execute("DELETE FROM mailbox_sessions WHERE token_hash = ?", [token_hash])
     connection.commit()
+
+
+def revoke_mailbox_sessions_for_email(connection: sqlite3.Connection, *, email: str) -> int:
+    cursor = connection.execute("DELETE FROM mailbox_sessions WHERE email = ?", [email.lower()])
+    connection.commit()
+    return int(cursor.rowcount)
 
 
 def delete_expired_mailbox_sessions(connection: sqlite3.Connection, now: int) -> None:
