@@ -20,10 +20,12 @@ Admin endpoints accept bearer tokens from `POST /api/v1/admin/session` or the le
 
 Admin password login verifies active administrator users against stored Argon2id password hashes, creates a hashed bearer session, and stores no admin password material in runtime session tables. Suspending an administrator prevents existing bearer sessions from resolving because the session lookup rechecks the user record.
 
+Administrator roles are intentionally coarse for private beta. `owner` can perform every admin action, including granting or suspending administrators. `admin` can read admin metadata and invite normal users but cannot grant administrator access. `operator` can read metadata and operate domains, mailboxes, aliases, DKIM keys, DNS verification, and status changes but cannot invite users. `auditor` is read-only.
+
 The first persistence boundary is:
 
 - `domains`: hosted domain names and lifecycle status
-- `users`: invite-created users with password hashes only
+- `users`: invite-created users with password hashes and coarse administrator role metadata
 - `mailboxes`: user-owned mailbox addresses under hosted domains
 - `aliases`: forwarding aliases
 - `dkim_keys`: generated DKIM private keys and public DNS TXT values

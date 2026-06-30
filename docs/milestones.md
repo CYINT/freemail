@@ -22,7 +22,7 @@
 - DNS guidance for MX, SPF, DKIM, and DMARC.
 - Audit logs.
 
-Current progress: persistent APIs exist for administrator bootstrap, admin email/password bearer sessions, static admin-token fallback, domains, invite-created users, mailboxes, aliases, DKIM keys, generated MX/SPF/DKIM/DMARC DNS guidance, and audit logs. Bootstrap and user creation accept one-time initial passwords and hash them server-side with Argon2id before storage. Admin password login verifies active administrators against those hashes, stores only hashed bearer sessions, and rejects suspended admins. The webmail preview now includes an admin console for bootstrap, admin sign-in, domain, user, mailbox, alias, DKIM, DNS-guidance, suspension/reactivation, and audit-log workflows. The remaining work is granular role permissions and mail-core synchronization.
+Current progress: persistent APIs exist for administrator bootstrap, admin email/password bearer sessions, static admin-token fallback, owner/admin/operator/auditor permissions, domains, invite-created users, mailboxes, aliases, DKIM keys, generated MX/SPF/DKIM/DMARC DNS guidance, and audit logs. Bootstrap and user creation accept one-time initial passwords and hash them server-side with Argon2id before storage. Admin password login verifies active administrators against those hashes, stores only hashed bearer sessions, and rejects suspended admins. The webmail preview now includes an admin console for bootstrap, admin sign-in, role-scoped user invitation, domain, user, mailbox, alias, DKIM, DNS-guidance, suspension/reactivation, and audit-log workflows. The remaining work is mail-core synchronization.
 
 ## M3 - Webmail MVP
 

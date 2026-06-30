@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS users (
     display_name TEXT NOT NULL,
     password_hash TEXT NOT NULL,
     is_admin INTEGER NOT NULL DEFAULT 0,
+    admin_role TEXT NOT NULL DEFAULT 'member',
     status TEXT NOT NULL DEFAULT 'invited',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -160,7 +161,7 @@ STATUS_TABLES = {
 METADATA_SCHEMA_REVISION = "sqlite-schema-v1"
 REQUIRED_TABLE_COLUMNS = {
     "domains": {"id", "name", "status", "created_at"},
-    "users": {"id", "email", "display_name", "password_hash", "is_admin", "status", "created_at"},
+    "users": {"id", "email", "display_name", "password_hash", "is_admin", "admin_role", "status", "created_at"},
     "mailboxes": {"id", "user_id", "local_part", "domain_id", "address", "status", "created_at"},
     "aliases": {"id", "source", "destination", "status", "created_at"},
     "audit_log": {"id", "actor", "action", "target_type", "target_id", "created_at"},
@@ -290,6 +291,7 @@ def bootstrap_admin(
             display_name=display_name,
             password_hash=password_hash,
             is_admin=True,
+            admin_role="owner",
         ),
         actor,
     )
@@ -317,10 +319,10 @@ def create_user(connection: sqlite3.Connection, payload: StoredUserCreate, actor
     row_id = _execute_insert(
         connection,
         """
-        INSERT INTO users (email, display_name, password_hash, is_admin)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO users (email, display_name, password_hash, is_admin, admin_role)
+        VALUES (?, ?, ?, ?, ?)
         """,
-        [payload.email.lower(), payload.display_name, payload.password_hash, int(payload.is_admin)],
+        [payload.email.lower(), payload.display_name, payload.password_hash, int(payload.is_admin), payload.admin_role],
     )
     _audit(connection, actor, "user.invite", "user", row_id)
     connection.commit()
@@ -399,6 +401,10 @@ def get_domain(connection: sqlite3.Connection, domain_id: int) -> sqlite3.Row:
     return _get_row(connection, "domains", domain_id)
 
 
+def get_user(connection: sqlite3.Connection, user_id: int) -> sqlite3.Row:
+    return _get_row(connection, "users", user_id)
+
+
 def list_dkim_keys_for_domain(connection: sqlite3.Connection, domain_id: int) -> list[sqlite3.Row]:
     _get_row(connection, "domains", domain_id)
     return list(
@@ -465,7 +471,7 @@ def get_admin_session(connection: sqlite3.Connection, token_hash: str, now: int)
     delete_expired_admin_sessions(connection, now)
     return connection.execute(
         """
-        SELECT admin_sessions.*
+        SELECT admin_sessions.*, users.admin_role
         FROM admin_sessions
         JOIN users ON users.id = admin_sessions.user_id
         WHERE admin_sessions.token_hash = ?
@@ -714,6 +720,11 @@ def _execute_insert(connection: sqlite3.Connection, statement: str, values: Iter
 
 
 def _migrate_schema(connection: sqlite3.Connection) -> None:
+    user_columns = {row["name"] for row in connection.execute("PRAGMA table_info(users)")}
+    if "admin_role" not in user_columns:
+        connection.execute("ALTER TABLE users ADD COLUMN admin_role TEXT NOT NULL DEFAULT 'member'")
+        connection.execute("UPDATE users SET admin_role = 'owner' WHERE is_admin = 1")
+        connection.commit()
     connection.execute(
         """
         CREATE TABLE IF NOT EXISTS admin_sessions (

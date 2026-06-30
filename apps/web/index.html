@@ -164,6 +164,15 @@
               <label>Display name <input name="displayName" type="text" required></label>
               <label>Initial password <input name="initialPassword" type="password" minlength="12" autocomplete="new-password" required></label>
               <label class="checkbox-field"><input name="isAdmin" type="checkbox"> Administrator</label>
+              <label>Admin role
+                <select id="admin-role" name="adminRole">
+                  <option value="member">Member</option>
+                  <option value="auditor">Auditor</option>
+                  <option value="operator">Operator</option>
+                  <option value="admin">Admin</option>
+                  <option value="owner">Owner</option>
+                </select>
+              </label>
               <button type="submit">Invite user</button>
             </form>
 

@@ -89,6 +89,7 @@ from .sessions import bearer_token
 from .sessions import create_admin_session
 from .sessions import create_mailbox_session
 from .sessions import InvalidSessionError
+from .sessions import AdminPrincipal
 from .sessions import MailboxCredentials
 from .sessions import resolve_admin_session
 from .sessions import resolve_mailbox_session
@@ -101,6 +102,28 @@ from .secret_box import SecretBoxConfigurationError
 from .secret_box import SecretBoxDecryptionError
 from .settings import get_settings
 from .settings import Settings
+
+
+ROLE_PERMISSIONS = {
+    "owner": {
+        "admin.read",
+        "admin.manage",
+        "admin.users",
+        "admin.grant",
+    },
+    "admin": {
+        "admin.read",
+        "admin.manage",
+        "admin.users",
+    },
+    "operator": {
+        "admin.read",
+        "admin.manage",
+    },
+    "auditor": {
+        "admin.read",
+    },
+}
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -142,11 +165,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         authorization: str | None = Header(default=None),
         x_freemail_admin_token: str | None = Header(default=None),
         connection: sqlite3.Connection = Depends(get_connection),
-    ) -> str:
+    ) -> AdminPrincipal:
         token = bearer_token(authorization)
         if token:
             try:
-                return resolve_admin_session(connection, token=token).actor
+                return resolve_admin_session(connection, token=token)
             except InvalidSessionError as error:
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin session") from error
         if not active_settings.admin_api_token:
@@ -156,7 +179,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
         if x_freemail_admin_token != active_settings.admin_api_token:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin API token")
-        return "admin-api"
+        return AdminPrincipal(user_id=0, email="admin-token", actor="admin-api", role="owner")
+
+    def require_permission(principal: AdminPrincipal, permission: str) -> None:
+        if permission not in ROLE_PERMISSIONS.get(principal.role, set()):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Admin role lacks {permission} permission")
 
     def require_bootstrap(x_freemail_bootstrap_token: str | None = Header(default=None)) -> str:
         if not active_settings.bootstrap_token:
@@ -874,130 +901,155 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/api/v1/admin/domains", response_model=list[DomainRecord])
     def list_domains(
-        _actor: str = Depends(require_admin),
+        principal: AdminPrincipal = Depends(require_admin),
         connection: sqlite3.Connection = Depends(get_connection),
     ) -> list[dict[str, object]]:
+        require_permission(principal, "admin.read")
         return _rows_to_dicts(database.list_rows(connection, "domains"))
 
     @app.post("/api/v1/admin/domains", response_model=DomainRecord, status_code=status.HTTP_201_CREATED)
     def add_domain(
         payload: DomainCreate,
-        actor: str = Depends(require_admin),
+        principal: AdminPrincipal = Depends(require_admin),
         connection: sqlite3.Connection = Depends(get_connection),
     ) -> dict[str, object]:
-        return _row_to_dict(_create_or_raise(lambda: database.create_domain(connection, payload, actor)))
+        require_permission(principal, "admin.manage")
+        return _row_to_dict(_create_or_raise(lambda: database.create_domain(connection, payload, principal.actor)))
 
     @app.patch("/api/v1/admin/domains/{domain_id}/status", response_model=DomainRecord)
     def update_domain_status(
         domain_id: int,
         payload: AdminStatusUpdate,
-        actor: str = Depends(require_admin),
+        principal: AdminPrincipal = Depends(require_admin),
         connection: sqlite3.Connection = Depends(get_connection),
     ) -> dict[str, object]:
+        require_permission(principal, "admin.manage")
         return _row_to_dict(
-            _create_or_raise(lambda: database.update_status(connection, "domains", domain_id, payload.status, actor))
+            _create_or_raise(
+                lambda: database.update_status(connection, "domains", domain_id, payload.status, principal.actor)
+            )
         )
 
     @app.get("/api/v1/admin/users", response_model=list[UserRecord])
     def list_users(
-        _actor: str = Depends(require_admin),
+        principal: AdminPrincipal = Depends(require_admin),
         connection: sqlite3.Connection = Depends(get_connection),
     ) -> list[dict[str, object]]:
+        require_permission(principal, "admin.read")
         return _rows_to_dicts(database.list_rows(connection, "users"))
 
     @app.post("/api/v1/admin/users", response_model=UserRecord, status_code=status.HTTP_201_CREATED)
     def add_user(
         payload: UserCreate,
-        actor: str = Depends(require_admin),
+        principal: AdminPrincipal = Depends(require_admin),
         connection: sqlite3.Connection = Depends(get_connection),
     ) -> dict[str, object]:
+        require_permission(principal, "admin.users")
+        if payload.is_admin:
+            require_permission(principal, "admin.grant")
+        admin_role = _normalized_admin_role(payload.is_admin, payload.admin_role)
         stored_payload = StoredUserCreate(
             email=payload.email,
             display_name=payload.display_name,
             password_hash=hash_initial_password(payload.initial_password),
             is_admin=payload.is_admin,
+            admin_role=admin_role,
         )
-        return _row_to_dict(_create_or_raise(lambda: database.create_user(connection, stored_payload, actor)))
+        return _row_to_dict(_create_or_raise(lambda: database.create_user(connection, stored_payload, principal.actor)))
 
     @app.patch("/api/v1/admin/users/{user_id}/status", response_model=UserRecord)
     def update_user_status(
         user_id: int,
         payload: AdminStatusUpdate,
-        actor: str = Depends(require_admin),
+        principal: AdminPrincipal = Depends(require_admin),
         connection: sqlite3.Connection = Depends(get_connection),
     ) -> dict[str, object]:
+        require_permission(principal, "admin.users")
+        target = _create_or_raise(lambda: database.get_user(connection, user_id))
+        if int(target["is_admin"]):
+            require_permission(principal, "admin.grant")
         return _row_to_dict(
-            _create_or_raise(lambda: database.update_status(connection, "users", user_id, payload.status, actor))
+            _create_or_raise(lambda: database.update_status(connection, "users", user_id, payload.status, principal.actor))
         )
 
     @app.get("/api/v1/admin/mailboxes", response_model=list[MailboxRecord])
     def list_mailboxes(
-        _actor: str = Depends(require_admin),
+        principal: AdminPrincipal = Depends(require_admin),
         connection: sqlite3.Connection = Depends(get_connection),
     ) -> list[dict[str, object]]:
+        require_permission(principal, "admin.read")
         return _rows_to_dicts(database.list_rows(connection, "mailboxes"))
 
     @app.post("/api/v1/admin/mailboxes", response_model=MailboxRecord, status_code=status.HTTP_201_CREATED)
     def add_mailbox(
         payload: MailboxCreate,
-        actor: str = Depends(require_admin),
+        principal: AdminPrincipal = Depends(require_admin),
         connection: sqlite3.Connection = Depends(get_connection),
     ) -> dict[str, object]:
-        return _row_to_dict(_create_or_raise(lambda: database.create_mailbox(connection, payload, actor)))
+        require_permission(principal, "admin.manage")
+        return _row_to_dict(_create_or_raise(lambda: database.create_mailbox(connection, payload, principal.actor)))
 
     @app.patch("/api/v1/admin/mailboxes/{mailbox_id}/status", response_model=MailboxRecord)
     def update_mailbox_status(
         mailbox_id: int,
         payload: AdminStatusUpdate,
-        actor: str = Depends(require_admin),
+        principal: AdminPrincipal = Depends(require_admin),
         connection: sqlite3.Connection = Depends(get_connection),
     ) -> dict[str, object]:
+        require_permission(principal, "admin.manage")
         return _row_to_dict(
-            _create_or_raise(lambda: database.update_status(connection, "mailboxes", mailbox_id, payload.status, actor))
+            _create_or_raise(
+                lambda: database.update_status(connection, "mailboxes", mailbox_id, payload.status, principal.actor)
+            )
         )
 
     @app.get("/api/v1/admin/aliases", response_model=list[AliasRecord])
     def list_aliases(
-        _actor: str = Depends(require_admin),
+        principal: AdminPrincipal = Depends(require_admin),
         connection: sqlite3.Connection = Depends(get_connection),
     ) -> list[dict[str, object]]:
+        require_permission(principal, "admin.read")
         return _rows_to_dicts(database.list_rows(connection, "aliases"))
 
     @app.post("/api/v1/admin/aliases", response_model=AliasRecord, status_code=status.HTTP_201_CREATED)
     def add_alias(
         payload: AliasCreate,
-        actor: str = Depends(require_admin),
+        principal: AdminPrincipal = Depends(require_admin),
         connection: sqlite3.Connection = Depends(get_connection),
     ) -> dict[str, object]:
-        return _row_to_dict(_create_or_raise(lambda: database.create_alias(connection, payload, actor)))
+        require_permission(principal, "admin.manage")
+        return _row_to_dict(_create_or_raise(lambda: database.create_alias(connection, payload, principal.actor)))
 
     @app.patch("/api/v1/admin/aliases/{alias_id}/status", response_model=AliasRecord)
     def update_alias_status(
         alias_id: int,
         payload: AdminStatusUpdate,
-        actor: str = Depends(require_admin),
+        principal: AdminPrincipal = Depends(require_admin),
         connection: sqlite3.Connection = Depends(get_connection),
     ) -> dict[str, object]:
+        require_permission(principal, "admin.manage")
         return _row_to_dict(
-            _create_or_raise(lambda: database.update_status(connection, "aliases", alias_id, payload.status, actor))
+            _create_or_raise(lambda: database.update_status(connection, "aliases", alias_id, payload.status, principal.actor))
         )
 
     @app.get("/api/v1/admin/dkim-keys", response_model=list[DkimKeyRecord])
     def list_dkim_keys(
-        _actor: str = Depends(require_admin),
+        principal: AdminPrincipal = Depends(require_admin),
         connection: sqlite3.Connection = Depends(get_connection),
     ) -> list[dict[str, object]]:
+        require_permission(principal, "admin.read")
         return _rows_to_dicts(database.list_rows(connection, "dkim_keys"))
 
     @app.post("/api/v1/admin/dkim-keys", response_model=DkimKeyCreated, status_code=status.HTTP_201_CREATED)
     def add_dkim_key(
         payload: DkimKeyCreate,
-        actor: str = Depends(require_admin),
+        principal: AdminPrincipal = Depends(require_admin),
         connection: sqlite3.Connection = Depends(get_connection),
     ) -> dict[str, object]:
+        require_permission(principal, "admin.manage")
         public_txt, private_key_pem = dkim.generate_dkim_key_pair()
         row = _create_or_raise(
-            lambda: database.create_dkim_key(connection, payload, public_txt, private_key_pem, actor)
+            lambda: database.create_dkim_key(connection, payload, public_txt, private_key_pem, principal.actor)
         )
         return _row_to_dict(row)
 
@@ -1005,21 +1057,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def update_dkim_key_status(
         dkim_key_id: int,
         payload: AdminStatusUpdate,
-        actor: str = Depends(require_admin),
+        principal: AdminPrincipal = Depends(require_admin),
         connection: sqlite3.Connection = Depends(get_connection),
     ) -> dict[str, object]:
+        require_permission(principal, "admin.manage")
         return _row_to_dict(
             _create_or_raise(
-                lambda: database.update_status(connection, "dkim_keys", dkim_key_id, payload.status, actor)
+                lambda: database.update_status(connection, "dkim_keys", dkim_key_id, payload.status, principal.actor)
             )
         )
 
     @app.get("/api/v1/admin/domains/{domain_id}/dns", response_model=DomainDnsGuidance)
     def domain_dns_guidance(
         domain_id: int,
-        _actor: str = Depends(require_admin),
+        principal: AdminPrincipal = Depends(require_admin),
         connection: sqlite3.Connection = Depends(get_connection),
     ) -> DomainDnsGuidance:
+        require_permission(principal, "admin.read")
         try:
             domain = database.get_domain(connection, domain_id)
             dkim_keys = database.list_dkim_keys_for_domain(connection, domain_id)
@@ -1036,9 +1090,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def domain_dns_verify(
         domain_id: int,
         payload: DomainDnsPostureCreate,
-        _actor: str = Depends(require_admin),
+        principal: AdminPrincipal = Depends(require_admin),
         connection: sqlite3.Connection = Depends(get_connection),
     ) -> dict[str, object]:
+        require_permission(principal, "admin.read")
         try:
             domain = database.get_domain(connection, domain_id)
             dkim_keys = database.list_dkim_keys_for_domain(connection, domain_id)
@@ -1057,9 +1112,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/api/v1/admin/audit-log", response_model=list[AuditRecord])
     def audit_log(
-        _actor: str = Depends(require_admin),
+        principal: AdminPrincipal = Depends(require_admin),
         connection: sqlite3.Connection = Depends(get_connection),
     ) -> list[dict[str, object]]:
+        require_permission(principal, "admin.read")
         return _rows_to_dicts(database.list_rows(connection, "audit_log"))
 
     return app
@@ -1082,6 +1138,12 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, object]:
 
 def _rows_to_dicts(rows: list[sqlite3.Row]) -> list[dict[str, object]]:
     return [_row_to_dict(row) for row in rows]
+
+
+def _normalized_admin_role(is_admin: bool, requested_role: str) -> str:
+    if not is_admin:
+        return "member"
+    return "operator" if requested_role == "member" else requested_role
 
 
 def _encrypted_push_token(push_token: str, secret: str | None) -> str | None:

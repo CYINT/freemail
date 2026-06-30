@@ -268,6 +268,154 @@ def test_suspended_admin_blocks_existing_bearer_admin_session(tmp_path):
     assert response.json()["detail"] == "Invalid admin session"
 
 
+def test_owner_can_create_scoped_admin_and_role_is_returned(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.post(
+            "/api/v1/admin/users",
+            headers=admin_headers(),
+            json={
+                "email": "operator@example.com",
+                "displayName": "Operator User",
+                "initialPassword": "correct horse battery",
+                "isAdmin": True,
+                "adminRole": "operator",
+            },
+        )
+
+    assert response.status_code == 201
+    assert response.json()["isAdmin"] is True
+    assert response.json()["adminRole"] == "operator"
+
+
+def test_admin_role_can_invite_member_but_cannot_grant_admin(tmp_path):
+    with make_client(tmp_path) as client:
+        client.post(
+            "/api/v1/admin/users",
+            headers=admin_headers(),
+            json={
+                "email": "manager@example.com",
+                "displayName": "Manager User",
+                "initialPassword": "correct horse battery",
+                "isAdmin": True,
+                "adminRole": "admin",
+            },
+        )
+        login = client.post(
+            "/api/v1/admin/session",
+            json={"email": "manager@example.com", "password": "correct horse battery"},
+        )
+        bearer_headers = {"Authorization": f"Bearer {login.json()['token']}"}
+        invited = client.post(
+            "/api/v1/admin/users",
+            headers=bearer_headers,
+            json={
+                "email": "member@example.com",
+                "displayName": "Member User",
+                "initialPassword": "correct horse battery",
+            },
+        )
+        denied = client.post(
+            "/api/v1/admin/users",
+            headers=bearer_headers,
+            json={
+                "email": "other-admin@example.com",
+                "displayName": "Other Admin",
+                "initialPassword": "correct horse battery",
+                "isAdmin": True,
+                "adminRole": "operator",
+            },
+        )
+
+    assert login.status_code == 200
+    assert invited.status_code == 201
+    assert invited.json()["isAdmin"] is False
+    assert invited.json()["adminRole"] == "member"
+    assert denied.status_code == 403
+    assert denied.json()["detail"] == "Admin role lacks admin.grant permission"
+
+
+def test_operator_can_manage_domains_but_cannot_invite_users(tmp_path):
+    with make_client(tmp_path) as client:
+        client.post(
+            "/api/v1/admin/users",
+            headers=admin_headers(),
+            json={
+                "email": "operator@example.com",
+                "displayName": "Operator User",
+                "initialPassword": "correct horse battery",
+                "isAdmin": True,
+                "adminRole": "operator",
+            },
+        )
+        login = client.post(
+            "/api/v1/admin/session",
+            json={"email": "operator@example.com", "password": "correct horse battery"},
+        )
+        bearer_headers = {"Authorization": f"Bearer {login.json()['token']}"}
+        domain = client.post("/api/v1/admin/domains", headers=bearer_headers, json={"name": "example.com"})
+        denied = client.post(
+            "/api/v1/admin/users",
+            headers=bearer_headers,
+            json={
+                "email": "member@example.com",
+                "displayName": "Member User",
+                "initialPassword": "correct horse battery",
+            },
+        )
+
+    assert login.status_code == 200
+    assert domain.status_code == 201
+    assert denied.status_code == 403
+    assert denied.json()["detail"] == "Admin role lacks admin.users permission"
+
+
+def test_auditor_can_read_but_cannot_mutate_admin_metadata(tmp_path):
+    with make_client(tmp_path) as client:
+        client.post("/api/v1/admin/domains", headers=admin_headers(), json={"name": "example.com"})
+        client.post(
+            "/api/v1/admin/users",
+            headers=admin_headers(),
+            json={
+                "email": "auditor@example.com",
+                "displayName": "Auditor User",
+                "initialPassword": "correct horse battery",
+                "isAdmin": True,
+                "adminRole": "auditor",
+            },
+        )
+        login = client.post(
+            "/api/v1/admin/session",
+            json={"email": "auditor@example.com", "password": "correct horse battery"},
+        )
+        bearer_headers = {"Authorization": f"Bearer {login.json()['token']}"}
+        domains = client.get("/api/v1/admin/domains", headers=bearer_headers)
+        denied = client.post("/api/v1/admin/domains", headers=bearer_headers, json={"name": "other.example"})
+
+    assert login.status_code == 200
+    assert domains.status_code == 200
+    assert domains.json()[0]["name"] == "example.com"
+    assert denied.status_code == 403
+    assert denied.json()["detail"] == "Admin role lacks admin.manage permission"
+
+
+def test_non_admin_user_role_is_forced_to_member(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.post(
+            "/api/v1/admin/users",
+            headers=admin_headers(),
+            json={
+                "email": "member@example.com",
+                "displayName": "Member User",
+                "initialPassword": "correct horse battery",
+                "adminRole": "owner",
+            },
+        )
+
+    assert response.status_code == 201
+    assert response.json()["isAdmin"] is False
+    assert response.json()["adminRole"] == "member"
+
+
 def test_admin_can_suspend_and_reactivate_domain_user_and_mailbox(tmp_path):
     with make_client(tmp_path) as client:
         domain = client.post("/api/v1/admin/domains", headers=admin_headers(), json={"name": "example.com"}).json()

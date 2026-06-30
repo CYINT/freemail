@@ -116,6 +116,7 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         "admin-api-base-url",
         "admin-email",
         "admin-password",
+        "admin-role",
         "admin-token",
         "bootstrap-token",
         "admin-status",
@@ -133,6 +134,8 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
             failures.append(f"missing live mailbox UI marker: {marker}")
     if "initialPassword" not in html_text(parser):
         failures.append("missing initialPassword admin form field")
+    if "adminRole" not in html_text(parser) or "adminRole" not in js_text:
+        failures.append("missing adminRole user form field")
     for marker in [
         "fetch(",
         "/api/v1/mailbox/session",

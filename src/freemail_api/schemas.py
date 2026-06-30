@@ -45,6 +45,7 @@ class UserCreate(ApiModel):
     display_name: str = Field(min_length=1, max_length=160)
     initial_password: str = Field(min_length=12, max_length=512)
     is_admin: bool = False
+    admin_role: str = Field(default="member", pattern=r"^(member|auditor|operator|admin|owner)$")
 
 
 class StoredUserCreate(ApiModel):
@@ -52,6 +53,7 @@ class StoredUserCreate(ApiModel):
     display_name: str = Field(min_length=1, max_length=160)
     password_hash: str = Field(min_length=20, max_length=512)
     is_admin: bool = False
+    admin_role: str = Field(default="member", pattern=r"^(member|auditor|operator|admin|owner)$")
 
 
 class UserRecord(ApiModel):
@@ -59,6 +61,7 @@ class UserRecord(ApiModel):
     email: EmailStr
     display_name: str
     is_admin: bool
+    admin_role: str
     status: str
 
     model_config = ConfigDict(alias_generator=to_camel, from_attributes=True, populate_by_name=True)

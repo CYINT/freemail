@@ -95,6 +95,13 @@ The bootstrap endpoint requires `X-FreeMail-Bootstrap-Token`, refuses to run unl
 
 Admin password login verifies active administrator users against the stored Argon2id hash, creates a hashed bearer session, and stores no password material in the session table. Suspending an administrator invalidates existing bearer sessions because session resolution rechecks the user record.
 
+Administrator bearer sessions enforce coarse roles:
+
+- `owner`: full access, including granting or suspending administrators.
+- `admin`: read access plus normal user invitations; cannot grant administrator access.
+- `operator`: read access plus domain, mailbox, alias, DKIM, DNS, and suspension operations; cannot invite users or grant administrators.
+- `auditor`: read-only access to admin metadata, DNS guidance, and audit logs.
+
 DNS guidance returns the MX, SPF, DMARC, and DKIM records expected for a domain. The DNS verification endpoint accepts observed DNS values and returns a check list plus a `ready` boolean; it is intended as the repeatable gate before controlled-domain mail-flow tests.
 
 Admin status endpoints support abuse response for private beta. Domains, mailboxes, aliases, and DKIM keys accept `active` or `suspended`; users accept `invited` or `suspended`. Status changes are audit logged, suspended metadata blocks mailbox API access for managed mailboxes, and suspended domains, mailboxes, aliases, and DKIM keys are excluded from DNS guidance and Stalwart apply-plan exports where applicable.

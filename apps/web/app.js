@@ -204,6 +204,7 @@ adminUserForm?.addEventListener("submit", async (event) => {
       displayName: String(form.get("displayName") || "").trim(),
       initialPassword: String(form.get("initialPassword") || ""),
       isAdmin: form.get("isAdmin") === "on",
+      adminRole: String(form.get("adminRole") || "member"),
     },
     "User invited.",
   );
@@ -1071,7 +1072,7 @@ function renderAdminOverview({ domains, users, mailboxes, aliases, dkimKeys, aud
       statusActiveValue: "active",
       extraActions: [domainDnsAction],
     }),
-    adminTable("Users", users, ["id", "email", "displayName", "isAdmin", "status"], {
+    adminTable("Users", users, ["id", "email", "displayName", "isAdmin", "adminRole", "status"], {
       statusPath: "/api/v1/admin/users",
       statusActiveValue: "invited",
     }),

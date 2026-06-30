@@ -31,6 +31,7 @@ class AdminPrincipal:
     user_id: int
     email: str
     actor: str
+    role: str
 
 
 @dataclass(frozen=True)
@@ -126,7 +127,7 @@ def resolve_admin_session(
     if row is None:
         raise InvalidSessionError("Admin session not found")
     email = str(row["email"]).lower()
-    return AdminPrincipal(user_id=int(row["user_id"]), email=email, actor=f"admin:{email}")
+    return AdminPrincipal(user_id=int(row["user_id"]), email=email, actor=f"admin:{email}", role=str(row["admin_role"]))
 
 
 def revoke_admin_session(connection: sqlite3.Connection, token: str) -> None:
