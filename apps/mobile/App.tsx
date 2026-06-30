@@ -18,6 +18,7 @@ import {
 } from "react-native";
 
 import {
+  archiveMailboxMessage,
   ComposeAttachment,
   createMailboxPushNotification,
   createMailboxFolder,
@@ -37,6 +38,7 @@ import {
   MailMessageDetail,
   MailboxPushDevice,
   MailboxPushNotification,
+  moveMailboxMessage,
   renameMailboxFolder,
   registerMailboxPushDevice,
   revokeMailboxSession,
@@ -420,6 +422,42 @@ export default function App() {
     }
   }
 
+  async function archiveSelectedMessage() {
+    if (!session || !selectedMessage) {
+      return;
+    }
+    setLoading(true);
+    setStatus("Archiving message...");
+    try {
+      await archiveMailboxMessage(session, selectedMessage.folder, selectedMessage.messageId);
+      setSelectedMessage(null);
+      await refreshMailbox(session, folder);
+      setStatus("Message archived.");
+    } catch (error) {
+      setStatus(readableError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function moveSelectedMessage(targetFolder: string, successMessage: string) {
+    if (!session || !selectedMessage) {
+      return;
+    }
+    setLoading(true);
+    setStatus(`Moving message to ${targetFolder}...`);
+    try {
+      await moveMailboxMessage(session, selectedMessage.folder, selectedMessage.messageId, targetFolder);
+      setSelectedMessage(null);
+      await refreshMailbox(session, folder);
+      setStatus(successMessage);
+    } catch (error) {
+      setStatus(readableError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function addContactToDraft(contact: MailContact) {
     const existing = composeTo
       .split(",")
@@ -535,6 +573,15 @@ export default function App() {
                   </Pressable>
                   <Pressable style={styles.secondaryButton} onPress={forwardSelectedMessage}>
                     <Text>Forward</Text>
+                  </Pressable>
+                  <Pressable style={styles.secondaryButton} onPress={archiveSelectedMessage}>
+                    <Text>Archive</Text>
+                  </Pressable>
+                  <Pressable style={styles.secondaryButton} onPress={() => moveSelectedMessage("Junk Mail", "Message moved to spam.")}>
+                    <Text>Spam</Text>
+                  </Pressable>
+                  <Pressable style={styles.dangerButton} onPress={() => moveSelectedMessage("Deleted Items", "Message deleted.")}>
+                    <Text style={styles.dangerButtonText}>Delete</Text>
                   </Pressable>
                 </View>
               ) : null}
@@ -750,7 +797,7 @@ const styles = StyleSheet.create({
   listPanel: { backgroundColor: "#ffffff", borderRadius: 8, padding: 12, minHeight: 220 },
   readerPanel: { backgroundColor: "#ffffff", borderRadius: 8, padding: 12, minHeight: 140, gap: 10 },
   rowHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  inlineControls: { flexDirection: "row", alignItems: "center", gap: 8 },
+  inlineControls: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8 },
   flexInput: { flex: 1 },
   sectionTitle: { color: "#1c2638", fontSize: 18, fontWeight: "700" },
   folderChip: {

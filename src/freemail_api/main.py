@@ -163,7 +163,7 @@ COMPONENT_READINESS = {
     "mobile": {
         "status": "source-ready",
         "evidence": [
-            "Expo/React Native client with VPN API target, mailbox sessions, message workflows, folder controls, contacts, attachments, offline metadata cache, and push-device flows",
+            "Expo/React Native client with VPN API target, mailbox sessions, message workflows, archive/spam/delete actions, folder controls, contacts, attachments, offline metadata cache, and push-device flows",
             "mobile static QA, config validation, native prebuild drill, typecheck, and dependency audit in CI",
         ],
         "remainingReleaseEvidence": [

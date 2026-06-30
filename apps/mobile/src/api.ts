@@ -157,6 +157,38 @@ export async function loadMailboxAttachment(
   return response.blob();
 }
 
+export async function archiveMailboxMessage(
+  session: MailboxSession,
+  folder: string,
+  messageId: string,
+  archiveFolder = "Archive",
+): Promise<void> {
+  await request(session.apiBaseUrl, "/api/v1/mailbox/message/archive", {
+    method: "POST",
+    headers: {
+      ...mailboxHeaders(session),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ folder, messageId, archiveFolder }),
+  });
+}
+
+export async function moveMailboxMessage(
+  session: MailboxSession,
+  folder: string,
+  messageId: string,
+  targetFolder: string,
+): Promise<void> {
+  await request(session.apiBaseUrl, "/api/v1/mailbox/message/move", {
+    method: "POST",
+    headers: {
+      ...mailboxHeaders(session),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ folder, messageId, targetFolder }),
+  });
+}
+
 export async function registerMailboxPushDevice(
   session: MailboxSession,
   deviceId: string,
