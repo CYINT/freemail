@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 import json
 from pathlib import Path
 from typing import Any
@@ -141,7 +142,7 @@ def _check_deliverability_evidence(options: PrivateBetaGateOptions) -> dict[str,
         abuse_complaints = -1
     passed = (
         payload.get("passed") is True
-        and bool(str(payload.get("checkedAt", "")).strip())
+        and _is_timezone_aware_iso8601(payload.get("checkedAt"))
         and (not expected_domain or evidence_domain == expected_domain)
         and payload.get("spfAligned") is True
         and payload.get("dmarcAligned") is True
@@ -177,7 +178,14 @@ def _check_queue_evidence(path: Path | None) -> dict[str, Any]:
     pending = _coerce_int(payload.get("pending", payload.get("pendingCount", payload.get("pendingMessages", 0))))
     due = _coerce_int(payload.get("due", payload.get("dueCount", payload.get("dueMessages", 0))))
     clear = payload.get("clear", pending == 0 and due == 0)
-    passed = payload.get("passed", True) is True and clear is True and pending == 0 and due == 0
+    reviewed_at = payload.get("reviewedAt")
+    passed = (
+        payload.get("passed", True) is True
+        and clear is True
+        and pending == 0
+        and due == 0
+        and _is_timezone_aware_iso8601(reviewed_at)
+    )
     return _check(
         "queue-evidence",
         passed,
@@ -188,7 +196,7 @@ def _check_queue_evidence(path: Path | None) -> dict[str, Any]:
                 "clear": clear,
                 "pending": pending,
                 "due": due,
-                "reviewedAt": payload.get("reviewedAt"),
+                "reviewedAt": reviewed_at,
             },
         ),
     )
@@ -280,3 +288,16 @@ def _coerce_int(value: object) -> int:
         return int(value or 0)
     except (TypeError, ValueError):
         return -1
+
+
+def _is_timezone_aware_iso8601(value: object) -> bool:
+    text = str(value or "").strip()
+    if not text:
+        return False
+    if text.endswith("Z"):
+        text = f"{text[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return False
+    return parsed.tzinfo is not None and parsed.utcoffset() is not None

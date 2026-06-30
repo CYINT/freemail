@@ -114,7 +114,10 @@ def test_resolve_observed_dns_reports_missing_answers(monkeypatch):
 
 def test_private_beta_gate_accepts_utf8_bom_json_evidence(tmp_path):
     queue = tmp_path / "queue.json"
-    queue.write_text('\ufeff{"passed": true, "pending": 0, "due": 0}', encoding="utf-8")
+    queue.write_text(
+        '\ufeff{"passed": true, "pending": 0, "due": 0, "reviewedAt": "2026-06-30T00:00:00Z"}',
+        encoding="utf-8",
+    )
 
     check = private_beta_gate._check_queue_evidence(queue)
 
@@ -170,12 +173,38 @@ def test_private_beta_gate_rejects_non_clear_queue_helper_output(tmp_path):
 
 def test_private_beta_gate_rejects_malformed_queue_counts(tmp_path):
     queue = tmp_path / "queue.json"
-    queue.write_text(json.dumps({"passed": True, "pendingCount": "many", "dueCount": 0}), encoding="utf-8")
+    queue.write_text(
+        json.dumps({"passed": True, "pendingCount": "many", "dueCount": 0, "reviewedAt": "2026-06-30T00:00:00Z"}),
+        encoding="utf-8",
+    )
 
     check = private_beta_gate._check_queue_evidence(queue)
 
     assert check["status"] == "fail"
     assert check["details"]["pending"] == -1
+
+
+def test_private_beta_gate_rejects_queue_without_review_timestamp(tmp_path):
+    queue = tmp_path / "queue.json"
+    queue.write_text(json.dumps({"passed": True, "pending": 0, "due": 0}), encoding="utf-8")
+
+    check = private_beta_gate._check_queue_evidence(queue)
+
+    assert check["status"] == "fail"
+    assert check["details"]["reviewedAt"] is None
+
+
+def test_private_beta_gate_rejects_timezone_free_queue_review_timestamp(tmp_path):
+    queue = tmp_path / "queue.json"
+    queue.write_text(
+        json.dumps({"passed": True, "pending": 0, "due": 0, "reviewedAt": "2026-06-30T00:00:00"}),
+        encoding="utf-8",
+    )
+
+    check = private_beta_gate._check_queue_evidence(queue)
+
+    assert check["status"] == "fail"
+    assert check["details"]["reviewedAt"] == "2026-06-30T00:00:00"
 
 
 def test_private_beta_gate_rejects_malformed_abuse_complaint_count(tmp_path):
@@ -203,6 +232,58 @@ def test_private_beta_gate_rejects_malformed_abuse_complaint_count(tmp_path):
 
     assert check["status"] == "fail"
     assert check["details"]["abuseComplaints"] == -1
+
+
+def test_private_beta_gate_rejects_malformed_deliverability_checked_at(tmp_path):
+    deliverability = tmp_path / "deliverability.json"
+    deliverability.write_text(
+        json.dumps(
+            {
+                "passed": True,
+                "domain": "example.com",
+                "checkedAt": "after DNS review",
+                "spfAligned": True,
+                "dmarcAligned": True,
+                "dkimAligned": True,
+                "queueReviewed": True,
+                "bounceOrRetryReviewed": True,
+                "abuseComplaints": 0,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    check = private_beta_gate._check_deliverability_evidence(
+        PrivateBetaGateOptions(domain="example.com", deliverability_evidence=deliverability)
+    )
+
+    assert check["status"] == "fail"
+
+
+def test_private_beta_gate_rejects_timezone_free_deliverability_checked_at(tmp_path):
+    deliverability = tmp_path / "deliverability.json"
+    deliverability.write_text(
+        json.dumps(
+            {
+                "passed": True,
+                "domain": "example.com",
+                "checkedAt": "2026-06-30T00:00:00",
+                "spfAligned": True,
+                "dmarcAligned": True,
+                "dkimAligned": True,
+                "queueReviewed": True,
+                "bounceOrRetryReviewed": True,
+                "abuseComplaints": 0,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    check = private_beta_gate._check_deliverability_evidence(
+        PrivateBetaGateOptions(domain="example.com", deliverability_evidence=deliverability)
+    )
+
+    assert check["status"] == "fail"
 
 
 def test_private_beta_gate_requires_beta_evidence_when_enabled():
@@ -246,7 +327,10 @@ def test_private_beta_gate_accepts_complete_beta_evidence(tmp_path):
         ),
         encoding="utf-8",
     )
-    queue.write_text(json.dumps({"passed": True, "pending": 0, "due": 0}), encoding="utf-8")
+    queue.write_text(
+        json.dumps({"passed": True, "pending": 0, "due": 0, "reviewedAt": "2026-06-30T00:00:00Z"}),
+        encoding="utf-8",
+    )
     deliverability.write_text(
         json.dumps(
             {

@@ -66,7 +66,7 @@ Generate queue evidence with the Stalwart queue helper after controlled mail-flo
 .\.venv\Scripts\python.exe scripts\qa_stalwart_queue.py > .freemail-qa\queue-example.com.json
 ```
 
-The queue JSON must show a clear queue. The private-beta gate accepts the helper output fields `passed`, `clear`, `pending`, `due`, `pendingCount`, `dueCount`, `reviewedAt`, and `messages`; nonzero pending or due counts fail the gate.
+The queue JSON must show a clear queue and a timezone-aware ISO-8601 `reviewedAt` timestamp. The private-beta gate accepts the helper output fields `passed`, `clear`, `pending`, `due`, `pendingCount`, `dueCount`, `reviewedAt`, and `messages`; nonzero pending or due counts fail the gate.
 
 The acceptance JSON must include:
 
@@ -94,6 +94,8 @@ The deliverability evidence JSON must include:
   "abuseComplaints": 0
 }
 ```
+
+The `checkedAt` value must be a timezone-aware ISO-8601 timestamp.
 
 ## Provenance
 
