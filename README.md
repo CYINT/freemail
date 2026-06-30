@@ -541,6 +541,21 @@ Generate deliverability evidence from the controlled mail-flow and queue artifac
 
 The deliverability helper writes credential-free JSON and exits nonzero until mail-flow passed, DKIM aligns with the controlled domain, the queue is clear, SPF/DMARC are operator-confirmed, bounce/retry state has been reviewed, and known abuse complaints are zero.
 
+Record decision-owner acceptance after the controlled-domain packet and known limitations are reviewed:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\collect_private_beta_acceptance.py `
+  --domain example.com `
+  --output .freemail-qa\private-beta\private-beta-acceptance.example.com.json `
+  --decision-owner "Decision Owner" `
+  --accepted `
+  --known-limitation "Private beta only; do not expose FreeMail to the public internet." `
+  --known-limitation "Controlled-domain DNS, mail-flow, queue, mail-core apply, deliverability, backup, and restore evidence must be current." `
+  --force
+```
+
+The acceptance helper writes credential-free JSON and exits nonzero unless acceptance is explicit, the decision owner is present, the access boundary mentions VPN, and at least one known limitation is recorded.
+
 ## VPN-Only Deployment
 
 Read `docs/deployment-vpn.md`. The intended local hostname is:

@@ -268,6 +268,21 @@ The acceptance JSON must include:
 
 The `acceptedAt` value must be a timezone-aware ISO-8601 timestamp.
 
+Operators can generate decision-owner acceptance evidence after the controlled-domain packet and known limitations are reviewed:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\collect_private_beta_acceptance.py `
+  --domain example.com `
+  --output .freemail-qa\private-beta\private-beta-acceptance.example.com.json `
+  --decision-owner "Decision Owner" `
+  --accepted `
+  --known-limitation "Private beta only; do not expose FreeMail to the public internet." `
+  --known-limitation "Controlled-domain DNS, mail-flow, queue, mail-core apply, deliverability, backup, and restore evidence must be current." `
+  --force
+```
+
+The helper exits nonzero unless acceptance is explicit, the decision owner is present, the access boundary mentions VPN, and at least one known limitation is recorded. It writes credential-free JSON only.
+
 The deliverability evidence JSON must include:
 
 ```json
