@@ -18,6 +18,7 @@ REQUIRED_CI_STEPS = (
     "Lint",
     "Repository secret scan",
     "License policy scan",
+    "Open-source readiness",
     "Tests",
     "Browser webmail QA",
     "Mobile static QA",

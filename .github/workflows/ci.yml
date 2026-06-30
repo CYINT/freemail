@@ -27,6 +27,8 @@ jobs:
         run: python scripts/qa_repo_secrets.py
       - name: License policy scan
         run: python scripts/qa_license_policy.py
+      - name: Open-source readiness
+        run: python scripts/open_source_readiness.py
       - name: Install browser QA runtime
         run: python -m playwright install --with-deps chromium
       - name: Tests

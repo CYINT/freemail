@@ -59,7 +59,10 @@ Run repository hygiene scans before publishing changes:
 ```powershell
 .\.venv\Scripts\python.exe scripts\qa_repo_secrets.py
 .\.venv\Scripts\python.exe scripts\qa_license_policy.py
+.\.venv\Scripts\python.exe scripts\open_source_readiness.py
 ```
+
+`scripts\open_source_readiness.py` verifies public-repository hygiene: AGPL license files, contributor/security documents, third-party notices, CI publication gates, ignored secret/signing-material boundaries, dependency-license policy, and VPN/private-beta disclosure. It intentionally reports product-release blockers separately from open-source publication readiness.
 
 ## Admin API
 

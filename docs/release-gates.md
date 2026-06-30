@@ -118,6 +118,7 @@ The gate verifies:
 - the `Upload coverage to Codecov` step completed successfully in that exact CI run
 - tracked repository files pass the secret/signing-material scan
 - direct runtime dependencies pass the AGPL-compatible license policy scan
+- open-source readiness passes for license, contributor, security, third-party notice, CI, ignored-secret, and VPN/private-beta disclosure posture
 - `docker compose config --quiet`
 - resolved Compose port bindings for the API, web, and mail-core profiles are loopback-only
 - metadata and mail-store backup evidence files exist, are non-empty, and have SHA-256 checksums recorded in the gate output
