@@ -2,10 +2,34 @@
 
 FreeMail release gates are intended for private-beta and later release candidates. They do not make the stack public; the current deployment posture remains VPN-only.
 
+After collecting backups, mobile evidence, private-beta gate output, and release notes, create a top-level release evidence manifest:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\create_release_evidence_manifest.py `
+  --output .freemail-qa\release\release-evidence-manifest.json `
+  --metadata-backup .freemail-qa\backups\metadata.json `
+  --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
+  --mobile-release-evidence .freemail-qa\mobile-release-evidence.json `
+  --require-mobile-store-submission `
+  --private-beta-evidence .freemail-qa\private-beta-gate-example.com.json `
+  --release-notes docs\release-notes\v0.1.0-private-beta.md `
+  --release-version v0.1.0-private-beta
+```
+
+The manifest is credential-free. It stores release-packet paths relative to the manifest location when possible, plus the candidate version and mobile store-submission requirement. Keep the evidence files themselves outside Git unless the file is intentionally public, such as release notes.
+
 Before the hard gate, inspect the local release packet without touching Docker, GitHub, or live runtime URLs:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\release_packet_status.py `
+  --manifest .freemail-qa\release\release-evidence-manifest.json
+```
+
+Explicit artifact flags override manifest values when an artifact has been relocated:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\release_packet_status.py `
+  --manifest .freemail-qa\release\release-evidence-manifest.json `
   --metadata-backup .freemail-qa\backups\metadata.json `
   --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
   --mobile-release-evidence .freemail-qa\mobile-release-evidence.json `
@@ -21,6 +45,14 @@ Run the gate from a clean checkout after pushing the candidate commit to `CYINT/
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\release_gate.py `
+  --manifest .freemail-qa\release\release-evidence-manifest.json
+```
+
+The release gate also accepts explicit artifact flags, which override manifest values:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\release_gate.py `
+  --manifest .freemail-qa\release\release-evidence-manifest.json `
   --metadata-backup .freemail-qa\backups\metadata.json `
   --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
   --mobile-release-evidence .freemail-qa\mobile-release-evidence.json `

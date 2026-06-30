@@ -369,10 +369,32 @@ Restore drills should target a separate volume before replacing the active Stalw
 
 Read `docs/upgrade.md` and `docs/release-gates.md` before private-beta upgrades or release-candidate work.
 
+Create a top-level release evidence manifest after the private-beta packet, backups, mobile evidence, and release notes are ready:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\create_release_evidence_manifest.py `
+  --output .freemail-qa\release\release-evidence-manifest.json `
+  --metadata-backup .freemail-qa\backups\metadata.json `
+  --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
+  --mobile-release-evidence .freemail-qa\mobile-release-evidence.json `
+  --require-mobile-store-submission `
+  --private-beta-evidence .freemail-qa\private-beta-gate-example.com.json `
+  --release-notes docs\release-notes\v0.1.0-private-beta.md `
+  --release-version v0.1.0-private-beta
+```
+
 Before running the hard release gate, inspect the local release packet inventory:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\release_packet_status.py `
+  --manifest .freemail-qa\release\release-evidence-manifest.json
+```
+
+Explicit artifact flags can override manifest entries when evidence is stored in a different location:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\release_packet_status.py `
+  --manifest .freemail-qa\release\release-evidence-manifest.json `
   --metadata-backup .freemail-qa\backups\metadata.json `
   --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
   --mobile-release-evidence .freemail-qa\mobile-release-evidence.json `
@@ -388,6 +410,14 @@ Run the local release gate only after the candidate commit has been pushed and G
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\release_gate.py `
+  --manifest .freemail-qa\release\release-evidence-manifest.json
+```
+
+The release gate also accepts explicit artifact flags, which override manifest values:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\release_gate.py `
+  --manifest .freemail-qa\release\release-evidence-manifest.json `
   --metadata-backup .freemail-qa\backups\metadata.json `
   --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
   --mobile-release-evidence .freemail-qa\mobile-release-evidence.json `

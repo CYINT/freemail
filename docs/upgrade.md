@@ -48,7 +48,8 @@ $env:FREEMAIL_RELEASE_COMMIT=(git rev-parse HEAD)
 .\.venv\Scripts\python.exe scripts\qa_mail_core.py --strict
 Invoke-RestMethod https://freemail.kuzuryu.ai/health
 Invoke-RestMethod https://freemail.kuzuryu.ai/api/v1/mail-core/readiness
-.\.venv\Scripts\python.exe scripts\release_gate.py `
+.\.venv\Scripts\python.exe scripts\create_release_evidence_manifest.py `
+  --output .freemail-qa\release\release-evidence-manifest.json `
   --metadata-backup .freemail-qa\backups\metadata.json `
   --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
   --mobile-release-evidence .freemail-qa\mobile-release-evidence.json `
@@ -56,6 +57,10 @@ Invoke-RestMethod https://freemail.kuzuryu.ai/api/v1/mail-core/readiness
   --private-beta-evidence .freemail-qa\private-beta-gate-example.com.json `
   --release-notes docs\release-notes\v0.1.0-private-beta.md `
   --release-version v0.1.0-private-beta
+.\.venv\Scripts\python.exe scripts\release_packet_status.py `
+  --manifest .freemail-qa\release\release-evidence-manifest.json
+.\.venv\Scripts\python.exe scripts\release_gate.py `
+  --manifest .freemail-qa\release\release-evidence-manifest.json
 ```
 
 ## Rollback
