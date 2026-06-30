@@ -3,6 +3,7 @@ from __future__ import annotations
 import sqlite3
 from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 
 from .schemas import AliasCreate, BootstrapAdminCreate, DkimKeyCreate, DomainCreate, MailboxCreate, UserCreate
 
@@ -145,6 +146,53 @@ STATUS_TABLES = {
     "dkim_keys": {"target_type": "dkim_key", "allowed": {"active", "suspended"}},
 }
 
+METADATA_SCHEMA_REVISION = "sqlite-schema-v1"
+REQUIRED_TABLE_COLUMNS = {
+    "domains": {"id", "name", "status", "created_at"},
+    "users": {"id", "email", "display_name", "password_hash", "is_admin", "status", "created_at"},
+    "mailboxes": {"id", "user_id", "local_part", "domain_id", "address", "status", "created_at"},
+    "aliases": {"id", "source", "destination", "status", "created_at"},
+    "audit_log": {"id", "actor", "action", "target_type", "target_id", "created_at"},
+    "dkim_keys": {
+        "id",
+        "domain_id",
+        "selector",
+        "dns_name",
+        "public_txt",
+        "private_key_pem",
+        "status",
+        "created_at",
+    },
+    "mailbox_sessions": {"id", "token_hash", "email", "encrypted_password", "expires_at", "created_at"},
+    "outbound_send_events": {"id", "mailbox_email", "recipient_count", "created_at"},
+    "mailbox_push_devices": {
+        "id",
+        "mailbox_email",
+        "device_id",
+        "platform",
+        "push_token_hash",
+        "encrypted_push_token",
+        "provider",
+        "enabled",
+        "created_at",
+        "updated_at",
+    },
+    "mailbox_push_notifications": {
+        "id",
+        "mailbox_email",
+        "device_id",
+        "provider",
+        "encrypted_push_token",
+        "title",
+        "body",
+        "status",
+        "provider_message_id",
+        "last_error",
+        "created_at",
+        "delivered_at",
+    },
+}
+
 
 def connect(database_path: str) -> sqlite3.Connection:
     path = Path(database_path)
@@ -160,6 +208,32 @@ def initialize(database_path: str) -> None:
     with connect(database_path) as connection:
         connection.executescript(SCHEMA)
         _migrate_schema(connection)
+
+
+def metadata_readiness(connection: sqlite3.Connection) -> dict[str, Any]:
+    checks: list[dict[str, Any]] = []
+    for table, required_columns in REQUIRED_TABLE_COLUMNS.items():
+        row = connection.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+            [table],
+        ).fetchone()
+        exists = row is not None
+        actual_columns = {column["name"] for column in connection.execute(f"PRAGMA table_info({table})")} if exists else set()
+        missing_columns = sorted(required_columns - actual_columns)
+        checks.append(
+            {
+                "name": table,
+                "status": "pass" if exists and not missing_columns else "fail",
+                "missingColumns": missing_columns,
+            }
+        )
+    ready = all(check["status"] == "pass" for check in checks)
+    return {
+        "status": "ready" if ready else "not-ready",
+        "backend": "sqlite",
+        "schemaRevision": METADATA_SCHEMA_REVISION,
+        "checks": checks,
+    }
 
 
 def list_rows(connection: sqlite3.Connection, table: str) -> list[sqlite3.Row]:

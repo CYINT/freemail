@@ -11,6 +11,13 @@ def test_private_beta_gate_runtime_only_checks_vpn_boundary(monkeypatch):
             return {"status": "ok", "vpnOnly": True, "release": {"commit": "unknown"}}
         if url.endswith("/deployment"):
             return {"exposure": "vpn-only", "publicInternet": False, "requiredBoundary": "Dragonscale/VPN clients only"}
+        if url.endswith("/metadata/readiness"):
+            return {
+                "status": "ready",
+                "backend": "sqlite",
+                "schemaRevision": "sqlite-schema-v1",
+                "checks": [{"name": "domains", "status": "pass", "missingColumns": []}],
+            }
         return {"status": "ready", "tcpReachable": True, "protocolReady": True}
 
     monkeypatch.setattr("freemail_api.release_gate._fetch_json", fake_fetch)
@@ -21,6 +28,7 @@ def test_private_beta_gate_runtime_only_checks_vpn_boundary(monkeypatch):
     assert [check["name"] for check in result["checks"]] == [
         "runtime-health",
         "deployment-boundary",
+        "metadata-readiness",
         "mail-core-readiness",
     ]
 

@@ -20,6 +20,7 @@ class ReleaseGateOptions:
     branch: str = "main"
     health_url: str | None = "https://freemail.kuzuryu.ai/health"
     deployment_url: str | None = "https://freemail.kuzuryu.ai/api/v1/deployment"
+    metadata_readiness_url: str | None = "https://freemail.kuzuryu.ai/api/v1/metadata/readiness"
     readiness_url: str | None = "https://freemail.kuzuryu.ai/api/v1/mail-core/readiness"
     metadata_backup: Path | None = None
     mail_store_backup: Path | None = None
@@ -40,7 +41,15 @@ def run_release_gate(options: ReleaseGateOptions) -> dict[str, Any]:
     if not options.skip_backup_evidence:
         checks.extend(_check_backup_evidence(options.metadata_backup, options.mail_store_backup))
     if not options.skip_runtime:
-        checks.extend(_check_runtime(options.health_url, options.deployment_url, options.readiness_url, commit))
+        checks.extend(
+            _check_runtime(
+                options.health_url,
+                options.deployment_url,
+                options.readiness_url,
+                commit,
+                metadata_readiness_url=options.metadata_readiness_url,
+            )
+        )
 
     passed = all(check["status"] == "pass" for check in checks)
     return {
@@ -143,6 +152,8 @@ def _check_runtime(
     deployment_url: str | None,
     readiness_url: str | None,
     commit: str,
+    *,
+    metadata_readiness_url: str | None = None,
 ) -> list[dict[str, Any]]:
     checks: list[dict[str, Any]] = []
     if health_url:
@@ -178,6 +189,24 @@ def _check_runtime(
                 },
             )
         )
+    if metadata_readiness_url:
+        metadata = _fetch_json(metadata_readiness_url)
+        checks.append(
+            _check(
+                "metadata-readiness",
+                metadata.get("status") == "ready"
+                and metadata.get("backend") == "sqlite"
+                and bool(str(metadata.get("schemaRevision", "")).strip())
+                and _checks_passed(metadata.get("checks")),
+                {
+                    "url": metadata_readiness_url,
+                    "status": metadata.get("status"),
+                    "backend": metadata.get("backend"),
+                    "schemaRevision": metadata.get("schemaRevision"),
+                    "checks": metadata.get("checks"),
+                },
+            )
+        )
     if readiness_url:
         readiness = _fetch_json(readiness_url)
         checks.append(
@@ -195,6 +224,12 @@ def _check_runtime(
             )
         )
     return checks
+
+
+def _checks_passed(checks: object) -> bool:
+    return isinstance(checks, list) and bool(checks) and all(
+        isinstance(check, dict) and check.get("status") == "pass" for check in checks
+    )
 
 
 def _fetch_json(url: str) -> dict[str, Any]:

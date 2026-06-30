@@ -255,6 +255,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "requiredBoundary": "Dragonscale/VPN clients only",
         }
 
+    @app.get("/api/v1/metadata/readiness")
+    def metadata_readiness(connection: sqlite3.Connection = Depends(get_connection)) -> dict[str, object]:
+        return database.metadata_readiness(connection)
+
     @app.get("/api/v1/mail-core/readiness")
     def mail_core_readiness() -> dict[str, object]:
         return probe_mail_core(

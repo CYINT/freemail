@@ -31,6 +31,13 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
             return {"status": "ok", "vpnOnly": True, "release": {"commit": "abc123"}}
         if url.endswith("/deployment"):
             return {"exposure": "vpn-only", "publicInternet": False, "requiredBoundary": "Dragonscale/VPN clients only"}
+        if url.endswith("/metadata/readiness"):
+            return {
+                "status": "ready",
+                "backend": "sqlite",
+                "schemaRevision": "sqlite-schema-v1",
+                "checks": [{"name": "domains", "status": "pass", "missingColumns": []}],
+            }
         return {"status": "ready", "tcpReachable": True, "protocolReady": True}
 
     monkeypatch.setattr(release_gate, "_command", fake_command)
@@ -51,6 +58,7 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
         "mail-store-backup",
         "runtime-health",
         "deployment-boundary",
+        "metadata-readiness",
         "mail-core-readiness",
     }
 
@@ -103,6 +111,31 @@ def test_runtime_deployment_boundary_requires_vpn_only(monkeypatch):
 
     assert checks[0]["name"] == "deployment-boundary"
     assert checks[0]["status"] == "fail"
+
+
+def test_runtime_metadata_readiness_requires_ready_sqlite_schema(monkeypatch):
+    monkeypatch.setattr(
+        release_gate,
+        "_fetch_json",
+        lambda _url: {
+            "status": "not-ready",
+            "backend": "sqlite",
+            "schemaRevision": "sqlite-schema-v1",
+            "checks": [{"name": "users", "status": "fail", "missingColumns": ["status"]}],
+        },
+    )
+
+    checks = release_gate._check_runtime(
+        None,
+        None,
+        None,
+        "abc123",
+        metadata_readiness_url="https://freemail.kuzuryu.ai/api/v1/metadata/readiness",
+    )
+
+    assert checks[0]["name"] == "metadata-readiness"
+    assert checks[0]["status"] == "fail"
+    assert checks[0]["details"]["checks"][0]["missingColumns"] == ["status"]
 
 
 def test_backup_file_check_requires_non_empty_file(tmp_path):

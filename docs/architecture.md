@@ -33,6 +33,8 @@ Future migrations can move this store to PostgreSQL without changing the externa
 
 SQLite is the only supported FreeMail API metadata backend today. The current code passes `sqlite3.Connection` through the API, backup/restore tooling, session handling, outbound policy, Stalwart export, and tests. Do not present PostgreSQL as supported until those boundaries are moved behind a database adapter and covered by CI.
 
+Runtime metadata readiness is exposed at `/api/v1/metadata/readiness`. The endpoint reports the supported backend (`sqlite`), schema revision, and required table/column checks without returning database paths or secrets. Release and private-beta gates require this endpoint to be ready before a candidate can be accepted.
+
 PostgreSQL readiness requires:
 
 - a configured database URL setting that does not break the existing SQLite default

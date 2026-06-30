@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
-from freemail_api.main import app
+from freemail_api.main import app, create_app
+from freemail_api.settings import Settings
 
 
 client = TestClient(app)
@@ -37,3 +38,18 @@ def test_deployment_is_not_public_internet():
     assert payload["hostname"] == "freemail.kuzuryu.ai"
     assert payload["exposure"] == "vpn-only"
     assert payload["publicInternet"] is False
+
+
+def test_metadata_readiness_reports_sqlite_schema_without_paths(tmp_path):
+    database_path = tmp_path / "freemail.sqlite"
+    isolated_app = create_app(Settings(database_path=str(database_path)))
+    with TestClient(isolated_app) as isolated_client:
+        response = isolated_client.get("/api/v1/metadata/readiness")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "ready"
+    assert payload["backend"] == "sqlite"
+    assert payload["schemaRevision"] == "sqlite-schema-v1"
+    assert all(check["status"] == "pass" for check in payload["checks"])
+    assert "path" not in payload

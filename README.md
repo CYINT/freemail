@@ -343,7 +343,7 @@ Run the local release gate only after the candidate commit has been pushed and G
   --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz
 ```
 
-The release gate checks clean Git state, remote SHA, GitHub Actions CI, Compose config, backup evidence, VPN-only health/deployment metadata, and mail-core protocol readiness.
+The release gate checks clean Git state, remote SHA, GitHub Actions CI, Compose config, backup evidence, VPN-only health/deployment metadata, metadata-store readiness, and mail-core protocol readiness.
 
 Run the private-beta runtime gate during development:
 

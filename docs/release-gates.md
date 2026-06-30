@@ -19,6 +19,7 @@ The gate verifies:
 - metadata and mail-store backup evidence files exist, are non-empty, and have SHA-256 checksums recorded in the gate output
 - `https://freemail.kuzuryu.ai/health` reports VPN-only health and release metadata
 - `https://freemail.kuzuryu.ai/api/v1/deployment` reports `vpn-only` exposure and `publicInternet: false`
+- `https://freemail.kuzuryu.ai/api/v1/metadata/readiness` reports the expected SQLite metadata schema revision and required table/column checks
 - `https://freemail.kuzuryu.ai/api/v1/mail-core/readiness` reports SMTP, submission, IMAP, and JMAP readiness
 
 For offline development only, individual external checks can be skipped:
@@ -91,6 +92,7 @@ Release provenance for a candidate consists of:
 - release-gate JSON output, including backup file SHA-256 checksums
 - private-beta gate JSON output for each controlled domain, including backup file SHA-256 checksums
 - deliverability/abuse evidence for each controlled domain
+- metadata readiness evidence for the active API database
 - metadata backup path and checksum, stored outside Git
 - mail-store backup path and checksum, stored outside Git
 - deployment hostname and exposure boundary evidence

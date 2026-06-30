@@ -29,6 +29,7 @@ class PrivateBetaGateOptions:
     skip_evidence: bool = False
     health_url: str | None = "https://freemail.kuzuryu.ai/health"
     deployment_url: str | None = "https://freemail.kuzuryu.ai/api/v1/deployment"
+    metadata_readiness_url: str | None = "https://freemail.kuzuryu.ai/api/v1/metadata/readiness"
     readiness_url: str | None = "https://freemail.kuzuryu.ai/api/v1/mail-core/readiness"
     skip_runtime: bool = False
 
@@ -36,7 +37,15 @@ class PrivateBetaGateOptions:
 def run_private_beta_gate(options: PrivateBetaGateOptions) -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
     if not options.skip_runtime:
-        checks.extend(_check_runtime(options.health_url, options.deployment_url, options.readiness_url, "unknown"))
+        checks.extend(
+            _check_runtime(
+                options.health_url,
+                options.deployment_url,
+                options.readiness_url,
+                "unknown",
+                metadata_readiness_url=options.metadata_readiness_url,
+            )
+        )
     if not options.skip_dns:
         checks.append(_check_dns_posture(options))
     if not options.skip_evidence:
