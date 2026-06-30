@@ -14,8 +14,8 @@ The current mobile implementation is a source-level foundation, not a production
 - Folder-scoped search and contacts loaded from mailbox headers.
 - Attachment metadata display, authenticated download/share handling, and bounded document-picker compose attachments.
 - Secure offline metadata cache for the last loaded folder, messages, and contacts.
-- Bearer-authenticated push-device registration, listing, and revocation contract.
-- Future provider-specific push delivery, richer attachment handling, and native release workflows.
+- Bearer-authenticated push-device registration, listing, revocation, and delivery-status contract.
+- Future credential-backed APNS/FCM adapters and native release workflows.
 
 ## Development
 
@@ -46,7 +46,7 @@ Static mobile QA runs from the repository root and does not require a native too
 
 The static gate checks that the mobile client uses provider-neutral FreeMail language, references the expected mailbox API endpoints for sessions, snapshots, search, contacts, folders, message details, attachments, push-device registration, and send, defaults to the VPN hostname, and does not persist mailbox passwords or bearer sessions in insecure browser-style storage. It also guards the document-picker/base64 compose attachment path plus the authenticated attachment download/share path. The offline cache stores mailbox metadata only and the static gate fails if credential markers are added to that cache path.
 
-Push-provider delivery is a contract surface at this stage. The mobile client can register and revoke a provider token through the FreeMail API, and the API stores only a hashed token. Provider-specific APNS/FCM delivery remains a future optional integration so the AGPL core stays provider-neutral.
+Push-provider delivery is provider-neutral at this stage. The mobile client can register and revoke a provider token through the FreeMail API, send a push test, and read recent notification delivery status. The API stores only a hashed provider token. `contract-only` and `development` registrations use a deterministic development provider; APNS/FCM registrations remain queued as `pending_provider` until an operator adds a credential-backed adapter.
 
 ## Native Release Readiness
 

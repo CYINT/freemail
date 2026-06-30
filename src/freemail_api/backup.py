@@ -24,7 +24,12 @@ def export_metadata_backup(
         "schemaVersion": BACKUP_SCHEMA_VERSION,
         "generatedAt": generated_at or datetime.now(UTC).isoformat(timespec="seconds"),
         "tables": {table: _export_table(connection, table) for table in BACKUP_TABLES},
-        "excludedTables": ["mailbox_sessions", "outbound_send_events", "mailbox_push_devices"],
+        "excludedTables": [
+            "mailbox_sessions",
+            "outbound_send_events",
+            "mailbox_push_devices",
+            "mailbox_push_notifications",
+        ],
     }
 
 

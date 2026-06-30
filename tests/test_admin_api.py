@@ -503,6 +503,102 @@ def test_mailbox_push_device_register_list_and_revoke(tmp_path, monkeypatch):
     assert row["push_token_hash"] != "provider-token-123"
 
 
+def test_mailbox_push_notifications_require_bearer_session(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.post(
+            "/api/v1/mailbox/push/notifications",
+            json={"title": "FreeMail", "body": "New message"},
+        )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Mailbox credentials required"
+
+
+def test_mailbox_push_notifications_dispatch_development_provider(tmp_path, monkeypatch):
+    class Snapshot:
+        def as_dict(self):
+            return {"email": "admin@example.com", "folders": [], "messages": []}
+
+    monkeypatch.setattr("freemail_api.main.list_mailbox_snapshot", lambda **_kwargs: Snapshot())
+
+    with make_client(tmp_path) as client:
+        session_response = client.post(
+            "/api/v1/mailbox/session",
+            json={"email": "admin@example.com", "password": "secret"},
+        )
+        token = session_response.json()["token"]
+        headers = {"Authorization": f"Bearer {token}"}
+        client.post(
+            "/api/v1/mailbox/push/devices",
+            headers=headers,
+            json={
+                "deviceId": "device-123",
+                "platform": "development",
+                "pushToken": "provider-token-123",
+                "provider": "development",
+            },
+        )
+        create_response = client.post(
+            "/api/v1/mailbox/push/notifications",
+            headers=headers,
+            json={"title": "FreeMail", "body": "New message"},
+        )
+        list_response = client.get("/api/v1/mailbox/push/notifications", headers=headers)
+
+    assert create_response.status_code == 200
+    created = create_response.json()
+    assert len(created) == 1
+    assert created[0]["mailboxEmail"] == "admin@example.com"
+    assert created[0]["deviceId"] == "device-123"
+    assert created[0]["provider"] == "development"
+    assert created[0]["status"] == "delivered"
+    assert created[0]["providerMessageId"].startswith("development:")
+    assert created[0]["lastError"] is None
+    assert list_response.status_code == 200
+    assert list_response.json()[0]["status"] == "delivered"
+    with sqlite3.connect(tmp_path / "freemail.sqlite") as connection:
+        connection.row_factory = sqlite3.Row
+        row = connection.execute("SELECT COUNT(*) AS count FROM mailbox_push_notifications").fetchone()
+    assert row["count"] == 1
+
+
+def test_mailbox_push_notifications_mark_unconfigured_provider_pending(tmp_path, monkeypatch):
+    class Snapshot:
+        def as_dict(self):
+            return {"email": "admin@example.com", "folders": [], "messages": []}
+
+    monkeypatch.setattr("freemail_api.main.list_mailbox_snapshot", lambda **_kwargs: Snapshot())
+
+    with make_client(tmp_path) as client:
+        session_response = client.post(
+            "/api/v1/mailbox/session",
+            json={"email": "admin@example.com", "password": "secret"},
+        )
+        token = session_response.json()["token"]
+        headers = {"Authorization": f"Bearer {token}"}
+        client.post(
+            "/api/v1/mailbox/push/devices",
+            headers=headers,
+            json={
+                "deviceId": "device-123",
+                "platform": "android",
+                "pushToken": "provider-token-123",
+                "provider": "fcm",
+            },
+        )
+        response = client.post(
+            "/api/v1/mailbox/push/notifications",
+            headers=headers,
+            json={"title": "FreeMail", "body": "New message"},
+        )
+
+    assert response.status_code == 200
+    notification = response.json()[0]
+    assert notification["status"] == "pending_provider"
+    assert notification["providerMessageId"] is None
+    assert "fcm" in notification["lastError"]
+
+
 def test_mailbox_search_requires_mailbox_credentials(tmp_path):
     with make_client(tmp_path) as client:
         response = client.get("/api/v1/mailbox/search?folder=INBOX&query=hello")

@@ -289,6 +289,27 @@ class MailboxPushDeviceDeleteRecord(ApiModel):
     device_id: str
 
 
+class MailboxPushNotificationCreate(ApiModel):
+    title: str = Field(min_length=1, max_length=120)
+    body: str = Field(min_length=1, max_length=240)
+
+
+class MailboxPushNotificationRecord(ApiModel):
+    id: int
+    mailbox_email: EmailStr
+    device_id: str
+    provider: str
+    title: str
+    body: str
+    status: str
+    provider_message_id: str | None = None
+    last_error: str | None = None
+    created_at: str
+    delivered_at: str | None = None
+
+    model_config = ConfigDict(alias_generator=to_camel, from_attributes=True, populate_by_name=True)
+
+
 class MailboxSendCreate(ApiModel):
     recipients: list[EmailStr] = Field(min_length=1, max_length=50)
     subject: str = Field(min_length=1, max_length=255)

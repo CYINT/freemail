@@ -35,6 +35,7 @@ from .outbound_policy import enforce_outbound_rate_limit
 from .outbound_policy import OutboundRateLimitExceeded
 from .outbound_policy import OutboundRatePolicy
 from .outbound_policy import record_outbound_send
+from .push_delivery import dispatch_push_notification
 from .schemas import (
     AliasCreate,
     AliasRecord,
@@ -63,6 +64,8 @@ from .schemas import (
     MailboxPushDeviceCreate,
     MailboxPushDeviceDeleteRecord,
     MailboxPushDeviceRecord,
+    MailboxPushNotificationCreate,
+    MailboxPushNotificationRecord,
     MailboxRecord,
     MailboxSearchRecord,
     MailboxSendCreate,
@@ -330,6 +333,66 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "revoked": database.revoke_mailbox_push_device(connection, email=credentials.email, device_id=device_id),
             "device_id": device_id,
         }
+
+    @app.post("/api/v1/mailbox/push/notifications", response_model=list[MailboxPushNotificationRecord])
+    def mailbox_push_notification_create(
+        payload: MailboxPushNotificationCreate,
+        authorization: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> list[dict[str, object]]:
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=None,
+            x_freemail_mailbox_password=None,
+            connection=connection,
+        )
+        rows = database.create_mailbox_push_notifications(
+            connection,
+            email=credentials.email,
+            title=payload.title,
+            body=payload.body,
+        )
+        dispatched = []
+        for row in rows:
+            result = dispatch_push_notification(
+                provider=str(row["provider"]),
+                device_id=str(row["device_id"]),
+                title=str(row["title"]),
+                body=str(row["body"]),
+            )
+            if result.delivered and result.provider_message_id:
+                dispatched.append(
+                    database.mark_mailbox_push_notification_delivered(
+                        connection,
+                        notification_id=int(row["id"]),
+                        provider_message_id=result.provider_message_id,
+                    )
+                )
+            else:
+                dispatched.append(
+                    database.mark_mailbox_push_notification_pending_provider(
+                        connection,
+                        notification_id=int(row["id"]),
+                        last_error=result.error or "push provider adapter is not configured",
+                    )
+                )
+        return _rows_to_dicts(dispatched)
+
+    @app.get("/api/v1/mailbox/push/notifications", response_model=list[MailboxPushNotificationRecord])
+    def mailbox_push_notification_list(
+        limit: int = 25,
+        authorization: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> list[dict[str, object]]:
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=None,
+            x_freemail_mailbox_password=None,
+            connection=connection,
+        )
+        if limit < 1 or limit > 100:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="limit must be between 1 and 100")
+        return _rows_to_dicts(database.list_mailbox_push_notifications(connection, email=credentials.email, limit=limit))
 
     @app.get("/api/v1/mailbox/snapshot", response_model=MailboxSnapshotRecord)
     def mailbox_snapshot(

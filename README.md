@@ -118,17 +118,21 @@ npm audit --audit-level=moderate
 Pop-Location
 ```
 
-The mobile scaffold lives in `apps\mobile`, uses Expo/React Native, defaults to `https://freemail.kuzuryu.ai`, and persists bearer sessions through `expo-secure-store` rather than browser-style storage. It currently covers sign-in, inbox/folder snapshots, message reading, compose/send with bounded document-picker attachments, reply/forward drafts, folder-scoped search, contacts, non-core folder management, attachment metadata plus authenticated download/share handling, secure offline metadata caching for the last loaded mailbox views, and a bearer-authenticated push-device registration contract.
+The mobile scaffold lives in `apps\mobile`, uses Expo/React Native, defaults to `https://freemail.kuzuryu.ai`, and persists bearer sessions through `expo-secure-store` rather than browser-style storage. It currently covers sign-in, inbox/folder snapshots, message reading, compose/send with bounded document-picker attachments, reply/forward drafts, folder-scoped search, contacts, non-core folder management, attachment metadata plus authenticated download/share handling, secure offline metadata caching for the last loaded mailbox views, bearer-authenticated push-device registration, and provider-neutral push notification delivery status.
 
 Mobile native release posture is documented in `docs\mobile-release.md`. The open-source repo keeps signing credentials, provisioning profiles, keystores, store API keys, and generated native projects out of source control; CI validates the Expo config and static release checklist instead.
 
-Push-provider delivery is intentionally not wired to a third-party service yet. The current contract stores only hashed provider tokens for mailbox/device registration and gives native clients stable register/list/revoke APIs:
+Credential-backed APNS/FCM delivery is intentionally not wired to a third-party service yet. The current contract stores only hashed provider tokens for mailbox/device registration and gives native clients stable register/list/revoke plus provider-neutral notification status APIs:
 
 ```text
 POST /api/v1/mailbox/push/devices
 GET /api/v1/mailbox/push/devices
 DELETE /api/v1/mailbox/push/devices/{deviceId}
+POST /api/v1/mailbox/push/notifications
+GET /api/v1/mailbox/push/notifications
 ```
+
+Push notification dispatch has a deterministic development provider for `contract-only` and `development` registrations. APNS/FCM registrations are queued as `pending_provider` until an operator adds a credential-backed adapter; raw provider tokens are still not returned by the API and runtime push tables are excluded from metadata backups.
 
 The webmail preview can load live mailbox folders and message headers from the API. Start `admin-api`, `mail-core`, and `web`, open `http://127.0.0.1:18091`, enter a mailbox address/password, and keep the API field pointed at `http://127.0.0.1:18090`. The browser client exchanges the mailbox password for a bearer session at `POST /api/v1/mailbox/session`, stores only the bearer token in `localStorage`, and revokes it with `DELETE /api/v1/mailbox/session` on sign out. The API stores mailbox passwords only as encrypted session material using `FREEMAIL_SESSION_SECRET`. For a different local web origin, set `FREEMAIL_WEB_CORS_ORIGINS`.
 

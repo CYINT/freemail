@@ -87,7 +87,7 @@ The current mobile foundation covers:
 - attachment metadata display and authenticated download/share handling
 - bounded document-picker compose attachments encoded for the mailbox send API
 - SecureStore-backed offline metadata cache for last loaded folder, message header, and contact snapshots
-- bearer-authenticated push-device registration, listing, and revocation contract with hashed provider tokens
+- bearer-authenticated push-device registration, listing, revocation, notification queueing, and development-provider dispatch with hashed provider tokens
 - static QA that forbids provider trade-dress references and insecure browser-style credential storage
 
-Native build, app-store signing, and provider-specific push delivery remain future mobile milestones.
+Native build, app-store signing, and credential-backed APNS/FCM adapters remain future mobile milestones.

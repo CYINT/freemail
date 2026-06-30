@@ -5,7 +5,7 @@ FreeMail currently has two persistence surfaces:
 - API metadata in SQLite at `FREEMAIL_DB_PATH`.
 - Mail-core data in the Docker volume mounted at `/var/lib/stalwart`.
 
-The metadata backup tools cover domains, users, mailboxes, aliases, DKIM keys, and audit logs. They intentionally exclude browser mailbox sessions, outbound rate-limit counters, and push-device registrations.
+The metadata backup tools cover domains, users, mailboxes, aliases, DKIM keys, and audit logs. They intentionally exclude browser mailbox sessions, outbound rate-limit counters, push-device registrations, and push-notification delivery records.
 
 Metadata backups include DKIM private keys and password hashes. Treat every backup file as sensitive operational material: encrypt it at rest, keep it out of Git, and restrict access to administrators.
 
@@ -31,7 +31,7 @@ Replace an existing metadata database only after taking a fresh copy of the curr
 
 ## Mail Store
 
-The metadata backup does not include mailbox browser sessions, outbound rate counters, push-device registrations, mailbox messages, attachments, indexes, or queues. Messages, attachments, indexes, and queues live in the Compose-managed Stalwart Docker volume mounted at `/var/lib/stalwart` during the current Stalwart spike. With the default Compose project name in this repo, Docker names that volume `freemail_freemail_stalwart`.
+The metadata backup does not include mailbox browser sessions, outbound rate counters, push-device registrations, push-notification delivery records, mailbox messages, attachments, indexes, or queues. Messages, attachments, indexes, and queues live in the Compose-managed Stalwart Docker volume mounted at `/var/lib/stalwart` during the current Stalwart spike. With the default Compose project name in this repo, Docker names that volume `freemail_freemail_stalwart`.
 
 For local recovery drills, stop writers before archiving or replacing the volume. At minimum, stop the Stalwart container before taking the archive:
 

@@ -19,6 +19,7 @@ import {
 
 import {
   ComposeAttachment,
+  createMailboxPushNotification,
   createMailboxFolder,
   createMailboxSession,
   deleteMailboxFolder,
@@ -26,6 +27,7 @@ import {
   loadMailboxContacts,
   loadMailboxMessage,
   loadMailboxPushDevices,
+  loadMailboxPushNotifications,
   loadMailboxSnapshot,
   MailAttachment,
   MailboxSession,
@@ -34,6 +36,7 @@ import {
   MailMessage,
   MailMessageDetail,
   MailboxPushDevice,
+  MailboxPushNotification,
   renameMailboxFolder,
   registerMailboxPushDevice,
   revokeMailboxSession,
@@ -65,6 +68,7 @@ export default function App() {
   const [messages, setMessages] = useState<MailMessage[]>([]);
   const [contacts, setContacts] = useState<MailContact[]>([]);
   const [pushDevices, setPushDevices] = useState<MailboxPushDevice[]>([]);
+  const [pushNotifications, setPushNotifications] = useState<MailboxPushNotification[]>([]);
   const [selectedMessage, setSelectedMessage] = useState<MailMessageDetail | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [newFolderName, setNewFolderName] = useState("");
@@ -115,6 +119,7 @@ export default function App() {
     setMessages([]);
     setContacts([]);
     setPushDevices([]);
+    setPushNotifications([]);
     setSelectedMessage(null);
     await clearStoredMailboxSession();
     if (activeSession) {
@@ -146,11 +151,13 @@ export default function App() {
         loadMailboxContacts(activeSession, targetFolder),
       ]);
       const devices = await loadMailboxPushDevices(activeSession);
+      const notifications = await loadMailboxPushNotifications(activeSession);
       setFolder(targetFolder);
       setFolders(snapshot.folders || []);
       setMessages(snapshot.messages || []);
       setContacts(contactList.contacts || []);
       setPushDevices(devices || []);
+      setPushNotifications(notifications || []);
       setSelectedMessage(null);
       await saveCachedMailboxSnapshot(activeSession, targetFolder, snapshot, contactList.contacts || []);
       setStatus(`Loaded ${snapshot.messages?.length || 0} messages from ${targetFolder}.`);
@@ -191,6 +198,23 @@ export default function App() {
         current.map((device) => (device.deviceId === deviceId ? { ...device, enabled: false } : device)),
       );
       setStatus(`Push device ${deviceId} revoked.`);
+    } catch (error) {
+      setStatus(readableError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function sendTestPushNotification() {
+    if (!session) {
+      return;
+    }
+    setLoading(true);
+    setStatus("Sending push test...");
+    try {
+      const notifications = await createMailboxPushNotification(session, "FreeMail", "Push delivery test");
+      setPushNotifications(notifications);
+      setStatus(`Push test created for ${notifications.length} devices.`);
     } catch (error) {
       setStatus(readableError(error));
     } finally {
@@ -563,6 +587,9 @@ export default function App() {
               <Pressable style={styles.secondaryButton} onPress={registerPushDevice}>
                 <Text>Register push device</Text>
               </Pressable>
+              <Pressable style={styles.secondaryButton} onPress={sendTestPushNotification}>
+                <Text>Send push test</Text>
+              </Pressable>
               {pushDevices.map((device) => (
                 <View key={device.deviceId} style={styles.pushDeviceRow}>
                   <View>
@@ -576,6 +603,16 @@ export default function App() {
                       <Text>Revoke</Text>
                     </Pressable>
                   ) : null}
+                </View>
+              ))}
+              {pushNotifications.map((notification) => (
+                <View key={notification.id} style={styles.pushDeviceRow}>
+                  <View>
+                    <Text style={styles.sender}>{notification.title}</Text>
+                    <Text style={styles.meta}>
+                      {notification.deviceId} - {notification.provider} - {notification.status}
+                    </Text>
+                  </View>
                 </View>
               ))}
             </View>

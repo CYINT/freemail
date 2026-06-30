@@ -103,6 +103,23 @@ CREATE TABLE IF NOT EXISTS mailbox_push_devices (
 
 CREATE INDEX IF NOT EXISTS idx_mailbox_push_devices_mailbox_enabled
 ON mailbox_push_devices(mailbox_email, enabled);
+
+CREATE TABLE IF NOT EXISTS mailbox_push_notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mailbox_email TEXT NOT NULL,
+    device_id TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'queued',
+    provider_message_id TEXT,
+    last_error TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    delivered_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_mailbox_push_notifications_mailbox_created
+ON mailbox_push_notifications(mailbox_email, created_at);
 """
 
 
@@ -385,6 +402,95 @@ def revoke_mailbox_push_device(connection: sqlite3.Connection, *, email: str, de
     )
     connection.commit()
     return cursor.rowcount > 0
+
+
+def create_mailbox_push_notifications(
+    connection: sqlite3.Connection,
+    *,
+    email: str,
+    title: str,
+    body: str,
+) -> list[sqlite3.Row]:
+    rows = connection.execute(
+        """
+        SELECT mailbox_email, device_id, provider
+        FROM mailbox_push_devices
+        WHERE mailbox_email = ? AND enabled = 1
+        ORDER BY updated_at DESC, id DESC
+        """,
+        [email.lower()],
+    ).fetchall()
+    notification_ids = []
+    for row in rows:
+        notification_ids.append(
+            _execute_insert(
+                connection,
+                """
+                INSERT INTO mailbox_push_notifications (mailbox_email, device_id, provider, title, body)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                [row["mailbox_email"], row["device_id"], row["provider"], title, body],
+            )
+        )
+    connection.commit()
+    return [_get_row(connection, "mailbox_push_notifications", row_id) for row_id in notification_ids]
+
+
+def mark_mailbox_push_notification_delivered(
+    connection: sqlite3.Connection,
+    *,
+    notification_id: int,
+    provider_message_id: str,
+) -> sqlite3.Row:
+    connection.execute(
+        """
+        UPDATE mailbox_push_notifications
+        SET status = 'delivered', provider_message_id = ?, last_error = NULL, delivered_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        """,
+        [provider_message_id, notification_id],
+    )
+    connection.commit()
+    return _get_row(connection, "mailbox_push_notifications", notification_id)
+
+
+def mark_mailbox_push_notification_pending_provider(
+    connection: sqlite3.Connection,
+    *,
+    notification_id: int,
+    last_error: str,
+) -> sqlite3.Row:
+    connection.execute(
+        """
+        UPDATE mailbox_push_notifications
+        SET status = 'pending_provider', last_error = ?
+        WHERE id = ?
+        """,
+        [last_error, notification_id],
+    )
+    connection.commit()
+    return _get_row(connection, "mailbox_push_notifications", notification_id)
+
+
+def list_mailbox_push_notifications(
+    connection: sqlite3.Connection,
+    *,
+    email: str,
+    limit: int = 25,
+) -> list[sqlite3.Row]:
+    return list(
+        connection.execute(
+            """
+            SELECT id, mailbox_email, device_id, provider, title, body, status, provider_message_id,
+                   last_error, created_at, delivered_at
+            FROM mailbox_push_notifications
+            WHERE mailbox_email = ?
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            [email.lower(), limit],
+        )
+    )
 
 
 def _execute_insert(connection: sqlite3.Connection, statement: str, values: Iterable[object]) -> int:

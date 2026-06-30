@@ -68,6 +68,20 @@ export type MailboxPushDevice = {
   updatedAt: string;
 };
 
+export type MailboxPushNotification = {
+  id: number;
+  mailboxEmail: string;
+  deviceId: string;
+  provider: string;
+  title: string;
+  body: string;
+  status: string;
+  providerMessageId: string | null;
+  lastError: string | null;
+  createdAt: string;
+  deliveredAt: string | null;
+};
+
 export type ComposeMessage = {
   recipients: string[];
   subject: string;
@@ -173,6 +187,29 @@ export async function revokeMailboxPushDevice(session: MailboxSession, deviceId:
     method: "DELETE",
     headers: mailboxHeaders(session),
   });
+}
+
+export async function createMailboxPushNotification(
+  session: MailboxSession,
+  title: string,
+  body: string,
+): Promise<MailboxPushNotification[]> {
+  const response = await request(session.apiBaseUrl, "/api/v1/mailbox/push/notifications", {
+    method: "POST",
+    headers: {
+      ...mailboxHeaders(session),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ title, body }),
+  });
+  return response.json();
+}
+
+export async function loadMailboxPushNotifications(session: MailboxSession): Promise<MailboxPushNotification[]> {
+  const response = await request(session.apiBaseUrl, "/api/v1/mailbox/push/notifications?limit=10", {
+    headers: mailboxHeaders(session),
+  });
+  return response.json();
 }
 
 export async function sendMailboxMessage(session: MailboxSession, message: ComposeMessage): Promise<void> {
