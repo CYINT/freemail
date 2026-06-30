@@ -1,0 +1,157 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime, timezone
+import json
+from pathlib import Path
+import re
+from typing import Any
+
+
+EVIDENCE_FILENAMES = {
+    "observed_dns": "observed-dns.{domain}.json",
+    "deliverability": "deliverability.{domain}.json",
+    "acceptance": "private-beta-acceptance.{domain}.json",
+    "manifest": "private-beta-evidence-manifest.{domain}.json",
+}
+
+
+@dataclass(frozen=True)
+class PrivateBetaEvidenceTemplateOptions:
+    domain: str
+    output_dir: Path
+    decision_owner: str = ""
+    force: bool = False
+    checked_at: datetime | None = None
+
+
+def create_private_beta_evidence_templates(options: PrivateBetaEvidenceTemplateOptions) -> dict[str, Any]:
+    domain = _normalize_domain(options.domain)
+    checked_at = _format_timestamp(options.checked_at or datetime.now(timezone.utc))
+    options.output_dir.mkdir(parents=True, exist_ok=True)
+
+    payloads = {
+        "observed_dns": _observed_dns_template(domain),
+        "deliverability": _deliverability_template(domain, checked_at),
+        "acceptance": _acceptance_template(domain, checked_at, options.decision_owner),
+    }
+    paths = {
+        name: options.output_dir / pattern.format(domain=domain)
+        for name, pattern in EVIDENCE_FILENAMES.items()
+        if name != "manifest"
+    }
+    for name, payload in payloads.items():
+        _write_json(paths[name], payload, force=options.force)
+
+    manifest_path = options.output_dir / EVIDENCE_FILENAMES["manifest"].format(domain=domain)
+    manifest = _manifest_template(domain, checked_at, paths)
+    _write_json(manifest_path, manifest, force=options.force)
+    return {
+        "domain": domain,
+        "generatedAt": checked_at,
+        "files": {**{name: str(path) for name, path in paths.items()}, "manifest": str(manifest_path)},
+    }
+
+
+def _normalize_domain(domain: str) -> str:
+    normalized = domain.strip().lower().rstrip(".")
+    if not normalized or not re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?", normalized):
+        raise ValueError("domain must be a non-empty DNS name")
+    if ".." in normalized or "." not in normalized:
+        raise ValueError("domain must be a fully qualified DNS name")
+    return normalized
+
+
+def _format_timestamp(value: datetime) -> str:
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("checked_at must be timezone-aware")
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _observed_dns_template(domain: str) -> dict[str, Any]:
+    return {
+        "domain": domain,
+        "observedRecords": [
+            {
+                "type": "MX",
+                "name": domain,
+                "values": [],
+                "evidenceNote": "Fill with live MX answers after controlled-domain DNS propagates.",
+            },
+            {
+                "type": "TXT",
+                "name": domain,
+                "values": [],
+                "evidenceNote": "Fill with SPF TXT answers observed for the controlled domain.",
+            },
+            {
+                "type": "TXT",
+                "name": f"_dmarc.{domain}",
+                "values": [],
+                "evidenceNote": "Fill with DMARC TXT answers observed for the controlled domain.",
+            },
+            {
+                "type": "TXT",
+                "name": f"mail._domainkey.{domain}",
+                "values": [],
+                "evidenceNote": "Fill with DKIM TXT answers for the active selector.",
+            },
+        ],
+    }
+
+
+def _deliverability_template(domain: str, checked_at: str) -> dict[str, Any]:
+    return {
+        "passed": False,
+        "domain": domain,
+        "checkedAt": checked_at,
+        "spfAligned": False,
+        "dmarcAligned": False,
+        "dkimAligned": False,
+        "queueReviewed": False,
+        "bounceOrRetryReviewed": False,
+        "abuseComplaints": -1,
+        "notes": [
+            "Replace this draft after controlled inbound/outbound smoke tests and queue review.",
+            "Do not mark passed true until SPF, DMARC, DKIM, queue, bounce/retry, and abuse checks are verified.",
+        ],
+    }
+
+
+def _acceptance_template(domain: str, accepted_at: str, decision_owner: str) -> dict[str, Any]:
+    return {
+        "accepted": False,
+        "acceptedAt": accepted_at,
+        "decisionOwner": decision_owner,
+        "accessBoundary": "Dragonscale/VPN clients only",
+        "knownLimitations": [
+            "Private beta only; do not expose FreeMail to the public internet.",
+            "Controlled-domain DNS, mail-flow, queue, deliverability, backup, and mobile release evidence must be current.",
+            "SQLite is the only supported API metadata backend until PostgreSQL adapter work is completed.",
+        ],
+        "domain": domain,
+    }
+
+
+def _manifest_template(domain: str, generated_at: str, paths: dict[str, Path]) -> dict[str, Any]:
+    return {
+        "domain": domain,
+        "generatedAt": generated_at,
+        "draftOnly": True,
+        "privateBetaGateInputs": {
+            "--observed-dns": str(paths["observed_dns"]),
+            "--deliverability-evidence": str(paths["deliverability"]),
+            "--acceptance": str(paths["acceptance"]),
+            "--mail-flow-evidence": "Generate with scripts/qa_mail_flow.py after controlled-domain mail flow.",
+            "--queue-evidence": "Generate with scripts/qa_stalwart_queue.py after controlled-domain mail flow.",
+            "--metadata-backup": "Generate with scripts/backup_metadata.py before beta access.",
+            "--mail-store-backup": "Generate with scripts/backup_mail_store.py before beta access.",
+        },
+        "releaseBoundary": "VPN-only private beta on freemail.kuzuryu.ai until public release gates are explicitly satisfied.",
+    }
+
+
+def _write_json(path: Path, payload: dict[str, Any], *, force: bool) -> None:
+    if path.exists() and not force:
+        raise FileExistsError(f"{path} already exists; pass --force to overwrite draft templates")
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")

@@ -375,6 +375,17 @@ For a real beta domain, pass admin DNS guidance plus observed DNS evidence, mail
   --acceptance .freemail-qa\private-beta-acceptance-example.com.json
 ```
 
+To avoid hand-authoring the JSON packet, create draft evidence templates first:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\create_private_beta_evidence_templates.py `
+  --domain example.com `
+  --output-dir .freemail-qa\private-beta `
+  --decision-owner "Decision Owner"
+```
+
+The generated files are credential-free drafts. They intentionally keep `passed` and `accepted` false until controlled-domain DNS, mail flow, queue, deliverability, backup, and owner-review evidence are actually recorded.
+
 Generate queue evidence with `scripts\qa_stalwart_queue.py` after controlled mail-flow tests; the private-beta gate requires a clear queue with zero pending and due messages.
 
 ## VPN-Only Deployment
