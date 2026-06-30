@@ -119,6 +119,24 @@ The generated mail-core apply, deliverability, and acceptance templates are inte
 
 The generated manifest provides the expected paths for observed DNS, mail-flow, queue, mail-core apply, deliverability, backup, and acceptance evidence. `scripts\private_beta_gate.py --manifest` loads those paths, and any explicit CLI path flag overrides the corresponding manifest entry.
 
+After the controlled mailbox, mailbox-secret JSON, and admin DNS guidance exist, operators can collect the live DNS, mail-flow, queue, and deliverability evidence into the generated packet:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\collect_controlled_domain_evidence.py `
+  --domain example.com `
+  --output-dir .freemail-qa\private-beta `
+  --email admin@example.com `
+  --secrets-json secrets\mail-core-users.json `
+  --dns-guidance .freemail-qa\dns-guidance-example.com.json `
+  --spf-aligned `
+  --dmarc-aligned `
+  --bounce-or-retry-reviewed `
+  --abuse-complaints 0 `
+  --force
+```
+
+The collector runs controlled mail-flow checks, queries the Stalwart queue helper, resolves live DNS from the guidance record names, and writes credential-free JSON only. It intentionally leaves mail-core apply evidence, metadata backup, mail-store backup, and decision-owner acceptance as separate evidence artifacts.
+
 Before running the full private-beta gate, check the packet inventory:
 
 ```powershell

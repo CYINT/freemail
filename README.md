@@ -458,6 +458,24 @@ To avoid hand-authoring the JSON packet, create draft evidence templates first:
 
 The generated files are credential-free drafts. They intentionally keep `passed`, `applied`, and `accepted` false until controlled-domain DNS, mail flow, mail-core apply, queue, deliverability, backup, and owner-review evidence are actually recorded.
 
+After the controlled mailbox and DNS guidance exist, collect live DNS, mail-flow, queue, and deliverability evidence into the same packet:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\collect_controlled_domain_evidence.py `
+  --domain example.com `
+  --output-dir .freemail-qa\private-beta `
+  --email admin@example.com `
+  --secrets-json secrets\mail-core-users.json `
+  --dns-guidance .freemail-qa\dns-guidance-example.com.json `
+  --spf-aligned `
+  --dmarc-aligned `
+  --bounce-or-retry-reviewed `
+  --abuse-complaints 0 `
+  --force
+```
+
+The collector writes credential-free observed DNS, mail-flow, queue, and deliverability JSON. It does not replace mail-core apply evidence, backup artifacts, or decision-owner acceptance.
+
 Check packet inventory before running the full private-beta gate:
 
 ```powershell
