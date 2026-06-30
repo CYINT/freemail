@@ -15,6 +15,7 @@ def main() -> int:
     parser.add_argument("--observed-dns", type=Path)
     parser.add_argument("--mail-flow-evidence", type=Path)
     parser.add_argument("--queue-evidence", type=Path)
+    parser.add_argument("--deliverability-evidence", type=Path)
     parser.add_argument("--metadata-backup", type=Path)
     parser.add_argument("--mail-store-backup", type=Path)
     parser.add_argument("--acceptance", type=Path)
@@ -33,6 +34,7 @@ def main() -> int:
             observed_dns=args.observed_dns,
             mail_flow_evidence=args.mail_flow_evidence,
             queue_evidence=args.queue_evidence,
+            deliverability_evidence=args.deliverability_evidence,
             metadata_backup=args.metadata_backup,
             mail_store_backup=args.mail_store_backup,
             acceptance=args.acceptance,

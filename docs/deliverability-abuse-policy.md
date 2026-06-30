@@ -26,4 +26,5 @@ FreeMail is in a controlled private-beta posture. Do not expose the stack direct
 - Local DKIM-signing smoke must pass for the mailbox domain.
 - Queue gate must be clear after controlled outbound tests unless the test explicitly records retry/bounce behavior.
 - SPF and DMARC evidence must be recorded for the controlled domain before external beta use.
+- Deliverability evidence must record SPF alignment, DMARC alignment, DKIM alignment, queue review, bounce/retry review, and zero known abuse complaints for the controlled beta domain.
 - Abuse and deliverability evidence must be recorded in the planning lane before public release.

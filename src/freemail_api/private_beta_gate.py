@@ -20,6 +20,7 @@ class PrivateBetaGateOptions:
     observed_dns: Path | None = None
     mail_flow_evidence: Path | None = None
     queue_evidence: Path | None = None
+    deliverability_evidence: Path | None = None
     metadata_backup: Path | None = None
     mail_store_backup: Path | None = None
     acceptance: Path | None = None
@@ -77,6 +78,7 @@ def _check_beta_evidence(options: PrivateBetaGateOptions) -> list[dict[str, Any]
     return [
         _check_mail_flow_evidence(options),
         _check_queue_evidence(options.queue_evidence),
+        _check_deliverability_evidence(options),
         _check_file("metadata-backup-evidence", options.metadata_backup, "--metadata-backup"),
         _check_file("mail-store-backup-evidence", options.mail_store_backup, "--mail-store-backup"),
         _check_acceptance(options.acceptance),
@@ -111,6 +113,45 @@ def _check_mail_flow_evidence(options: PrivateBetaGateOptions) -> dict[str, Any]
             "submissionFound": bool(submission_found),
             "requiredDkimDomain": payload.get("requiredDkimDomain"),
             "expectedDomain": options.domain,
+        },
+    )
+
+
+def _check_deliverability_evidence(options: PrivateBetaGateOptions) -> dict[str, Any]:
+    if options.deliverability_evidence is None:
+        return _check("deliverability-abuse-evidence", False, {"error": "--deliverability-evidence is required"})
+    payload = _load_json(options.deliverability_evidence)
+    expected_domain = (options.domain or "").lower()
+    evidence_domain = str(payload.get("domain", "")).lower()
+    try:
+        abuse_complaints = int(payload.get("abuseComplaints", -1))
+    except (TypeError, ValueError):
+        abuse_complaints = -1
+    passed = (
+        payload.get("passed") is True
+        and bool(str(payload.get("checkedAt", "")).strip())
+        and (not expected_domain or evidence_domain == expected_domain)
+        and payload.get("spfAligned") is True
+        and payload.get("dmarcAligned") is True
+        and payload.get("dkimAligned") is True
+        and payload.get("queueReviewed") is True
+        and payload.get("bounceOrRetryReviewed") is True
+        and abuse_complaints == 0
+    )
+    return _check(
+        "deliverability-abuse-evidence",
+        passed,
+        {
+            "path": str(options.deliverability_evidence),
+            "passed": payload.get("passed"),
+            "domain": payload.get("domain"),
+            "expectedDomain": options.domain,
+            "spfAligned": payload.get("spfAligned"),
+            "dmarcAligned": payload.get("dmarcAligned"),
+            "dkimAligned": payload.get("dkimAligned"),
+            "queueReviewed": payload.get("queueReviewed"),
+            "bounceOrRetryReviewed": payload.get("bounceOrRetryReviewed"),
+            "abuseComplaints": abuse_complaints,
         },
     )
 
@@ -195,7 +236,7 @@ def _load_observed_dns(path: Path | None) -> list[dict[str, object]]:
 
 
 def _load_json(path: Path) -> dict[str, Any]:
-    with path.open("r", encoding="utf-8") as handle:
+    with path.open("r", encoding="utf-8-sig") as handle:
         payload = json.load(handle)
     if not isinstance(payload, dict):
         raise ValueError(f"{path} must contain a JSON object")

@@ -353,6 +353,7 @@ For a real beta domain, pass admin DNS guidance plus observed DNS evidence, mail
   --observed-dns .freemail-qa\observed-dns-example.com.json `
   --mail-flow-evidence .freemail-qa\mail-flow-example.com.json `
   --queue-evidence .freemail-qa\queue-example.com.json `
+  --deliverability-evidence .freemail-qa\deliverability-example.com.json `
   --metadata-backup .freemail-qa\backups\metadata.json `
   --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
   --acceptance .freemail-qa\private-beta-acceptance-example.com.json

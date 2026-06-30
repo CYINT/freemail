@@ -103,6 +103,42 @@ def test_resolve_observed_dns_reports_missing_answers(monkeypatch):
     assert observed == [{"type": "TXT", "name": "example.com", "values": []}]
 
 
+def test_private_beta_gate_accepts_utf8_bom_json_evidence(tmp_path):
+    queue = tmp_path / "queue.json"
+    queue.write_text('\ufeff{"passed": true, "pending": 0, "due": 0}', encoding="utf-8")
+
+    check = private_beta_gate._check_queue_evidence(queue)
+
+    assert check["status"] == "pass"
+
+
+def test_private_beta_gate_rejects_malformed_abuse_complaint_count(tmp_path):
+    deliverability = tmp_path / "deliverability.json"
+    deliverability.write_text(
+        json.dumps(
+            {
+                "passed": True,
+                "domain": "example.com",
+                "checkedAt": "2026-06-30T00:00:00Z",
+                "spfAligned": True,
+                "dmarcAligned": True,
+                "dkimAligned": True,
+                "queueReviewed": True,
+                "bounceOrRetryReviewed": True,
+                "abuseComplaints": "none",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    check = private_beta_gate._check_deliverability_evidence(
+        PrivateBetaGateOptions(domain="example.com", deliverability_evidence=deliverability)
+    )
+
+    assert check["status"] == "fail"
+    assert check["details"]["abuseComplaints"] == -1
+
+
 def test_private_beta_gate_requires_beta_evidence_when_enabled():
     result = run_private_beta_gate(
         PrivateBetaGateOptions(
@@ -116,6 +152,7 @@ def test_private_beta_gate_requires_beta_evidence_when_enabled():
     assert [check["name"] for check in result["checks"]] == [
         "controlled-mail-flow-evidence",
         "queue-evidence",
+        "deliverability-abuse-evidence",
         "metadata-backup-evidence",
         "mail-store-backup-evidence",
         "private-beta-acceptance",
@@ -125,6 +162,7 @@ def test_private_beta_gate_requires_beta_evidence_when_enabled():
 def test_private_beta_gate_accepts_complete_beta_evidence(tmp_path):
     mail_flow = tmp_path / "mail-flow.json"
     queue = tmp_path / "queue.json"
+    deliverability = tmp_path / "deliverability.json"
     metadata = tmp_path / "metadata.json"
     mail_store = tmp_path / "mail-store.tar.gz"
     acceptance = tmp_path / "acceptance.json"
@@ -143,6 +181,22 @@ def test_private_beta_gate_accepts_complete_beta_evidence(tmp_path):
         encoding="utf-8",
     )
     queue.write_text(json.dumps({"passed": True, "pending": 0, "due": 0}), encoding="utf-8")
+    deliverability.write_text(
+        json.dumps(
+            {
+                "passed": True,
+                "domain": "example.com",
+                "checkedAt": "2026-06-30T00:00:00Z",
+                "spfAligned": True,
+                "dmarcAligned": True,
+                "dkimAligned": True,
+                "queueReviewed": True,
+                "bounceOrRetryReviewed": True,
+                "abuseComplaints": 0,
+            }
+        ),
+        encoding="utf-8",
+    )
     metadata.write_text("{}", encoding="utf-8")
     mail_store.write_bytes(b"backup")
     acceptance.write_text(
@@ -164,6 +218,7 @@ def test_private_beta_gate_accepts_complete_beta_evidence(tmp_path):
             skip_dns=True,
             mail_flow_evidence=mail_flow,
             queue_evidence=queue,
+            deliverability_evidence=deliverability,
             metadata_backup=metadata,
             mail_store_backup=mail_store,
             acceptance=acceptance,
