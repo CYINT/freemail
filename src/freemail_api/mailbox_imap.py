@@ -94,6 +94,17 @@ class ArchivedMailboxMessage:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class MovedMailboxMessage:
+    folder: str
+    message_id: str
+    target_folder: str
+    moved: bool
+
+    def as_dict(self) -> dict[str, object]:
+        return asdict(self)
+
+
 def list_mailbox_snapshot(
     *,
     email: str,
@@ -128,13 +139,32 @@ def archive_mailbox_message(
     tls_context = _tls_context(verify_tls=verify_tls)
     with imaplib.IMAP4_SSL(host, port, ssl_context=tls_context, timeout=timeout_seconds) as imap:
         imap.login(email, password)
-        _archive_message(imap, folder=folder, message_id=message_id, archive_folder=archive_folder)
+        _move_message(imap, folder=folder, message_id=message_id, target_folder=archive_folder)
     return ArchivedMailboxMessage(
         folder=folder,
         message_id=message_id,
         archive_folder=archive_folder,
         archived=True,
     )
+
+
+def move_mailbox_message(
+    *,
+    email: str,
+    password: str,
+    host: str,
+    port: int,
+    folder: str,
+    message_id: str,
+    target_folder: str,
+    timeout_seconds: float = 10.0,
+    verify_tls: bool = False,
+) -> MovedMailboxMessage:
+    tls_context = _tls_context(verify_tls=verify_tls)
+    with imaplib.IMAP4_SSL(host, port, ssl_context=tls_context, timeout=timeout_seconds) as imap:
+        imap.login(email, password)
+        _move_message(imap, folder=folder, message_id=message_id, target_folder=target_folder)
+    return MovedMailboxMessage(folder=folder, message_id=message_id, target_folder=target_folder, moved=True)
 
 
 def search_mailbox_messages(
@@ -192,16 +222,20 @@ def get_mailbox_attachment(
 
 
 def _archive_message(imap: imaplib.IMAP4_SSL, *, folder: str, message_id: str, archive_folder: str) -> None:
+    _move_message(imap, folder=folder, message_id=message_id, target_folder=archive_folder)
+
+
+def _move_message(imap: imaplib.IMAP4_SSL, *, folder: str, message_id: str, target_folder: str) -> None:
     status, _data = imap.select(f'"{folder}"', readonly=False)
     if status != "OK":
         raise imaplib.IMAP4.error(f"Mailbox folder not found: {folder}")
-    _ensure_folder(imap, archive_folder)
+    _ensure_folder(imap, target_folder)
     status, _data = imap.select(f'"{folder}"', readonly=False)
     if status != "OK":
         raise imaplib.IMAP4.error(f"Mailbox folder not found: {folder}")
-    copy_status, _copy_data = imap.copy(message_id.encode("ascii"), f'"{archive_folder}"')
+    copy_status, _copy_data = imap.copy(message_id.encode("ascii"), f'"{target_folder}"')
     if copy_status != "OK":
-        raise imaplib.IMAP4.error("Mailbox message could not be archived")
+        raise imaplib.IMAP4.error("Mailbox message could not be moved")
     store_status, _store_data = imap.store(message_id.encode("ascii"), "+FLAGS", r"(\Deleted)")
     if store_status != "OK":
         raise imaplib.IMAP4.error("Mailbox message could not be removed from source folder")

@@ -453,6 +453,52 @@ def test_mailbox_search_returns_imap_results(tmp_path, monkeypatch):
     assert response.json()["messages"][0]["subject"] == "Hello"
 
 
+def test_mailbox_move_requires_mailbox_credentials(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.post(
+            "/api/v1/mailbox/message/move",
+            json={"folder": "INBOX", "messageId": "1", "targetFolder": "Deleted Items"},
+        )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Mailbox credentials required"
+
+
+def test_mailbox_move_returns_imap_move_payload(tmp_path, monkeypatch):
+    class Moved:
+        def as_dict(self):
+            return {
+                "folder": "INBOX",
+                "message_id": "1",
+                "target_folder": "Deleted Items",
+                "moved": True,
+            }
+
+    def fake_move(**kwargs):
+        assert kwargs["email"] == "admin@example.com"
+        assert kwargs["password"] == "secret"
+        assert kwargs["folder"] == "INBOX"
+        assert kwargs["message_id"] == "1"
+        assert kwargs["target_folder"] == "Deleted Items"
+        return Moved()
+
+    monkeypatch.setattr("freemail_api.main.move_mailbox_message", fake_move)
+
+    with make_client(tmp_path) as client:
+        response = client.post(
+            "/api/v1/mailbox/message/move",
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+            json={"folder": "INBOX", "messageId": "1", "targetFolder": "Deleted Items"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["moved"] is True
+    assert response.json()["targetFolder"] == "Deleted Items"
+
+
 def test_mailbox_message_requires_mailbox_credentials(tmp_path):
     with make_client(tmp_path) as client:
         response = client.get("/api/v1/mailbox/message?folder=INBOX&message_id=1")

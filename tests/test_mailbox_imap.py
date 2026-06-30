@@ -7,6 +7,7 @@ from freemail_api.mailbox_imap import (
     MailboxMessage,
     MailboxSearchResult,
     MailboxMessageDetail,
+    MovedMailboxMessage,
     MailboxSnapshot,
     _archive_message,
     _attachment_contents_from_message,
@@ -19,6 +20,7 @@ from freemail_api.mailbox_imap import (
     _get_message,
     _list_folders,
     _list_messages,
+    _move_message,
     _parse_folder,
     _quote_search_value,
     _search_criteria,
@@ -168,6 +170,17 @@ def test_archived_message_serializes_archive_result():
     }
 
 
+def test_moved_message_serializes_move_result():
+    moved = MovedMailboxMessage(folder="INBOX", message_id="7", target_folder="Deleted Items", moved=True)
+
+    assert moved.as_dict() == {
+        "folder": "INBOX",
+        "message_id": "7",
+        "target_folder": "Deleted Items",
+        "moved": True,
+    }
+
+
 def test_list_folders_counts_messages_and_unread():
     folders = _list_folders(FakeImap())
 
@@ -269,6 +282,17 @@ def test_archive_message_copies_marks_deleted_and_expunges():
     assert imap.selected_folders == [('"INBOX"', False), ('"Archive"', True), ('"INBOX"', False)]
     assert imap.copied_messages == [(b"3", '"Archive"')]
     assert imap.stored_flags == [(b"3", "+FLAGS", r"(\Deleted)")]
+    assert imap.expunge_called is True
+
+
+def test_move_message_copies_to_target_marks_deleted_and_expunges():
+    imap = FakeImap()
+
+    _move_message(imap, folder="INBOX", message_id="4", target_folder="Deleted Items")
+
+    assert imap.selected_folders == [('"INBOX"', False), ('"Deleted Items"', True), ('"INBOX"', False)]
+    assert imap.copied_messages == [(b"4", '"Deleted Items"')]
+    assert imap.stored_flags == [(b"4", "+FLAGS", r"(\Deleted)")]
     assert imap.expunge_called is True
 
 

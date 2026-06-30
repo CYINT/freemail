@@ -13,6 +13,8 @@ const logoutAction = document.querySelector("#mailbox-logout");
 const replyAction = document.querySelector("#reply-action");
 const forwardAction = document.querySelector("#forward-action");
 const archiveAction = document.querySelector("#archive-action");
+const spamAction = document.querySelector("#spam-action");
+const deleteAction = document.querySelector("#delete-action");
 const composeTo = document.querySelector("#compose-to");
 const composeSubject = document.querySelector("#compose-subject");
 const composeBody = document.querySelector("#compose-body");
@@ -82,6 +84,22 @@ archiveAction?.addEventListener("click", async () => {
     return;
   }
   await archiveMailboxMessage(selectedMessageDetail);
+});
+
+spamAction?.addEventListener("click", async () => {
+  if (!selectedMessageDetail) {
+    setStatus("Select a message before marking spam.", "error");
+    return;
+  }
+  await moveMailboxMessage(selectedMessageDetail, "Junk Mail", "Message moved to spam.");
+});
+
+deleteAction?.addEventListener("click", async () => {
+  if (!selectedMessageDetail) {
+    setStatus("Select a message before deleting.", "error");
+    return;
+  }
+  await moveMailboxMessage(selectedMessageDetail, "Deleted Items", "Message moved to trash.");
 });
 
 logoutAction?.addEventListener("click", async () => {
@@ -223,6 +241,37 @@ async function archiveMailboxMessage(message) {
     await loadMailboxSnapshot(mailboxSession.folder);
   } catch (error) {
     setStatus(`Archive failed: ${readableError(error)}`, "error");
+  }
+}
+
+async function moveMailboxMessage(message, targetFolder, successMessage) {
+  if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
+    setStatus("Load a mailbox before moving messages.", "error");
+    return;
+  }
+  setStatus(`Moving message to ${targetFolder}...`, "loading");
+  try {
+    const url = new URL("/api/v1/mailbox/message/move", mailboxSession.apiBaseUrl);
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        ...mailboxHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        folder: message.folder,
+        messageId: message.messageId,
+        targetFolder,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    setStatus(successMessage, "ready");
+    selectedMessageDetail = null;
+    await loadMailboxSnapshot(mailboxSession.folder);
+  } catch (error) {
+    setStatus(`Move failed: ${readableError(error)}`, "error");
   }
 }
 

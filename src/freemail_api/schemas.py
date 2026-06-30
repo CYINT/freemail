@@ -167,6 +167,19 @@ class MailboxArchiveRecord(ApiModel):
     archive_folder: str
 
 
+class MailboxMoveCreate(ApiModel):
+    folder: str = Field(min_length=1, max_length=160)
+    message_id: str = Field(min_length=1, max_length=64)
+    target_folder: str = Field(min_length=1, max_length=160)
+
+
+class MailboxMoveRecord(ApiModel):
+    moved: bool
+    folder: str
+    message_id: str
+    target_folder: str
+
+
 class MailboxSnapshotRecord(ApiModel):
     email: EmailStr
     folders: list[MailboxFolderSummary]

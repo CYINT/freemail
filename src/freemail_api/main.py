@@ -16,6 +16,7 @@ from .mailbox_imap import archive_mailbox_message
 from .mailbox_imap import get_mailbox_attachment
 from .mailbox_imap import get_mailbox_message
 from .mailbox_imap import list_mailbox_snapshot
+from .mailbox_imap import move_mailbox_message
 from .mailbox_imap import search_mailbox_messages
 from .mailbox_smtp import OutboundAttachment
 from .mailbox_smtp import send_mailbox_message
@@ -36,6 +37,8 @@ from .schemas import (
     MailboxArchiveRecord,
     MailboxCreate,
     MailboxMessageDetailRecord,
+    MailboxMoveCreate,
+    MailboxMoveRecord,
     MailboxRecord,
     MailboxSearchRecord,
     MailboxSendCreate,
@@ -400,6 +403,36 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except imaplib.IMAP4.error as error:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mailbox message not found") from error
         return archived.as_dict()
+
+    @app.post("/api/v1/mailbox/message/move", response_model=MailboxMoveRecord)
+    def mailbox_move(
+        payload: MailboxMoveCreate,
+        authorization: str | None = Header(default=None),
+        x_freemail_mailbox_email: str | None = Header(default=None),
+        x_freemail_mailbox_password: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=x_freemail_mailbox_email,
+            x_freemail_mailbox_password=x_freemail_mailbox_password,
+            connection=connection,
+        )
+        try:
+            moved = move_mailbox_message(
+                email=credentials.email,
+                password=credentials.password,
+                host=active_settings.mail_core_host,
+                port=active_settings.imap_port,
+                folder=payload.folder,
+                message_id=payload.message_id,
+                target_folder=payload.target_folder,
+            )
+        except OSError as error:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+        except imaplib.IMAP4.error as error:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mailbox message not found") from error
+        return moved.as_dict()
 
     @app.post("/api/v1/mailbox/send", response_model=MailboxSendRecord)
     def mailbox_send(

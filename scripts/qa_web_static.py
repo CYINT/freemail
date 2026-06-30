@@ -62,7 +62,7 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
     if missing_classes:
         failures.append(f"missing classes: {', '.join(missing_classes)}")
 
-    required_text = ["Inbox", "Compose", "Reply", "Forward", "Attach", "Send", "Junk Mail"]
+    required_text = ["Inbox", "Compose", "Reply", "Forward", "Attach", "Send", "Junk Mail", "Spam", "Delete"]
     page_text = " ".join(parser.text)
     for text in required_text:
         if text not in page_text:
@@ -101,6 +101,8 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         "reply-action",
         "forward-action",
         "archive-action",
+        "spam-action",
+        "delete-action",
     ]:
         if marker not in " ".join(parser.attributes.get("id", [])):
             failures.append(f"missing live mailbox UI marker: {marker}")
@@ -112,8 +114,10 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         "/api/v1/mailbox/message",
         "/api/v1/mailbox/message/attachment",
         "/api/v1/mailbox/message/archive",
+        "/api/v1/mailbox/message/move",
         "/api/v1/mailbox/send",
         "archiveMailboxMessage",
+        "moveMailboxMessage",
         "searchMailboxMessages",
         "downloadMailboxAttachment",
         "filesToAttachments",

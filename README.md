@@ -138,6 +138,14 @@ The current webmail preview supports reply and forward as live compose-prefill w
 
 The archive smoke creates and archives its own generated self-addressed message so it does not mutate arbitrary mailbox data.
 
+Delete and spam actions use the generic mailbox move API to copy a selected message into `Deleted Items` or `Junk Mail`, mark the source message deleted, and expunge the source folder:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\qa_mailbox_move_api.py --email admin@example.com --secrets-json secrets\mail-core-users.json
+```
+
+The move smoke creates two generated self-addressed messages, moves one to trash and one to spam, then verifies both generated messages are removed from `INBOX`.
+
 Attachment send/read/download is covered by a generated self-addressed smoke:
 
 ```powershell
