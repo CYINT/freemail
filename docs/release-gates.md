@@ -82,7 +82,7 @@ The gate verifies:
 For offline development only, individual external checks can be skipped:
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\release_gate.py --skip-github-ci --skip-runtime --skip-backup-evidence --skip-mobile-evidence --skip-private-beta-evidence --skip-release-notes
+.\.venv\Scripts\python.exe scripts\release_gate.py --skip-github-ci --skip-repo-secret-scan --skip-license-policy-scan --skip-runtime --skip-backup-evidence --skip-mobile-evidence --skip-private-beta-evidence --skip-release-notes
 ```
 
 Do not use skipped gates as release evidence.

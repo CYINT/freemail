@@ -5,6 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 import subprocess
+import sys
 from typing import Any
 from urllib.request import urlopen
 
@@ -30,6 +31,8 @@ class ReleaseGateOptions:
     release_notes: Path | None = None
     release_version: str | None = None
     skip_github_ci: bool = False
+    skip_repo_secret_scan: bool = False
+    skip_license_policy_scan: bool = False
     skip_backup_evidence: bool = False
     skip_mobile_evidence: bool = False
     skip_private_beta_evidence: bool = False
@@ -45,6 +48,10 @@ def run_release_gate(options: ReleaseGateOptions) -> dict[str, Any]:
         _check_remote_commit(options.remote, options.branch, commit),
         _check_compose_config(),
     ]
+    if not options.skip_repo_secret_scan:
+        checks.append(_check_repo_secret_scan())
+    if not options.skip_license_policy_scan:
+        checks.append(_check_license_policy_scan())
     if not options.skip_github_ci:
         checks.append(_check_github_ci(options.repo, commit))
     if not options.skip_backup_evidence:
@@ -131,6 +138,16 @@ def _check_github_ci(repo: str, commit: str) -> dict[str, Any]:
     latest = ci_runs[0] if ci_runs else None
     passed = bool(latest and latest.get("status") == "completed" and latest.get("conclusion") == "success")
     return _check("github-ci", passed, {"latestRun": latest})
+
+
+def _check_repo_secret_scan() -> dict[str, Any]:
+    _command([sys.executable, "scripts/qa_repo_secrets.py"])
+    return _check("repo-secret-scan", True, {"script": "scripts/qa_repo_secrets.py"})
+
+
+def _check_license_policy_scan() -> dict[str, Any]:
+    _command([sys.executable, "scripts/qa_license_policy.py"])
+    return _check("license-policy-scan", True, {"script": "scripts/qa_license_policy.py"})
 
 
 def _check_backup_evidence(

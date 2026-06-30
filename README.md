@@ -427,7 +427,9 @@ The release gate also accepts explicit artifact flags, which override manifest v
   --release-version v0.1.0-private-beta
 ```
 
-The release gate checks clean Git state, remote SHA, GitHub Actions CI, Compose config, backup evidence, mobile signed-build/store-submission evidence, controlled-domain private-beta evidence, mail-core apply evidence, release-notes evidence, VPN-only health/deployment metadata, metadata-store readiness, and mail-core protocol readiness.
+The release gate checks clean Git state, remote SHA, GitHub Actions CI, repository secret scan, license-policy scan, Compose config, backup evidence, mobile signed-build/store-submission evidence, controlled-domain private-beta evidence, mail-core apply evidence, release-notes evidence, VPN-only health/deployment metadata, metadata-store readiness, and mail-core protocol readiness.
+
+Offline development can skip individual external or slow checks with explicit `--skip-*` flags, including `--skip-github-ci`, `--skip-repo-secret-scan`, `--skip-license-policy-scan`, `--skip-runtime`, `--skip-backup-evidence`, `--skip-mobile-evidence`, `--skip-private-beta-evidence`, and `--skip-release-notes`. Do not use skipped gates as release evidence.
 
 Run the private-beta runtime gate during development:
 

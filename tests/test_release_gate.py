@@ -36,6 +36,10 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
             return "abc123\trefs/heads/main"
         if command == ["docker", "compose", "config", "--quiet"]:
             return ""
+        if command[1:] == ["scripts/qa_repo_secrets.py"]:
+            return "repo secret QA passed"
+        if command[1:] == ["scripts/qa_license_policy.py"]:
+            return "license policy QA passed"
         if command[:3] == ["gh", "run", "list"]:
             return '[{"databaseId":1,"status":"completed","conclusion":"success","workflowName":"CI","url":"url"}]'
         raise AssertionError(command)
@@ -87,6 +91,8 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
         "git-clean",
         "remote-sha",
         "compose-config",
+        "repo-secret-scan",
+        "license-policy-scan",
         "github-ci",
         "metadata-backup",
         "mail-store-backup",
@@ -108,6 +114,8 @@ def test_release_gate_fails_without_backup_evidence(tmp_path, monkeypatch):
             metadata_backup=None,
             mail_store_backup=None,
             skip_github_ci=True,
+            skip_repo_secret_scan=True,
+            skip_license_policy_scan=True,
             skip_release_notes=True,
             skip_mobile_evidence=True,
             skip_private_beta_evidence=True,
@@ -131,6 +139,8 @@ def test_release_gate_fails_without_mobile_release_evidence(tmp_path, monkeypatc
             metadata_backup=metadata,
             mail_store_backup=mail_store,
             skip_github_ci=True,
+            skip_repo_secret_scan=True,
+            skip_license_policy_scan=True,
             skip_release_notes=True,
             skip_runtime=True,
         )
@@ -156,6 +166,8 @@ def test_release_gate_reports_failed_mobile_release_evidence(tmp_path, monkeypat
             mobile_release_evidence=mobile_evidence,
             mobile_app_config=mobile_app_config,
             skip_github_ci=True,
+            skip_repo_secret_scan=True,
+            skip_license_policy_scan=True,
             skip_backup_evidence=True,
             skip_release_notes=True,
             skip_runtime=True,
@@ -174,6 +186,8 @@ def test_release_gate_fails_without_private_beta_evidence(tmp_path, monkeypatch)
     result = run_release_gate(
         ReleaseGateOptions(
             skip_github_ci=True,
+            skip_repo_secret_scan=True,
+            skip_license_policy_scan=True,
             skip_backup_evidence=True,
             skip_mobile_evidence=True,
             skip_release_notes=True,
@@ -198,6 +212,8 @@ def test_release_gate_reports_failed_private_beta_evidence(tmp_path, monkeypatch
         ReleaseGateOptions(
             private_beta_evidence=private_beta_evidence,
             skip_github_ci=True,
+            skip_repo_secret_scan=True,
+            skip_license_policy_scan=True,
             skip_backup_evidence=True,
             skip_mobile_evidence=True,
             skip_release_notes=True,
@@ -218,6 +234,8 @@ def test_assert_release_gate_raises_for_failed_checks(tmp_path, monkeypatch):
         assert_release_gate(
             ReleaseGateOptions(
                 skip_github_ci=True,
+                skip_repo_secret_scan=True,
+                skip_license_policy_scan=True,
                 skip_backup_evidence=True,
                 skip_mobile_evidence=True,
                 skip_private_beta_evidence=True,
