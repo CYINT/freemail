@@ -29,6 +29,19 @@ The first persistence boundary is:
 
 Future migrations can move this store to PostgreSQL without changing the external API contract.
 
+### Database Backend Status
+
+SQLite is the only supported FreeMail API metadata backend today. The current code passes `sqlite3.Connection` through the API, backup/restore tooling, session handling, outbound policy, Stalwart export, and tests. Do not present PostgreSQL as supported until those boundaries are moved behind a database adapter and covered by CI.
+
+PostgreSQL readiness requires:
+
+- a configured database URL setting that does not break the existing SQLite default
+- schema migration tooling that runs against both SQLite development databases and PostgreSQL deployments
+- repository functions that avoid SQLite-only row and conflict behavior
+- metadata backup/restore coverage against the production backend
+- release-gate coverage proving the active backend, migration revision, and backup evidence
+- documentation for managed PostgreSQL TLS, credentials, backup retention, and restore drills
+
 The current DKIM key surface generates 2048-bit RSA keys and returns the private key only on key creation. List and DNS-guidance responses expose only public DNS material.
 
 ## Mail-Core Candidate

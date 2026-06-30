@@ -75,7 +75,7 @@ Initial endpoints:
 - `POST /api/v1/admin/domains/{domainId}/dns/verify`
 - `GET /api/v1/admin/audit-log`
 
-The current metadata store is SQLite at `FREEMAIL_DB_PATH`, defaulting to `data/freemail.sqlite` locally and a Docker volume path in Compose. Mail-store persistence remains part of the Stalwart mail-core spike.
+The current metadata store is SQLite at `FREEMAIL_DB_PATH`, defaulting to `data/freemail.sqlite` locally and a Docker volume path in Compose. PostgreSQL is not yet a supported metadata backend; see `docs/architecture.md` for the adapter, migration, backup, and release-gate work required before production/private-beta PostgreSQL use. Mail-store persistence remains part of the Stalwart mail-core spike.
 
 The bootstrap endpoint requires `X-FreeMail-Bootstrap-Token`, refuses to run unless `FREEMAIL_BOOTSTRAP_TOKEN` is configured, and refuses to create a second administrator after the first admin exists.
 

@@ -58,6 +58,7 @@ Current progress: API metadata export and restore tooling exists for domains, us
 - VPN/private access boundary accepted.
 - External inbound/outbound smoke tests.
 - Deliverability evidence recorded.
+- Metadata backend decision recorded. SQLite is the only supported backend today; PostgreSQL requires an adapter, migrations, backup/restore coverage, and release-gate evidence before it can be claimed for production/private-beta use.
 
 ## M7 - Mobile Client
 
