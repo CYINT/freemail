@@ -137,6 +137,7 @@ The mobile scaffold lives in `apps\mobile`, uses Expo/React Native, defaults to 
 
 Mobile native release posture is documented in `docs\mobile-release.md`. The open-source repo keeps signing credentials, provisioning profiles, keystores, store API keys, and generated native projects out of source control; CI validates the Expo config, Android native prebuild drill, static release checklist, and macOS iOS native prebuild drill.
 Signed mobile builds and app-store submission evidence are validated with `scripts\mobile_release_gate.py` from credential-free evidence stored outside Git.
+Use `scripts\create_mobile_release_evidence_template.py` to create a failing credential-free draft evidence file before private signing and store-submission runs.
 
 The push contract stores hashed provider tokens for lookup and, when `FREEMAIL_PUSH_TOKEN_SECRET` is configured, stores encrypted provider tokens for runtime dispatch. Raw and encrypted provider tokens are never returned by the API and runtime push tables are excluded from metadata backups. Native clients use stable register/list/revoke plus provider-neutral notification status APIs:
 

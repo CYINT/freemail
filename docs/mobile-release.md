@@ -73,6 +73,15 @@ After signed iOS and Android builds complete in the private signing environment,
 .\.venv\Scripts\python.exe scripts\mobile_release_gate.py --evidence .freemail-qa\mobile-release-evidence.json
 ```
 
+Create a draft evidence file before the signing run so the required fields are explicit:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\create_mobile_release_evidence_template.py `
+  --output .freemail-qa\mobile-release-evidence.json
+```
+
+The generated file is a credential-free draft. It intentionally keeps `signed` and `submitted` false, artifact hashes empty, artifact byte counts zero, and evidence URLs empty until real signed-build and store-submission evidence is recorded.
+
 After TestFlight and Play internal-testing submission, require store submission evidence too:
 
 ```powershell
