@@ -19,6 +19,7 @@ def main() -> int:
     parser.add_argument("--branch", default="main")
     parser.add_argument("--health-url", default="https://freemail.kuzuryu.ai/health")
     parser.add_argument("--deployment-url", default="https://freemail.kuzuryu.ai/api/v1/deployment")
+    parser.add_argument("--product-readiness-url", default="https://freemail.kuzuryu.ai/api/v1/product/readiness")
     parser.add_argument("--metadata-readiness-url", default="https://freemail.kuzuryu.ai/api/v1/metadata/readiness")
     parser.add_argument("--readiness-url", default="https://freemail.kuzuryu.ai/api/v1/mail-core/readiness")
     parser.add_argument("--metadata-backup", type=Path)
@@ -61,6 +62,7 @@ def _options_from_args(args: argparse.Namespace, manifest: ReleaseGateOptions | 
         branch=args.branch,
         health_url=args.health_url,
         deployment_url=args.deployment_url,
+        product_readiness_url=args.product_readiness_url,
         metadata_readiness_url=args.metadata_readiness_url,
         readiness_url=args.readiness_url,
         metadata_backup=args.metadata_backup or _manifest_value(manifest, "metadata_backup"),

@@ -55,6 +55,8 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
             return {"status": "ok", "vpnOnly": True, "release": {"commit": "abc123"}}
         if url.endswith("/deployment"):
             return {"exposure": "vpn-only", "publicInternet": False, "requiredBoundary": "Dragonscale/VPN clients only"}
+        if url.endswith("/product/readiness"):
+            return valid_product_readiness()
         if url.endswith("/metadata/readiness"):
             return {
                 "status": "ready",
@@ -116,6 +118,7 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
         "release-notes",
         "runtime-health",
         "deployment-boundary",
+        "product-readiness",
         "metadata-readiness",
         "mail-core-readiness",
     }
@@ -466,6 +469,24 @@ def test_runtime_deployment_boundary_requires_vpn_only(monkeypatch):
     assert checks[0]["status"] == "fail"
 
 
+def test_runtime_product_readiness_requires_expected_component_statuses(monkeypatch):
+    payload = valid_product_readiness()
+    payload["components"]["mobile"]["status"] = "prototype"
+    monkeypatch.setattr(release_gate, "_fetch_json", lambda _url: payload)
+
+    checks = release_gate._check_runtime(
+        None,
+        None,
+        None,
+        "abc123",
+        product_readiness_url="https://freemail.kuzuryu.ai/api/v1/product/readiness",
+    )
+
+    assert checks[0]["name"] == "product-readiness"
+    assert checks[0]["status"] == "fail"
+    assert checks[0]["details"]["componentStatuses"]["mobile"] == "prototype"
+
+
 def test_runtime_metadata_readiness_requires_ready_sqlite_schema(monkeypatch):
     monkeypatch.setattr(
         release_gate,
@@ -679,6 +700,26 @@ def valid_compose_config():
                 ]
             },
         }
+    }
+
+
+def valid_product_readiness():
+    return {
+        "project": "FreeMail",
+        "license": "AGPL-3.0-or-later",
+        "credentialFreePublicRepo": True,
+        "vpnOnly": True,
+        "releaseReady": False,
+        "components": {
+            "adminApi": {"status": "ready"},
+            "mailCore": {"status": "runtime-ready"},
+            "webmail": {"status": "beta-ready"},
+            "mobile": {"status": "source-ready"},
+        },
+        "releaseBlockers": [
+            "controlled-domain DNS/mail-flow evidence",
+            "real signed native mobile builds",
+        ],
     }
 
 

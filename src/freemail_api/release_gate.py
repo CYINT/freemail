@@ -40,6 +40,7 @@ class ReleaseGateOptions:
     branch: str = "main"
     health_url: str | None = "https://freemail.kuzuryu.ai/health"
     deployment_url: str | None = "https://freemail.kuzuryu.ai/api/v1/deployment"
+    product_readiness_url: str | None = "https://freemail.kuzuryu.ai/api/v1/product/readiness"
     metadata_readiness_url: str | None = "https://freemail.kuzuryu.ai/api/v1/metadata/readiness"
     readiness_url: str | None = "https://freemail.kuzuryu.ai/api/v1/mail-core/readiness"
     metadata_backup: Path | None = None
@@ -108,6 +109,7 @@ def run_release_gate(options: ReleaseGateOptions) -> dict[str, Any]:
                 options.readiness_url,
                 commit,
                 metadata_readiness_url=options.metadata_readiness_url,
+                product_readiness_url=options.product_readiness_url,
             )
         )
 
@@ -496,6 +498,7 @@ def _check_runtime(
     commit: str,
     *,
     metadata_readiness_url: str | None = None,
+    product_readiness_url: str | None = None,
 ) -> list[dict[str, Any]]:
     checks: list[dict[str, Any]] = []
     if health_url:
@@ -528,6 +531,45 @@ def _check_runtime(
                     "exposure": deployment.get("exposure"),
                     "publicInternet": deployment.get("publicInternet"),
                     "requiredBoundary": deployment.get("requiredBoundary"),
+                },
+            )
+        )
+    if product_readiness_url:
+        product = _fetch_json(product_readiness_url)
+        components = product.get("components") if isinstance(product.get("components"), dict) else {}
+        component_statuses = {
+            name: component.get("status")
+            for name, component in components.items()
+            if isinstance(component, dict)
+        }
+        expected_statuses = {
+            "adminApi": "ready",
+            "mailCore": "runtime-ready",
+            "webmail": "beta-ready",
+            "mobile": "source-ready",
+        }
+        release_blockers = product.get("releaseBlockers")
+        checks.append(
+            _check(
+                "product-readiness",
+                product.get("project") == "FreeMail"
+                and product.get("license") == "AGPL-3.0-or-later"
+                and product.get("credentialFreePublicRepo") is True
+                and product.get("vpnOnly") is True
+                and product.get("releaseReady") is False
+                and component_statuses == expected_statuses
+                and isinstance(release_blockers, list)
+                and bool(release_blockers)
+                and "real signed native mobile builds" in release_blockers,
+                {
+                    "url": product_readiness_url,
+                    "project": product.get("project"),
+                    "license": product.get("license"),
+                    "credentialFreePublicRepo": product.get("credentialFreePublicRepo"),
+                    "vpnOnly": product.get("vpnOnly"),
+                    "releaseReady": product.get("releaseReady"),
+                    "componentStatuses": component_statuses,
+                    "releaseBlockers": release_blockers,
                 },
             )
         )
