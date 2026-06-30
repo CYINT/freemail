@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from . import database
 from . import dkim
 from .mail_core import probe_mail_core
+from .mailbox_imap import archive_mailbox_message
 from .mailbox_imap import get_mailbox_message
 from .mailbox_imap import list_mailbox_snapshot
 from .mailbox_smtp import send_mailbox_message
@@ -26,6 +27,8 @@ from .schemas import (
     DomainDnsGuidance,
     DomainCreate,
     DomainRecord,
+    MailboxArchiveCreate,
+    MailboxArchiveRecord,
     MailboxCreate,
     MailboxMessageDetailRecord,
     MailboxRecord,
@@ -58,8 +61,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.add_middleware(
             CORSMiddleware,
             allow_origins=cors_origins,
-            allow_methods=["GET", "POST"],
-            allow_headers=["X-FreeMail-Mailbox-Email", "X-FreeMail-Mailbox-Password"],
+            allow_methods=["GET", "POST", "OPTIONS"],
+            allow_headers=["Content-Type", "X-FreeMail-Mailbox-Email", "X-FreeMail-Mailbox-Password"],
         )
 
     def require_admin(x_freemail_admin_token: str | None = Header(default=None)) -> str:
@@ -188,6 +191,30 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except imaplib.IMAP4.error as error:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mailbox message not found") from error
         return message.as_dict()
+
+    @app.post("/api/v1/mailbox/message/archive", response_model=MailboxArchiveRecord)
+    def mailbox_archive(
+        payload: MailboxArchiveCreate,
+        x_freemail_mailbox_email: str | None = Header(default=None),
+        x_freemail_mailbox_password: str | None = Header(default=None),
+    ) -> dict[str, object]:
+        if not x_freemail_mailbox_email or not x_freemail_mailbox_password:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Mailbox credentials required")
+        try:
+            archived = archive_mailbox_message(
+                email=x_freemail_mailbox_email,
+                password=x_freemail_mailbox_password,
+                host=active_settings.mail_core_host,
+                port=active_settings.imap_port,
+                folder=payload.folder,
+                message_id=payload.message_id,
+                archive_folder=payload.archive_folder,
+            )
+        except OSError as error:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+        except imaplib.IMAP4.error as error:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mailbox message not found") from error
+        return archived.as_dict()
 
     @app.post("/api/v1/mailbox/send", response_model=MailboxSendRecord)
     def mailbox_send(

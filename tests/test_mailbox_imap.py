@@ -1,12 +1,15 @@
 from email.message import EmailMessage
 
 from freemail_api.mailbox_imap import (
+    ArchivedMailboxMessage,
     MailboxFolder,
     MailboxMessage,
     MailboxMessageDetail,
     MailboxSnapshot,
+    _archive_message,
     _body_from_message,
     _count_from_select,
+    _ensure_folder,
     _flags_from_fetch,
     _get_message,
     _list_folders,
@@ -17,11 +20,19 @@ from freemail_api.mailbox_imap import (
 
 
 class FakeImap:
+    def __init__(self):
+        self.selected_folders = []
+        self.created_folders = []
+        self.copied_messages = []
+        self.stored_flags = []
+        self.expunge_called = False
+
     def list(self):
         return "OK", [b'(\\HasNoChildren) "/" "INBOX"', b'(\\HasNoChildren) "/" "Sent Items"']
 
     def select(self, folder, readonly=True):
         self.selected_folder = folder
+        self.selected_folders.append((folder, readonly))
         return "OK", [b"3"]
 
     def search(self, charset, criteria):
@@ -41,6 +52,22 @@ class FakeImap:
         payload = headers + body if "BODY.PEEK[]" in query else headers
         prefix = b"3 (FLAGS (\\Seen) BODY[HEADER] {%d}" % len(payload)
         return "OK", [(prefix, payload)]
+
+    def create(self, folder):
+        self.created_folders.append(folder)
+        return "OK", []
+
+    def copy(self, message_id, folder):
+        self.copied_messages.append((message_id, folder))
+        return "OK", []
+
+    def store(self, message_id, command, flags):
+        self.stored_flags.append((message_id, command, flags))
+        return "OK", []
+
+    def expunge(self):
+        self.expunge_called = True
+        return "OK", []
 
 
 def test_parse_folder_extracts_folder_name():
@@ -96,6 +123,17 @@ def test_message_detail_serializes_body():
     assert detail.as_dict()["body"] == "Body text"
 
 
+def test_archived_message_serializes_archive_result():
+    archived = ArchivedMailboxMessage(folder="INBOX", message_id="7", archive_folder="Archive", archived=True)
+
+    assert archived.as_dict() == {
+        "folder": "INBOX",
+        "message_id": "7",
+        "archive_folder": "Archive",
+        "archived": True,
+    }
+
+
 def test_list_folders_counts_messages_and_unread():
     folders = _list_folders(FakeImap())
 
@@ -120,6 +158,30 @@ def test_get_message_parses_body_and_headers():
     assert message.subject == "Hello"
     assert message.body == "Body text"
     assert message.unread is False
+
+
+def test_archive_message_copies_marks_deleted_and_expunges():
+    imap = FakeImap()
+
+    _archive_message(imap, folder="INBOX", message_id="3", archive_folder="Archive")
+
+    assert imap.selected_folders == [('"INBOX"', False), ('"Archive"', True), ('"INBOX"', False)]
+    assert imap.copied_messages == [(b"3", '"Archive"')]
+    assert imap.stored_flags == [(b"3", "+FLAGS", r"(\Deleted)")]
+    assert imap.expunge_called is True
+
+
+def test_ensure_folder_creates_missing_archive_folder():
+    class MissingFolderImap(FakeImap):
+        def select(self, folder, readonly=True):
+            self.selected_folder = folder
+            return ("NO", []) if folder == '"Archive"' else ("OK", [b"1"])
+
+    imap = MissingFolderImap()
+
+    _ensure_folder(imap, "Archive")
+
+    assert imap.created_folders == ['"Archive"']
 
 
 def test_body_from_message_prefers_plain_text_part():

@@ -146,6 +146,19 @@ class MailboxMessageDetailRecord(MailboxMessageSummary):
     body: str
 
 
+class MailboxArchiveCreate(ApiModel):
+    folder: str = Field(min_length=1, max_length=160)
+    message_id: str = Field(min_length=1, max_length=64)
+    archive_folder: str = Field(default="Archive", min_length=1, max_length=160)
+
+
+class MailboxArchiveRecord(ApiModel):
+    archived: bool
+    folder: str
+    message_id: str
+    archive_folder: str
+
+
 class MailboxSnapshotRecord(ApiModel):
     email: EmailStr
     folders: list[MailboxFolderSummary]

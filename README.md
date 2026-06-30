@@ -109,7 +109,13 @@ The first mailbox send API uses the same per-request credential posture and subm
 .\.venv\Scripts\python.exe scripts\qa_mailbox_send_api.py --email admin@example.com --recipient admin@example.com --secrets-json secrets\mail-core-users.json
 ```
 
-The current webmail preview supports reply and forward as live compose-prefill workflows from the selected message body; sending those drafts uses the same mailbox send API.
+The current webmail preview supports reply and forward as live compose-prefill workflows from the selected message body; sending those drafts uses the same mailbox send API. The Archive action uses IMAP copy/delete semantics, creates the `Archive` folder if it is missing, and refreshes the current folder after success:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\qa_mailbox_archive_api.py --email admin@example.com --secrets-json secrets\mail-core-users.json
+```
+
+The archive smoke creates and archives its own generated self-addressed message so it does not mutate arbitrary mailbox data.
 
 The mail-core spike profile starts the Stalwart candidate with ports still bound to loopback:
 

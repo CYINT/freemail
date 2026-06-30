@@ -50,6 +50,17 @@ class MailboxSnapshot:
         }
 
 
+@dataclass(frozen=True)
+class ArchivedMailboxMessage:
+    folder: str
+    message_id: str
+    archive_folder: str
+    archived: bool
+
+    def as_dict(self) -> dict[str, object]:
+        return asdict(self)
+
+
 def list_mailbox_snapshot(
     *,
     email: str,
@@ -69,6 +80,30 @@ def list_mailbox_snapshot(
     return MailboxSnapshot(email=email, folders=folders, messages=messages)
 
 
+def archive_mailbox_message(
+    *,
+    email: str,
+    password: str,
+    host: str,
+    port: int,
+    folder: str,
+    message_id: str,
+    archive_folder: str = "Archive",
+    timeout_seconds: float = 10.0,
+    verify_tls: bool = False,
+) -> ArchivedMailboxMessage:
+    tls_context = _tls_context(verify_tls=verify_tls)
+    with imaplib.IMAP4_SSL(host, port, ssl_context=tls_context, timeout=timeout_seconds) as imap:
+        imap.login(email, password)
+        _archive_message(imap, folder=folder, message_id=message_id, archive_folder=archive_folder)
+    return ArchivedMailboxMessage(
+        folder=folder,
+        message_id=message_id,
+        archive_folder=archive_folder,
+        archived=True,
+    )
+
+
 def get_mailbox_message(
     *,
     email: str,
@@ -84,6 +119,34 @@ def get_mailbox_message(
     with imaplib.IMAP4_SSL(host, port, ssl_context=tls_context, timeout=timeout_seconds) as imap:
         imap.login(email, password)
         return _get_message(imap, folder=folder, message_id=message_id)
+
+
+def _archive_message(imap: imaplib.IMAP4_SSL, *, folder: str, message_id: str, archive_folder: str) -> None:
+    status, _data = imap.select(f'"{folder}"', readonly=False)
+    if status != "OK":
+        raise imaplib.IMAP4.error(f"Mailbox folder not found: {folder}")
+    _ensure_folder(imap, archive_folder)
+    status, _data = imap.select(f'"{folder}"', readonly=False)
+    if status != "OK":
+        raise imaplib.IMAP4.error(f"Mailbox folder not found: {folder}")
+    copy_status, _copy_data = imap.copy(message_id.encode("ascii"), f'"{archive_folder}"')
+    if copy_status != "OK":
+        raise imaplib.IMAP4.error("Mailbox message could not be archived")
+    store_status, _store_data = imap.store(message_id.encode("ascii"), "+FLAGS", r"(\Deleted)")
+    if store_status != "OK":
+        raise imaplib.IMAP4.error("Mailbox message could not be removed from source folder")
+    expunge_status, _expunge_data = imap.expunge()
+    if expunge_status != "OK":
+        raise imaplib.IMAP4.error("Mailbox source folder expunge failed")
+
+
+def _ensure_folder(imap: imaplib.IMAP4_SSL, folder: str) -> None:
+    select_status, _data = imap.select(f'"{folder}"', readonly=True)
+    if select_status == "OK":
+        return
+    create_status, _create_data = imap.create(f'"{folder}"')
+    if create_status != "OK":
+        raise imaplib.IMAP4.error(f"Mailbox folder could not be created: {folder}")
 
 
 def _list_folders(imap: imaplib.IMAP4_SSL) -> list[MailboxFolder]:

@@ -94,6 +94,7 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         "compose-form",
         "reply-action",
         "forward-action",
+        "archive-action",
     ]:
         if marker not in " ".join(parser.attributes.get("id", [])):
             failures.append(f"missing live mailbox UI marker: {marker}")
@@ -101,7 +102,9 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         "fetch(",
         "/api/v1/mailbox/snapshot",
         "/api/v1/mailbox/message",
+        "/api/v1/mailbox/message/archive",
         "/api/v1/mailbox/send",
+        "archiveMailboxMessage",
         "renderMessageBody",
         "prefillReply",
         "prefillForward",

@@ -8,6 +8,7 @@ const messageBody = document.querySelector("#message-body");
 const composeForm = document.querySelector("#compose-form");
 const replyAction = document.querySelector("#reply-action");
 const forwardAction = document.querySelector("#forward-action");
+const archiveAction = document.querySelector("#archive-action");
 const composeTo = document.querySelector("#compose-to");
 const composeSubject = document.querySelector("#compose-subject");
 const composeBody = document.querySelector("#compose-body");
@@ -61,6 +62,14 @@ forwardAction?.addEventListener("click", () => {
   prefillForward(selectedMessageDetail);
 });
 
+archiveAction?.addEventListener("click", async () => {
+  if (!selectedMessageDetail) {
+    setStatus("Select a message before archiving.", "error");
+    return;
+  }
+  await archiveMailboxMessage(selectedMessageDetail);
+});
+
 async function loadMailboxSnapshot(folder) {
   if (!mailboxSession.email || !mailboxSession.password || !mailboxSession.apiBaseUrl) {
     setStatus("Enter mailbox credentials to load live mail.", "idle");
@@ -87,6 +96,38 @@ async function loadMailboxSnapshot(folder) {
     setStatus(`Loaded ${snapshot.messages?.length || 0} messages from ${folder}.`, "ready");
   } catch (error) {
     setStatus(`Mailbox load failed: ${readableError(error)}`, "error");
+  }
+}
+
+async function archiveMailboxMessage(message) {
+  if (!mailboxSession.email || !mailboxSession.password || !mailboxSession.apiBaseUrl) {
+    setStatus("Load a mailbox before archiving.", "error");
+    return;
+  }
+  setStatus("Archiving message...", "loading");
+  try {
+    const url = new URL("/api/v1/mailbox/message/archive", mailboxSession.apiBaseUrl);
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-FreeMail-Mailbox-Email": mailboxSession.email,
+        "X-FreeMail-Mailbox-Password": mailboxSession.password,
+      },
+      body: JSON.stringify({
+        folder: message.folder,
+        messageId: message.messageId,
+        archiveFolder: "Archive",
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    setStatus("Message archived.", "ready");
+    selectedMessageDetail = null;
+    await loadMailboxSnapshot(mailboxSession.folder);
+  } catch (error) {
+    setStatus(`Archive failed: ${readableError(error)}`, "error");
   }
 }
 

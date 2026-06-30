@@ -251,6 +251,23 @@ def test_mailbox_send_allows_loopback_web_preview_cors(tmp_path):
     assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:18091"
 
 
+def test_mailbox_archive_allows_loopback_web_preview_cors(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.options(
+            "/api/v1/mailbox/message/archive",
+            headers={
+                "Origin": "http://127.0.0.1:18091",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": (
+                    "Content-Type, X-FreeMail-Mailbox-Email, X-FreeMail-Mailbox-Password"
+                ),
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:18091"
+
+
 def test_mailbox_snapshot_returns_imap_adapter_payload(tmp_path, monkeypatch):
     class Snapshot:
         def as_dict(self):
@@ -347,6 +364,52 @@ def test_mailbox_send_requires_mailbox_credentials(tmp_path):
 
     assert response.status_code == 401
     assert response.json()["detail"] == "Mailbox credentials required"
+
+
+def test_mailbox_archive_requires_mailbox_credentials(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.post(
+            "/api/v1/mailbox/message/archive",
+            json={"folder": "INBOX", "messageId": "1", "archiveFolder": "Archive"},
+        )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Mailbox credentials required"
+
+
+def test_mailbox_archive_returns_imap_adapter_payload(tmp_path, monkeypatch):
+    class Archived:
+        def as_dict(self):
+            return {
+                "folder": "INBOX",
+                "message_id": "1",
+                "archive_folder": "Archive",
+                "archived": True,
+            }
+
+    def fake_archive(**kwargs):
+        assert kwargs["email"] == "admin@example.com"
+        assert kwargs["password"] == "secret"
+        assert kwargs["folder"] == "INBOX"
+        assert kwargs["message_id"] == "1"
+        assert kwargs["archive_folder"] == "Archive"
+        return Archived()
+
+    monkeypatch.setattr("freemail_api.main.archive_mailbox_message", fake_archive)
+
+    with make_client(tmp_path) as client:
+        response = client.post(
+            "/api/v1/mailbox/message/archive",
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+            json={"folder": "INBOX", "messageId": "1", "archiveFolder": "Archive"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["archived"] is True
+    assert response.json()["archiveFolder"] == "Archive"
 
 
 def test_mailbox_send_returns_submission_payload(tmp_path, monkeypatch):
