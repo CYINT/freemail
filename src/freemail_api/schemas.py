@@ -264,6 +264,31 @@ class MailboxSessionDeleteRecord(ApiModel):
     revoked: bool
 
 
+class MailboxPushDeviceCreate(ApiModel):
+    device_id: str = Field(min_length=8, max_length=160, pattern=r"^[A-Za-z0-9._:-]+$")
+    platform: str = Field(min_length=3, max_length=20, pattern=r"^(ios|android|web|development)$")
+    push_token: str = Field(min_length=8, max_length=512)
+    provider: str = Field(default="contract-only", min_length=3, max_length=64, pattern=r"^[A-Za-z0-9._:-]+$")
+
+
+class MailboxPushDeviceRecord(ApiModel):
+    id: int
+    mailbox_email: EmailStr
+    device_id: str
+    platform: str
+    provider: str
+    enabled: bool
+    created_at: str
+    updated_at: str
+
+    model_config = ConfigDict(alias_generator=to_camel, from_attributes=True, populate_by_name=True)
+
+
+class MailboxPushDeviceDeleteRecord(ApiModel):
+    revoked: bool
+    device_id: str
+
+
 class MailboxSendCreate(ApiModel):
     recipients: list[EmailStr] = Field(min_length=1, max_length=50)
     subject: str = Field(min_length=1, max_length=255)

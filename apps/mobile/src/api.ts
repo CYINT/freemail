@@ -55,6 +55,17 @@ export type MailboxContacts = {
   contacts: MailContact[];
 };
 
+export type MailboxPushDevice = {
+  id: number;
+  mailboxEmail: string;
+  deviceId: string;
+  platform: "ios" | "android" | "web" | "development";
+  provider: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type ComposeMessage = {
   recipients: string[];
   subject: string;
@@ -123,6 +134,38 @@ export async function loadMailboxAttachment(
   return response.blob();
 }
 
+export async function registerMailboxPushDevice(
+  session: MailboxSession,
+  deviceId: string,
+  pushToken: string,
+  provider = "contract-only",
+): Promise<MailboxPushDevice> {
+  const platform = devicePlatform();
+  const response = await request(session.apiBaseUrl, "/api/v1/mailbox/push/devices", {
+    method: "POST",
+    headers: {
+      ...mailboxHeaders(session),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ deviceId, platform, pushToken, provider }),
+  });
+  return response.json();
+}
+
+export async function loadMailboxPushDevices(session: MailboxSession): Promise<MailboxPushDevice[]> {
+  const response = await request(session.apiBaseUrl, "/api/v1/mailbox/push/devices", {
+    headers: mailboxHeaders(session),
+  });
+  return response.json();
+}
+
+export async function revokeMailboxPushDevice(session: MailboxSession, deviceId: string): Promise<void> {
+  await request(session.apiBaseUrl, `/api/v1/mailbox/push/devices/${encodeURIComponent(deviceId)}`, {
+    method: "DELETE",
+    headers: mailboxHeaders(session),
+  });
+}
+
 export async function sendMailboxMessage(session: MailboxSession, message: ComposeMessage): Promise<void> {
   await request(session.apiBaseUrl, "/api/v1/mailbox/send", {
     method: "POST",
@@ -175,4 +218,16 @@ async function mutateMailboxFolder(
     },
     body: JSON.stringify(payload),
   });
+}
+
+function devicePlatform(): "ios" | "android" | "development" {
+  const maybeNavigator = globalThis as { navigator?: { product?: string; userAgent?: string } };
+  const userAgent = maybeNavigator.navigator?.userAgent?.toLowerCase() || "";
+  if (userAgent.includes("android")) {
+    return "android";
+  }
+  if (userAgent.includes("iphone") || userAgent.includes("ipad") || userAgent.includes("ios")) {
+    return "ios";
+  }
+  return "development";
 }

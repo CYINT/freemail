@@ -1,4 +1,6 @@
+from hashlib import sha256
 from pathlib import Path
+import sqlite3
 
 from fastapi.testclient import TestClient
 
@@ -436,6 +438,69 @@ def test_mailbox_session_delete_revokes_token(tmp_path, monkeypatch):
     assert delete_response.status_code == 200
     assert delete_response.json()["revoked"] is True
     assert snapshot_response.status_code == 401
+
+
+def test_mailbox_push_devices_require_bearer_session(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.post(
+            "/api/v1/mailbox/push/devices",
+            json={
+                "deviceId": "device-123",
+                "platform": "development",
+                "pushToken": "provider-token-123",
+            },
+        )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Mailbox credentials required"
+
+
+def test_mailbox_push_device_register_list_and_revoke(tmp_path, monkeypatch):
+    class Snapshot:
+        def as_dict(self):
+            return {"email": "admin@example.com", "folders": [], "messages": []}
+
+    monkeypatch.setattr("freemail_api.main.list_mailbox_snapshot", lambda **_kwargs: Snapshot())
+
+    with make_client(tmp_path) as client:
+        session_response = client.post(
+            "/api/v1/mailbox/session",
+            json={"email": "admin@example.com", "password": "secret"},
+        )
+        token = session_response.json()["token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        register_response = client.post(
+            "/api/v1/mailbox/push/devices",
+            headers=headers,
+            json={
+                "deviceId": "device-123",
+                "platform": "development",
+                "pushToken": "provider-token-123",
+                "provider": "contract-only",
+            },
+        )
+        list_response = client.get("/api/v1/mailbox/push/devices", headers=headers)
+        revoke_response = client.delete("/api/v1/mailbox/push/devices/device-123", headers=headers)
+        revoked_list_response = client.get("/api/v1/mailbox/push/devices", headers=headers)
+
+    assert register_response.status_code == 200
+    registered = register_response.json()
+    assert registered["mailboxEmail"] == "admin@example.com"
+    assert registered["deviceId"] == "device-123"
+    assert registered["enabled"] is True
+    assert "pushToken" not in registered
+    assert "pushTokenHash" not in registered
+    assert list_response.status_code == 200
+    assert list_response.json()[0]["deviceId"] == "device-123"
+    assert revoke_response.status_code == 200
+    assert revoke_response.json() == {"revoked": True, "deviceId": "device-123"}
+    assert revoked_list_response.json()[0]["enabled"] is False
+    with sqlite3.connect(tmp_path / "freemail.sqlite") as connection:
+        connection.row_factory = sqlite3.Row
+        row = connection.execute("SELECT push_token_hash FROM mailbox_push_devices").fetchone()
+    assert row["push_token_hash"] == sha256("provider-token-123".encode("utf-8")).hexdigest()
+    assert row["push_token_hash"] != "provider-token-123"
 
 
 def test_mailbox_search_requires_mailbox_credentials(tmp_path):

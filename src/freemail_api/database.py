@@ -87,6 +87,22 @@ CREATE TABLE IF NOT EXISTS outbound_send_events (
 
 CREATE INDEX IF NOT EXISTS idx_outbound_send_events_mailbox_created
 ON outbound_send_events(mailbox_email, created_at);
+
+CREATE TABLE IF NOT EXISTS mailbox_push_devices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mailbox_email TEXT NOT NULL,
+    device_id TEXT NOT NULL,
+    platform TEXT NOT NULL,
+    push_token_hash TEXT NOT NULL,
+    provider TEXT NOT NULL DEFAULT 'contract-only',
+    enabled INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(mailbox_email, device_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_mailbox_push_devices_mailbox_enabled
+ON mailbox_push_devices(mailbox_email, enabled);
 """
 
 
@@ -314,6 +330,63 @@ def delete_old_outbound_send_events(connection: sqlite3.Connection, *, before: i
     connection.commit()
 
 
+def upsert_mailbox_push_device(
+    connection: sqlite3.Connection,
+    *,
+    email: str,
+    device_id: str,
+    platform: str,
+    push_token_hash: str,
+    provider: str,
+) -> sqlite3.Row:
+    normalized_email = email.lower()
+    normalized_device_id = device_id.strip()
+    connection.execute(
+        """
+        INSERT INTO mailbox_push_devices (
+            mailbox_email, device_id, platform, push_token_hash, provider, enabled, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
+        ON CONFLICT(mailbox_email, device_id) DO UPDATE SET
+            platform = excluded.platform,
+            push_token_hash = excluded.push_token_hash,
+            provider = excluded.provider,
+            enabled = 1,
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        [normalized_email, normalized_device_id, platform, push_token_hash, provider],
+    )
+    connection.commit()
+    return _get_mailbox_push_device(connection, normalized_email, normalized_device_id)
+
+
+def list_mailbox_push_devices(connection: sqlite3.Connection, *, email: str) -> list[sqlite3.Row]:
+    return list(
+        connection.execute(
+            """
+            SELECT id, mailbox_email, device_id, platform, provider, enabled, created_at, updated_at
+            FROM mailbox_push_devices
+            WHERE mailbox_email = ?
+            ORDER BY updated_at DESC, id DESC
+            """,
+            [email.lower()],
+        )
+    )
+
+
+def revoke_mailbox_push_device(connection: sqlite3.Connection, *, email: str, device_id: str) -> bool:
+    cursor = connection.execute(
+        """
+        UPDATE mailbox_push_devices
+        SET enabled = 0, updated_at = CURRENT_TIMESTAMP
+        WHERE mailbox_email = ? AND device_id = ?
+        """,
+        [email.lower(), device_id.strip()],
+    )
+    connection.commit()
+    return cursor.rowcount > 0
+
+
 def _execute_insert(connection: sqlite3.Connection, statement: str, values: Iterable[object]) -> int:
     try:
         cursor = connection.execute(statement, list(values))
@@ -339,4 +412,18 @@ def _get_row(connection: sqlite3.Connection, table: str, row_id: int) -> sqlite3
     row = connection.execute(f"SELECT * FROM {table} WHERE id = ?", [row_id]).fetchone()
     if row is None:
         raise MissingRecordError(f"{table} id {row_id} was not found")
+    return row
+
+
+def _get_mailbox_push_device(connection: sqlite3.Connection, email: str, device_id: str) -> sqlite3.Row:
+    row = connection.execute(
+        """
+        SELECT id, mailbox_email, device_id, platform, provider, enabled, created_at, updated_at
+        FROM mailbox_push_devices
+        WHERE mailbox_email = ? AND device_id = ?
+        """,
+        [email.lower(), device_id.strip()],
+    ).fetchone()
+    if row is None:
+        raise MissingRecordError(f"push device {device_id} was not found")
     return row

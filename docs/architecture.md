@@ -86,6 +86,7 @@ The current mobile foundation covers:
 - folder-scoped search and contacts
 - attachment metadata display and authenticated availability checks
 - SecureStore-backed offline metadata cache for last loaded folder, message header, and contact snapshots
+- bearer-authenticated push-device registration, listing, and revocation contract with hashed provider tokens
 - static QA that forbids provider trade-dress references and insecure browser-style credential storage
 
-Native build, app-store signing, push notifications, and richer attachment UX remain future mobile milestones.
+Native build, app-store signing, provider-specific push delivery, and richer attachment UX remain future mobile milestones.

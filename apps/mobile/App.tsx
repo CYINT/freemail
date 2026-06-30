@@ -21,14 +21,18 @@ import {
   loadMailboxAttachment,
   loadMailboxContacts,
   loadMailboxMessage,
+  loadMailboxPushDevices,
   loadMailboxSnapshot,
   MailboxSession,
   MailContact,
   MailFolder,
   MailMessage,
   MailMessageDetail,
+  MailboxPushDevice,
   renameMailboxFolder,
+  registerMailboxPushDevice,
   revokeMailboxSession,
+  revokeMailboxPushDevice,
   searchMailbox,
   sendMailboxMessage,
 } from "./src/api";
@@ -47,10 +51,13 @@ export default function App() {
   const [folders, setFolders] = useState<MailFolder[]>([]);
   const [messages, setMessages] = useState<MailMessage[]>([]);
   const [contacts, setContacts] = useState<MailContact[]>([]);
+  const [pushDevices, setPushDevices] = useState<MailboxPushDevice[]>([]);
   const [selectedMessage, setSelectedMessage] = useState<MailMessageDetail | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [newFolderName, setNewFolderName] = useState("");
   const [renameFolderName, setRenameFolderName] = useState("");
+  const [pushDeviceId, setPushDeviceId] = useState("");
+  const [pushToken, setPushToken] = useState("");
   const [composeTo, setComposeTo] = useState("");
   const [composeSubject, setComposeSubject] = useState("");
   const [composeBody, setComposeBody] = useState("");
@@ -93,6 +100,7 @@ export default function App() {
     setFolders([]);
     setMessages([]);
     setContacts([]);
+    setPushDevices([]);
     setSelectedMessage(null);
     await clearStoredMailboxSession();
     if (activeSession) {
@@ -123,13 +131,52 @@ export default function App() {
         loadMailboxSnapshot(activeSession, targetFolder),
         loadMailboxContacts(activeSession, targetFolder),
       ]);
+      const devices = await loadMailboxPushDevices(activeSession);
       setFolder(targetFolder);
       setFolders(snapshot.folders || []);
       setMessages(snapshot.messages || []);
       setContacts(contactList.contacts || []);
+      setPushDevices(devices || []);
       setSelectedMessage(null);
       await saveCachedMailboxSnapshot(activeSession, targetFolder, snapshot, contactList.contacts || []);
       setStatus(`Loaded ${snapshot.messages?.length || 0} messages from ${targetFolder}.`);
+    } catch (error) {
+      setStatus(readableError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function registerPushDevice() {
+    if (!session || !pushDeviceId.trim() || !pushToken.trim()) {
+      return;
+    }
+    setLoading(true);
+    setStatus("Registering push device...");
+    try {
+      const registered = await registerMailboxPushDevice(session, pushDeviceId.trim(), pushToken.trim());
+      setPushToken("");
+      setPushDevices((current) => [registered, ...current.filter((device) => device.deviceId !== registered.deviceId)]);
+      setStatus(`Push device ${registered.deviceId} registered.`);
+    } catch (error) {
+      setStatus(readableError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function revokePushDevice(deviceId: string) {
+    if (!session) {
+      return;
+    }
+    setLoading(true);
+    setStatus(`Revoking push device ${deviceId}...`);
+    try {
+      await revokeMailboxPushDevice(session, deviceId);
+      setPushDevices((current) =>
+        current.map((device) => (device.deviceId === deviceId ? { ...device, enabled: false } : device)),
+      );
+      setStatus(`Push device ${deviceId} revoked.`);
     } catch (error) {
       setStatus(readableError(error));
     } finally {
@@ -432,6 +479,45 @@ export default function App() {
             </View>
 
             <View style={styles.panel}>
+              <Text style={styles.sectionTitle}>Push devices</Text>
+              <View style={styles.inlineControls}>
+                <TextInput
+                  value={pushDeviceId}
+                  onChangeText={setPushDeviceId}
+                  style={[styles.input, styles.flexInput]}
+                  autoCapitalize="none"
+                  placeholder="Device ID"
+                />
+                <TextInput
+                  value={pushToken}
+                  onChangeText={setPushToken}
+                  style={[styles.input, styles.flexInput]}
+                  autoCapitalize="none"
+                  placeholder="Provider token"
+                  secureTextEntry
+                />
+              </View>
+              <Pressable style={styles.secondaryButton} onPress={registerPushDevice}>
+                <Text>Register push device</Text>
+              </Pressable>
+              {pushDevices.map((device) => (
+                <View key={device.deviceId} style={styles.pushDeviceRow}>
+                  <View>
+                    <Text style={styles.sender}>{device.deviceId}</Text>
+                    <Text style={styles.meta}>
+                      {device.platform} - {device.provider} - {device.enabled ? "enabled" : "revoked"}
+                    </Text>
+                  </View>
+                  {device.enabled ? (
+                    <Pressable style={styles.secondaryButton} onPress={() => revokePushDevice(device.deviceId)}>
+                      <Text>Revoke</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              ))}
+            </View>
+
+            <View style={styles.panel}>
               <Text style={styles.sectionTitle}>Compose</Text>
               <TextInput value={composeTo} onChangeText={setComposeTo} style={styles.input} autoCapitalize="none" placeholder="To" />
               <TextInput value={composeSubject} onChangeText={setComposeSubject} style={styles.input} placeholder="Subject" />
@@ -505,6 +591,14 @@ const styles = StyleSheet.create({
   messageRow: { borderBottomColor: "#d8dee9", borderBottomWidth: 1, paddingVertical: 10, gap: 3 },
   contactRow: { borderBottomColor: "#eef2f7", borderBottomWidth: 1, paddingVertical: 8, gap: 2 },
   attachmentRow: { borderColor: "#cbd5e1", borderRadius: 8, borderWidth: 1, padding: 10, gap: 2 },
+  pushDeviceRow: {
+    alignItems: "center",
+    borderBottomColor: "#eef2f7",
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+  },
   sender: { color: "#1f2937", fontWeight: "700" },
   subject: { color: "#1f2937", fontSize: 16 },
   meta: { color: "#697386", fontSize: 12 },

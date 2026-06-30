@@ -31,11 +31,20 @@ def test_metadata_backup_round_trip_preserves_core_metadata_and_key_material(tmp
             recipient_count=1,
             created_at=1_700_000_000,
         )
+        database.upsert_mailbox_push_device(
+            connection,
+            email="admin@example.com",
+            device_id="device-123",
+            platform="development",
+            push_token_hash="hashed-push-token",
+            provider="contract-only",
+        )
         backup = export_metadata_backup(connection, generated_at="2026-06-30T00:00:00+00:00")
 
     assert backup["schemaVersion"] == 1
-    assert backup["excludedTables"] == ["mailbox_sessions", "outbound_send_events"]
+    assert backup["excludedTables"] == ["mailbox_sessions", "outbound_send_events", "mailbox_push_devices"]
     assert "mailbox_sessions" not in backup["tables"]
+    assert "mailbox_push_devices" not in backup["tables"]
     assert backup["tables"]["dkim_keys"][0]["private_key_pem"] == "private-key-pem"
 
     with database.connect(str(target_path)) as connection:
@@ -50,6 +59,7 @@ def test_metadata_backup_round_trip_preserves_core_metadata_and_key_material(tmp
         assert [dict(row) for row in database.list_rows(connection, "audit_log")] == backup["tables"]["audit_log"]
         assert connection.execute("SELECT COUNT(*) FROM mailbox_sessions").fetchone()[0] == 0
         assert connection.execute("SELECT COUNT(*) FROM outbound_send_events").fetchone()[0] == 0
+        assert connection.execute("SELECT COUNT(*) FROM mailbox_push_devices").fetchone()[0] == 0
 
 
 def test_metadata_restore_refuses_non_empty_database_without_force(tmp_path):

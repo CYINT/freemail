@@ -117,7 +117,15 @@ npm audit --audit-level=moderate
 Pop-Location
 ```
 
-The mobile scaffold lives in `apps\mobile`, uses Expo/React Native, defaults to `https://freemail.kuzuryu.ai`, and persists bearer sessions through `expo-secure-store` rather than browser-style storage. It currently covers sign-in, inbox/folder snapshots, message reading, compose/send, reply/forward drafts, folder-scoped search, contacts, non-core folder management, attachment metadata/availability checks, and secure offline metadata caching for the last loaded mailbox views.
+The mobile scaffold lives in `apps\mobile`, uses Expo/React Native, defaults to `https://freemail.kuzuryu.ai`, and persists bearer sessions through `expo-secure-store` rather than browser-style storage. It currently covers sign-in, inbox/folder snapshots, message reading, compose/send, reply/forward drafts, folder-scoped search, contacts, non-core folder management, attachment metadata/availability checks, secure offline metadata caching for the last loaded mailbox views, and a bearer-authenticated push-device registration contract.
+
+Push-provider delivery is intentionally not wired to a third-party service yet. The current contract stores only hashed provider tokens for mailbox/device registration and gives native clients stable register/list/revoke APIs:
+
+```text
+POST /api/v1/mailbox/push/devices
+GET /api/v1/mailbox/push/devices
+DELETE /api/v1/mailbox/push/devices/{deviceId}
+```
 
 The webmail preview can load live mailbox folders and message headers from the API. Start `admin-api`, `mail-core`, and `web`, open `http://127.0.0.1:18091`, enter a mailbox address/password, and keep the API field pointed at `http://127.0.0.1:18090`. The browser client exchanges the mailbox password for a bearer session at `POST /api/v1/mailbox/session`, stores only the bearer token in `localStorage`, and revokes it with `DELETE /api/v1/mailbox/session` on sign out. The API stores mailbox passwords only as encrypted session material using `FREEMAIL_SESSION_SECRET`. For a different local web origin, set `FREEMAIL_WEB_CORS_ORIGINS`.
 
@@ -255,7 +263,7 @@ The exporter matches DKIM signatures by selector to avoid duplicate Stalwart sig
 
 ## Backup And Restore
 
-Read `docs/backup-restore.md` before relying on backups. The metadata backup tools export API metadata, audit logs, and DKIM key material; they intentionally exclude mailbox sessions, outbound rate-limit counters, and Stalwart mail-store data.
+Read `docs/backup-restore.md` before relying on backups. The metadata backup tools export API metadata, audit logs, and DKIM key material; they intentionally exclude mailbox sessions, outbound rate-limit counters, push-device registrations, and Stalwart mail-store data.
 
 Export metadata:
 

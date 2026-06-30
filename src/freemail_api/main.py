@@ -1,6 +1,7 @@
 import binascii
 from collections.abc import Iterator
 from contextlib import asynccontextmanager
+from hashlib import sha256
 import imaplib
 import smtplib
 import sqlite3
@@ -59,6 +60,9 @@ from .schemas import (
     MailboxMessageDetailRecord,
     MailboxMoveCreate,
     MailboxMoveRecord,
+    MailboxPushDeviceCreate,
+    MailboxPushDeviceDeleteRecord,
+    MailboxPushDeviceRecord,
     MailboxRecord,
     MailboxSearchRecord,
     MailboxSendCreate,
@@ -274,6 +278,58 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if token:
             revoke_mailbox_session(connection, token)
         return {"revoked": True}
+
+    @app.post("/api/v1/mailbox/push/devices", response_model=MailboxPushDeviceRecord)
+    def mailbox_push_device_register(
+        payload: MailboxPushDeviceCreate,
+        authorization: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=None,
+            x_freemail_mailbox_password=None,
+            connection=connection,
+        )
+        row = database.upsert_mailbox_push_device(
+            connection,
+            email=credentials.email,
+            device_id=payload.device_id,
+            platform=payload.platform,
+            push_token_hash=sha256(payload.push_token.encode("utf-8")).hexdigest(),
+            provider=payload.provider,
+        )
+        return _row_to_dict(row)
+
+    @app.get("/api/v1/mailbox/push/devices", response_model=list[MailboxPushDeviceRecord])
+    def mailbox_push_device_list(
+        authorization: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> list[dict[str, object]]:
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=None,
+            x_freemail_mailbox_password=None,
+            connection=connection,
+        )
+        return _rows_to_dicts(database.list_mailbox_push_devices(connection, email=credentials.email))
+
+    @app.delete("/api/v1/mailbox/push/devices/{device_id}", response_model=MailboxPushDeviceDeleteRecord)
+    def mailbox_push_device_delete(
+        device_id: str,
+        authorization: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=None,
+            x_freemail_mailbox_password=None,
+            connection=connection,
+        )
+        return {
+            "revoked": database.revoke_mailbox_push_device(connection, email=credentials.email, device_id=device_id),
+            "device_id": device_id,
+        }
 
     @app.get("/api/v1/mailbox/snapshot", response_model=MailboxSnapshotRecord)
     def mailbox_snapshot(
