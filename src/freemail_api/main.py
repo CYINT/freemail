@@ -28,6 +28,10 @@ from .mailbox_imap import rename_mailbox_folder
 from .mailbox_imap import search_mailbox_messages
 from .mailbox_smtp import OutboundAttachment
 from .mailbox_smtp import send_mailbox_message
+from .outbound_policy import enforce_outbound_rate_limit
+from .outbound_policy import OutboundRateLimitExceeded
+from .outbound_policy import OutboundRatePolicy
+from .outbound_policy import record_outbound_send
 from .schemas import (
     AliasCreate,
     AliasRecord,
@@ -131,6 +135,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return AttachmentPolicy(
             max_bytes=active_settings.max_attachment_bytes,
             allowed_content_types=parse_allowed_content_types(active_settings.allowed_attachment_content_types),
+        )
+
+    def outbound_rate_policy() -> OutboundRatePolicy:
+        return OutboundRatePolicy(
+            window_seconds=active_settings.send_rate_window_seconds,
+            max_messages=active_settings.send_rate_max_messages,
+            max_recipients=active_settings.send_rate_max_recipients,
         )
 
     def mailbox_credentials(
@@ -596,6 +607,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         try:
             validate_attachments(payload.attachments, attachment_policy())
+            recipient_count = len(payload.recipients)
+            enforce_outbound_rate_limit(
+                connection,
+                email=credentials.email,
+                recipient_count=recipient_count,
+                policy=outbound_rate_policy(),
+            )
             sent = send_mailbox_message(
                 email=credentials.email,
                 password=credentials.password,
@@ -613,8 +631,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     for attachment in payload.attachments
                 ],
             )
+            record_outbound_send(connection, email=credentials.email, recipient_count=recipient_count)
         except AttachmentPolicyError as error:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)) from error
+        except OutboundRateLimitExceeded as error:
+            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(error)) from error
         except (ValueError, binascii.Error) as error:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Invalid attachment payload") from error
         except smtplib.SMTPAuthenticationError as error:

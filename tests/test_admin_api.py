@@ -878,6 +878,90 @@ def test_mailbox_send_returns_submission_payload(tmp_path, monkeypatch):
     assert response.json()["messageId"] == "<message@example.com>"
 
 
+def test_mailbox_send_rejects_message_rate_limit_before_smtp(tmp_path, monkeypatch):
+    calls = []
+
+    class Sent:
+        def as_dict(self):
+            return {
+                "message_id": "<message@example.com>",
+                "sender": "admin@example.com",
+                "recipients": ["hello@example.com"],
+                "subject": "Hello",
+            }
+
+    def fake_send(**_kwargs):
+        calls.append("send")
+        return Sent()
+
+    monkeypatch.setattr("freemail_api.main.send_mailbox_message", fake_send)
+    settings = Settings(
+        database_path=str(tmp_path / "freemail.sqlite"),
+        admin_api_token=ADMIN_TOKEN,
+        bootstrap_token=BOOTSTRAP_TOKEN,
+        session_secret="test-session-secret",
+        send_rate_window_seconds=3600,
+        send_rate_max_messages=1,
+        send_rate_max_recipients=10,
+        release_commit="test",
+    )
+
+    with TestClient(create_app(settings)) as client:
+        headers = {
+            "X-FreeMail-Mailbox-Email": "admin@example.com",
+            "X-FreeMail-Mailbox-Password": "secret",
+        }
+        first = client.post(
+            "/api/v1/mailbox/send",
+            headers=headers,
+            json={"recipients": ["hello@example.com"], "subject": "Hello", "body": "Body"},
+        )
+        second = client.post(
+            "/api/v1/mailbox/send",
+            headers=headers,
+            json={"recipients": ["hello@example.com"], "subject": "Hello again", "body": "Body"},
+        )
+
+    assert first.status_code == 200
+    assert second.status_code == 429
+    assert "send rate limit" in second.json()["detail"]
+    assert calls == ["send"]
+
+
+def test_mailbox_send_rejects_recipient_rate_limit_before_smtp(tmp_path, monkeypatch):
+    def fake_send(**_kwargs):
+        raise AssertionError("SMTP send should not run for rejected rate-limit payload")
+
+    monkeypatch.setattr("freemail_api.main.send_mailbox_message", fake_send)
+    settings = Settings(
+        database_path=str(tmp_path / "freemail.sqlite"),
+        admin_api_token=ADMIN_TOKEN,
+        bootstrap_token=BOOTSTRAP_TOKEN,
+        session_secret="test-session-secret",
+        send_rate_window_seconds=3600,
+        send_rate_max_messages=10,
+        send_rate_max_recipients=1,
+        release_commit="test",
+    )
+
+    with TestClient(create_app(settings)) as client:
+        response = client.post(
+            "/api/v1/mailbox/send",
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+            json={
+                "recipients": ["hello@example.com", "ops@example.com"],
+                "subject": "Hello",
+                "body": "Body",
+            },
+        )
+
+    assert response.status_code == 429
+    assert "recipient rate limit" in response.json()["detail"]
+
+
 def test_mailbox_send_rejects_unsupported_attachment_content_type(tmp_path, monkeypatch):
     def fake_send(**_kwargs):
         raise AssertionError("SMTP send should not run for rejected attachments")

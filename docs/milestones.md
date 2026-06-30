@@ -41,6 +41,8 @@ Current progress: static webmail preview shell exists with inbox, message reader
 - Outbound throttles.
 - Abuse controls.
 
+Current progress: DKIM signing is locally verified in the mail-flow smoke for the provisioned mailbox domain, Stalwart queue inspection exists through a local-only CLI gate, and the mailbox send API now enforces configurable per-mailbox outbound message and recipient caps before SMTP submission. Accepted sends are recorded in the API database after SMTP accepts the message. Remaining work is controlled production-domain SPF/DMARC verification, explicit spam/abuse policy, bounce/reputation handling, and private-beta deliverability evidence.
+
 ## M5 - Backup, Restore, Upgrade, And Release Gates
 
 - Backup and restore for metadata, mail store, attachments, and key material.

@@ -181,6 +181,14 @@ Outbound attachment submission is bounded by:
 
 The API rejects unsupported content types, invalid base64 payloads, and decoded attachments above the configured per-attachment limit before SMTP submission.
 
+Outbound submission is also rate-limited per mailbox before SMTP submission:
+
+- `FREEMAIL_SEND_RATE_WINDOW_SECONDS`, default `3600`.
+- `FREEMAIL_SEND_RATE_MAX_MESSAGES`, default `120` accepted sends per window.
+- `FREEMAIL_SEND_RATE_MAX_RECIPIENTS`, default `500` accepted recipients per window.
+
+Set either max value to `0` to disable that specific cap. Accepted sends are recorded in the FreeMail API database after SMTP accepts the message; rejected attachments, invalid payloads, and refused SMTP attempts do not consume quota.
+
 The mail-core spike profile starts the Stalwart candidate with ports still bound to loopback:
 
 ```powershell

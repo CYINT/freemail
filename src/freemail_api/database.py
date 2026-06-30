@@ -77,6 +77,16 @@ CREATE TABLE IF NOT EXISTS mailbox_sessions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_mailbox_sessions_expires_at ON mailbox_sessions(expires_at);
+
+CREATE TABLE IF NOT EXISTS outbound_send_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mailbox_email TEXT NOT NULL,
+    recipient_count INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_outbound_send_events_mailbox_created
+ON outbound_send_events(mailbox_email, created_at);
 """
 
 
@@ -262,6 +272,45 @@ def revoke_mailbox_session(connection: sqlite3.Connection, token_hash: str) -> N
 
 def delete_expired_mailbox_sessions(connection: sqlite3.Connection, now: int) -> None:
     connection.execute("DELETE FROM mailbox_sessions WHERE expires_at <= ?", [now])
+    connection.commit()
+
+
+def count_outbound_send_events(
+    connection: sqlite3.Connection,
+    *,
+    email: str,
+    since: int,
+) -> tuple[int, int]:
+    row = connection.execute(
+        """
+        SELECT COUNT(*) AS message_count, COALESCE(SUM(recipient_count), 0) AS recipient_count
+        FROM outbound_send_events
+        WHERE mailbox_email = ? AND created_at >= ?
+        """,
+        [email.lower(), since],
+    ).fetchone()
+    return int(row["message_count"]), int(row["recipient_count"])
+
+
+def record_outbound_send_event(
+    connection: sqlite3.Connection,
+    *,
+    email: str,
+    recipient_count: int,
+    created_at: int,
+) -> None:
+    connection.execute(
+        """
+        INSERT INTO outbound_send_events (mailbox_email, recipient_count, created_at)
+        VALUES (?, ?, ?)
+        """,
+        [email.lower(), recipient_count, created_at],
+    )
+    connection.commit()
+
+
+def delete_old_outbound_send_events(connection: sqlite3.Connection, *, before: int) -> None:
+    connection.execute("DELETE FROM outbound_send_events WHERE created_at < ?", [before])
     connection.commit()
 
 

@@ -20,6 +20,9 @@ class Settings(BaseSettings):
         default="text/plain,text/csv,application/pdf,image/png,image/jpeg",
         validation_alias="FREEMAIL_ALLOWED_ATTACHMENT_CONTENT_TYPES",
     )
+    send_rate_window_seconds: int = Field(default=3600, validation_alias="FREEMAIL_SEND_RATE_WINDOW_SECONDS")
+    send_rate_max_messages: int = Field(default=120, validation_alias="FREEMAIL_SEND_RATE_MAX_MESSAGES")
+    send_rate_max_recipients: int = Field(default=500, validation_alias="FREEMAIL_SEND_RATE_MAX_RECIPIENTS")
     mail_core_host: str = Field(default="127.0.0.1", validation_alias="FREEMAIL_MAIL_CORE_HOST")
     smtp_port: int = Field(default=2525, validation_alias="FREEMAIL_SMTP_PORT")
     submission_port: int = Field(default=2465, validation_alias="FREEMAIL_SUBMISSION_PORT")
