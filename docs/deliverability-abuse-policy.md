@@ -28,4 +28,5 @@ FreeMail is in a controlled private-beta posture. Do not expose the stack direct
 - Queue gate must be clear after controlled outbound tests unless the test explicitly records retry/bounce behavior.
 - SPF and DMARC evidence must be recorded for the controlled domain before external beta use.
 - Deliverability evidence must record SPF alignment, DMARC alignment, DKIM alignment, queue review, bounce/retry review, and zero known abuse complaints for the controlled beta domain.
+- Generate credential-free deliverability evidence with `scripts/collect_deliverability_evidence.py` from controlled mail-flow and queue artifacts after SPF, DMARC, bounce/retry, and abuse review.
 - Abuse and deliverability evidence must be recorded in the planning lane before public release.

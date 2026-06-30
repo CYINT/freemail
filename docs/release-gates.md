@@ -286,6 +286,23 @@ The deliverability evidence JSON must include:
 
 The `checkedAt` value must be a timezone-aware ISO-8601 timestamp.
 
+Operators can generate that JSON from the controlled mail-flow and queue artifacts after SPF, DMARC, bounce/retry, and abuse review:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\collect_deliverability_evidence.py `
+  --domain example.com `
+  --mail-flow-evidence .freemail-qa\private-beta\mail-flow.example.com.json `
+  --queue-evidence .freemail-qa\private-beta\queue.example.com.json `
+  --output .freemail-qa\private-beta\deliverability.example.com.json `
+  --spf-aligned `
+  --dmarc-aligned `
+  --bounce-or-retry-reviewed `
+  --abuse-complaints 0 `
+  --force
+```
+
+The helper exits nonzero until mail-flow passed, DKIM aligns with the controlled domain, the queue is clear, SPF and DMARC are operator-confirmed, bounce/retry state has been reviewed, and known abuse complaints are zero. It writes credential-free JSON only.
+
 ## Provenance
 
 Release provenance for a candidate consists of:

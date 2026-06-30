@@ -524,6 +524,23 @@ Check packet inventory before running the full private-beta gate:
 
 Generate queue evidence with `scripts\qa_stalwart_queue.py` after controlled mail-flow tests; the private-beta gate requires a clear queue with zero pending and due messages.
 
+Generate deliverability evidence from the controlled mail-flow and queue artifacts after SPF, DMARC, bounce/retry, and abuse review:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\collect_deliverability_evidence.py `
+  --domain example.com `
+  --mail-flow-evidence .freemail-qa\private-beta\mail-flow.example.com.json `
+  --queue-evidence .freemail-qa\private-beta\queue.example.com.json `
+  --output .freemail-qa\private-beta\deliverability.example.com.json `
+  --spf-aligned `
+  --dmarc-aligned `
+  --bounce-or-retry-reviewed `
+  --abuse-complaints 0 `
+  --force
+```
+
+The deliverability helper writes credential-free JSON and exits nonzero until mail-flow passed, DKIM aligns with the controlled domain, the queue is clear, SPF/DMARC are operator-confirmed, bounce/retry state has been reviewed, and known abuse complaints are zero.
+
 ## VPN-Only Deployment
 
 Read `docs/deployment-vpn.md`. The intended local hostname is:
