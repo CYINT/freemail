@@ -61,7 +61,7 @@ def test_static_web_validation_flags_credential_storage():
         '<button id="bulk-archive-action">Archive</button><button id="bulk-spam-action">Spam</button>'
         '<button id="bulk-delete-action">Delete</button><button id="load-more-action">Load more</button>'
         '<section class="message-list"><div class="bulk-toolbar"></div><article class="message-row reader compose-panel">'
-        "Inbox Compose Reply Forward Download EML Import EML Mark read Mark unread Attach Send Junk Mail Spam Delete</article></section></main>"
+        "Inbox Compose Reply Forward Headers Download EML Import EML Mark read Mark unread Attach Send Junk Mail Spam Delete</article></section></main>"
     )
 
     failures = _validate(
@@ -73,6 +73,7 @@ def test_static_web_validation_flags_credential_storage():
         "fetch('/api/v1/mailbox/contacts'); "
         "fetch('/api/v1/mailbox/saved-contacts'); saveMailboxContact({}); deleteMailboxContact(1); saved-contact; "
         "fetch('/api/v1/mailbox/folder'); fetch('/api/v1/mailbox/folder/empty'); "
+        "fetch('/api/v1/mailbox/message/headers'); "
         "fetch('/api/v1/mailbox/message/attachment'); fetch('/api/v1/mailbox/message/source'); "
         "fetch('/api/v1/mailbox/message/import'); "
         "fetch('/api/v1/mailbox/message/archive'); "
@@ -89,6 +90,7 @@ def test_static_web_validation_flags_credential_storage():
         "bulkMailboxMessages('archive', 'Bulk messages archived'); selectedMessageIds.add('1'); "
         "loadMoreMailboxMessages(); nextOffset; hasMore; Load more; "
         "threadId; threadSubject; threadHint({}); Thread: "
+        "loadMailboxMessageHeaders({}); headers-action; renderMessageHeaders({}); "
         "fetch('/api/v1/mailbox/preferences'); loadMailboxPreferences(); saveMailboxPreferences(); "
         "renderMailboxPreferences(); Preferences saved; withSignature('body'); "
         "fetch('/api/v1/mailbox/draft'); saveMailboxDraft({}); Draft saved; composePayload(); "

@@ -59,6 +59,47 @@ class MailboxMessageSource:
 
 
 @dataclass(frozen=True)
+class MailboxHeaderField:
+    name: str
+    value: str
+
+    def as_dict(self) -> dict[str, object]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class MailboxMessageHeaders:
+    folder: str
+    message_id: str
+    subject: str
+    sender: str
+    recipients: str
+    date: str
+    message_id_header: str
+    reply_to: str
+    authentication_results: list[str]
+    list_unsubscribe: str
+    received_count: int
+    headers: list[MailboxHeaderField]
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "folder": self.folder,
+            "message_id": self.message_id,
+            "subject": self.subject,
+            "sender": self.sender,
+            "recipients": self.recipients,
+            "date": self.date,
+            "message_id_header": self.message_id_header,
+            "reply_to": self.reply_to,
+            "authentication_results": self.authentication_results,
+            "list_unsubscribe": self.list_unsubscribe,
+            "received_count": self.received_count,
+            "headers": [header.as_dict() for header in self.headers],
+        }
+
+
+@dataclass(frozen=True)
 class MailboxFolder:
     name: str
     message_count: int
@@ -523,6 +564,23 @@ def get_mailbox_message_source(
     with imaplib.IMAP4_SSL(host, port, ssl_context=tls_context, timeout=timeout_seconds) as imap:
         imap.login(email, password)
         return _get_message_source(imap, folder=folder, message_id=message_id)
+
+
+def get_mailbox_message_headers(
+    *,
+    email: str,
+    password: str,
+    host: str,
+    port: int,
+    folder: str,
+    message_id: str,
+    timeout_seconds: float = 10.0,
+    verify_tls: bool = False,
+) -> MailboxMessageHeaders:
+    tls_context = _tls_context(verify_tls=verify_tls)
+    with imaplib.IMAP4_SSL(host, port, ssl_context=tls_context, timeout=timeout_seconds) as imap:
+        imap.login(email, password)
+        return _get_message_headers(imap, folder=folder, message_id=message_id)
 
 
 def import_mailbox_message_source(
@@ -1050,6 +1108,31 @@ def _get_message_source(imap: imaplib.IMAP4_SSL, *, folder: str, message_id: str
 
 def _source_filename_part(value: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]", "_", value).strip("._-")[:64] or "message"
+
+
+def _get_message_headers(imap: imaplib.IMAP4_SSL, *, folder: str, message_id: str) -> MailboxMessageHeaders:
+    status, _data = imap.select(f'"{folder}"', readonly=True)
+    if status != "OK":
+        raise imaplib.IMAP4.error(f"Mailbox folder not found: {folder}")
+    fetch_status, fetch_data = imap.fetch(message_id.encode("ascii"), "(BODY.PEEK[HEADER])")
+    if fetch_status != "OK" or not fetch_data or not isinstance(fetch_data[0], tuple):
+        raise imaplib.IMAP4.error("Mailbox message not found")
+    parsed = BytesParser(policy=default).parsebytes(fetch_data[0][1])
+    headers = [MailboxHeaderField(name=name, value=str(value)) for name, value in parsed.items()]
+    return MailboxMessageHeaders(
+        folder=folder,
+        message_id=message_id,
+        subject=str(parsed.get("subject", "")),
+        sender=str(parsed.get("from", "")),
+        recipients=str(parsed.get("to", "")),
+        date=str(parsed.get("date", "")),
+        message_id_header=str(parsed.get("message-id", "")),
+        reply_to=str(parsed.get("reply-to", "")),
+        authentication_results=[str(value) for value in parsed.get_all("authentication-results", [])],
+        list_unsubscribe=str(parsed.get("list-unsubscribe", "")),
+        received_count=len(parsed.get_all("received", [])),
+        headers=headers,
+    )
 
 
 def _append_message_source(imap: imaplib.IMAP4_SSL, *, folder: str, content: bytes) -> None:

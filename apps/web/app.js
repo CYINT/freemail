@@ -12,6 +12,7 @@ const statusNode = document.querySelector("#mailbox-status");
 const readerSubject = document.querySelector("#reader-subject");
 const readerMeta = document.querySelector("#reader-meta");
 const messageBody = document.querySelector("#message-body");
+const messageHeaders = document.querySelector("#message-headers");
 const messageAttachments = document.querySelector("#message-attachments");
 const composeForm = document.querySelector("#compose-form");
 const saveDraftAction = document.querySelector("#save-draft-action");
@@ -21,6 +22,7 @@ const logoutAction = document.querySelector("#mailbox-logout");
 const replyAction = document.querySelector("#reply-action");
 const forwardAction = document.querySelector("#forward-action");
 const loadThreadAction = document.querySelector("#load-thread-action");
+const headersAction = document.querySelector("#headers-action");
 const editDraftAction = document.querySelector("#edit-draft-action");
 const downloadSourceAction = document.querySelector("#download-source-action");
 const importSourceAction = document.querySelector("#import-source-action");
@@ -179,6 +181,14 @@ loadThreadAction?.addEventListener("click", async () => {
     return;
   }
   await loadMailboxThread(selectedMessageDetail);
+});
+
+headersAction?.addEventListener("click", async () => {
+  if (!selectedMessageDetail) {
+    setStatus("Select a message before loading headers.", "error");
+    return;
+  }
+  await loadMailboxMessageHeaders(selectedMessageDetail);
 });
 
 editDraftAction?.addEventListener("click", () => {
@@ -1176,6 +1186,7 @@ function renderMessages(messages, { append = false } = {}) {
     readerSubject.textContent = "No messages";
     readerMeta.textContent = "Select another folder or refresh the mailbox.";
     renderMessageBody("This folder is empty.");
+    renderMessageHeaders(null);
     renderMessageAttachments(null);
     renderDraftActions(null);
     return;
@@ -1248,6 +1259,7 @@ async function selectMessage(message, row) {
   readerSubject.textContent = message.subject || "(no subject)";
   readerMeta.textContent = readerMetadata(message);
   renderMessageBody("Loading message...");
+  renderMessageHeaders(null);
   try {
     const detail = await loadMailboxMessage(message.folder, message.messageId);
     selectedMessageDetail = detail;
@@ -1259,6 +1271,7 @@ async function selectMessage(message, row) {
   } catch (error) {
     selectedMessageDetail = null;
     renderMessageBody(`Message load failed: ${readableError(error)}`);
+    renderMessageHeaders(null);
     renderMessageAttachments(null);
     renderDraftActions(null);
   }
@@ -1428,6 +1441,25 @@ async function loadMailboxMessage(folder, messageId) {
   return response.json();
 }
 
+async function loadMailboxMessageHeaders(message) {
+  setStatus("Loading message headers...", "loading");
+  try {
+    const url = new URL("/api/v1/mailbox/message/headers", mailboxSession.apiBaseUrl);
+    url.searchParams.set("folder", message.folder);
+    url.searchParams.set("message_id", message.messageId);
+    const response = await fetch(url, {
+      headers: mailboxHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    renderMessageHeaders(await response.json());
+    setStatus("Message headers loaded.", "ready");
+  } catch (error) {
+    setStatus(`Header load failed: ${readableError(error)}`, "error");
+  }
+}
+
 async function downloadMailboxAttachment(message, attachment) {
   if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
     setStatus("Load a mailbox before downloading attachments.", "error");
@@ -1537,6 +1569,50 @@ function renderMessageBody(body) {
         return node;
       }),
   );
+}
+
+function renderMessageHeaders(headers) {
+  if (!messageHeaders) {
+    return;
+  }
+  if (!headers) {
+    messageHeaders.replaceChildren();
+    return;
+  }
+  const heading = document.createElement("h3");
+  heading.textContent = "Headers";
+  const summary = document.createElement("dl");
+  summary.className = "header-summary";
+  const entries = [
+    ["From", headers.sender],
+    ["To", headers.recipients],
+    ["Reply-To", headers.replyTo],
+    ["Message-ID", headers.messageIdHeader],
+    ["Authentication", (headers.authenticationResults || []).join(" | ")],
+    ["List-Unsubscribe", headers.listUnsubscribe],
+    ["Received hops", String(headers.receivedCount || 0)],
+  ].filter(([, value]) => value);
+  entries.forEach(([name, value]) => {
+    const term = document.createElement("dt");
+    term.textContent = name;
+    const detail = document.createElement("dd");
+    detail.textContent = value;
+    summary.append(term, detail);
+  });
+  const details = document.createElement("details");
+  const label = document.createElement("summary");
+  label.textContent = `All headers (${(headers.headers || []).length})`;
+  const list = document.createElement("dl");
+  list.className = "header-list";
+  (headers.headers || []).forEach((header) => {
+    const term = document.createElement("dt");
+    term.textContent = header.name;
+    const detail = document.createElement("dd");
+    detail.textContent = header.value;
+    list.append(term, detail);
+  });
+  details.append(label, list);
+  messageHeaders.replaceChildren(heading, summary, details);
 }
 
 function renderMessageAttachments(message) {

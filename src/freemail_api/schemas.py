@@ -225,6 +225,26 @@ class MailboxMessageDetailRecord(MailboxMessageSummary):
     attachments: list[MailboxAttachmentRecord] = []
 
 
+class MailboxHeaderFieldRecord(ApiModel):
+    name: str
+    value: str
+
+
+class MailboxMessageHeadersRecord(ApiModel):
+    folder: str
+    message_id: str
+    subject: str
+    sender: str
+    recipients: str
+    date: str
+    message_id_header: str
+    reply_to: str
+    authentication_results: list[str]
+    list_unsubscribe: str
+    received_count: int
+    headers: list[MailboxHeaderFieldRecord]
+
+
 class MailboxArchiveCreate(ApiModel):
     folder: str = Field(min_length=1, max_length=160)
     message_id: str = Field(min_length=1, max_length=64)

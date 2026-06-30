@@ -9,6 +9,7 @@ from freemail_api.mailbox_imap import (
     MailboxFolder,
     MailboxMessage,
     MailboxMessageDetail,
+    MailboxMessageHeaders,
     MailboxMessagePage,
     MailboxMessageSource,
     ImportedMailboxMessage,
@@ -36,6 +37,7 @@ from freemail_api.mailbox_imap import (
     _flags_from_fetch,
     _get_attachment,
     _get_message,
+    _get_message_headers,
     _get_message_source,
     _append_message_source,
     _list_contacts,
@@ -89,10 +91,14 @@ class FakeImap:
             b"Subject: Hello\r\n"
             b"From: sender@example.com\r\n"
             b"To: admin@example.com\r\n"
+            b"Reply-To: support@example.com\r\n"
             b"Date: Mon, 01 Jan 2024 00:00:00 +0000\r\n"
             b"Message-ID: <message-3@example.com>\r\n"
             b"In-Reply-To: <message-1@example.com>\r\n"
             b"References: <message-1@example.com> <message-2@example.com>\r\n"
+            b"Authentication-Results: freemail.local; dkim=pass\r\n"
+            b"List-Unsubscribe: <mailto:unsubscribe@example.com>\r\n"
+            b"Received: from relay.example.com by freemail.local\r\n"
             b"\r\n"
         )
         payload = headers + body if "BODY.PEEK[]" in query else headers
@@ -220,6 +226,26 @@ def test_message_source_carries_raw_content_and_filename():
 
     assert source.filename == "freemail-INBOX-3.eml"
     assert b"Subject: Hello" in source.content
+
+
+def test_message_headers_serializes_summary_and_fields():
+    headers = MailboxMessageHeaders(
+        folder="INBOX",
+        message_id="3",
+        subject="Hello",
+        sender="sender@example.com",
+        recipients="admin@example.com",
+        date="Mon, 01 Jan 2024 00:00:00 +0000",
+        message_id_header="<message-3@example.com>",
+        reply_to="support@example.com",
+        authentication_results=["freemail.local; dkim=pass"],
+        list_unsubscribe="<mailto:unsubscribe@example.com>",
+        received_count=1,
+        headers=[],
+    )
+
+    assert headers.as_dict()["message_id_header"] == "<message-3@example.com>"
+    assert headers.as_dict()["authentication_results"] == ["freemail.local; dkim=pass"]
 
 
 def test_imported_message_serializes():
@@ -455,6 +481,7 @@ def test_list_contacts_deduplicates_addresses_by_frequency():
     assert contacts == [
         MailboxContact(name="", email="admin@example.com", message_count=3),
         MailboxContact(name="", email="sender@example.com", message_count=3),
+        MailboxContact(name="", email="support@example.com", message_count=3),
     ]
 
 
@@ -507,6 +534,18 @@ def test_get_message_source_returns_raw_eml_content_and_filename():
     assert source.filename == "freemail-INBOX-3.eml"
     assert b"Subject: Hello" in source.content
     assert b"Body text" in source.content
+
+
+def test_get_message_headers_returns_authentication_summary():
+    headers = _get_message_headers(FakeImap(), folder="INBOX", message_id="3")
+
+    assert headers.subject == "Hello"
+    assert headers.reply_to == "support@example.com"
+    assert headers.message_id_header == "<message-3@example.com>"
+    assert headers.authentication_results == ["freemail.local; dkim=pass"]
+    assert headers.list_unsubscribe == "<mailto:unsubscribe@example.com>"
+    assert headers.received_count == 1
+    assert any(header.name == "Subject" and header.value == "Hello" for header in headers.headers)
 
 
 def test_append_message_source_imports_raw_eml_into_folder():

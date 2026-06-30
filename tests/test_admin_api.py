@@ -2037,6 +2037,56 @@ def test_mailbox_attachment_returns_download_payload(tmp_path, monkeypatch):
     assert "report.txt" in response.headers["content-disposition"]
 
 
+def test_mailbox_message_headers_requires_mailbox_credentials(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.get("/api/v1/mailbox/message/headers?folder=INBOX&message_id=1")
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Mailbox credentials required"
+
+
+def test_mailbox_message_headers_returns_authentication_summary(tmp_path, monkeypatch):
+    class Headers:
+        def as_dict(self):
+            return {
+                "folder": "INBOX",
+                "message_id": "1",
+                "subject": "Hello",
+                "sender": "sender@example.com",
+                "recipients": "admin@example.com",
+                "date": "Mon, 01 Jan 2024 00:00:00 +0000",
+                "message_id_header": "<message@example.com>",
+                "reply_to": "reply@example.com",
+                "authentication_results": ["freemail.local; dkim=pass"],
+                "list_unsubscribe": "<mailto:unsubscribe@example.com>",
+                "received_count": 2,
+                "headers": [{"name": "Subject", "value": "Hello"}],
+            }
+
+    def fake_headers(**kwargs):
+        assert kwargs["email"] == "admin@example.com"
+        assert kwargs["password"] == "secret"
+        assert kwargs["folder"] == "INBOX"
+        assert kwargs["message_id"] == "1"
+        return Headers()
+
+    monkeypatch.setattr("freemail_api.main.get_mailbox_message_headers", fake_headers)
+
+    with make_client(tmp_path) as client:
+        response = client.get(
+            "/api/v1/mailbox/message/headers?folder=INBOX&message_id=1",
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["messageIdHeader"] == "<message@example.com>"
+    assert response.json()["authenticationResults"] == ["freemail.local; dkim=pass"]
+    assert response.json()["receivedCount"] == 2
+
+
 def test_mailbox_message_source_requires_mailbox_credentials(tmp_path):
     with make_client(tmp_path) as client:
         response = client.get("/api/v1/mailbox/message/source?folder=INBOX&message_id=1")

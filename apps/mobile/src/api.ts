@@ -36,6 +36,26 @@ export type MailMessageDetail = MailMessage & {
   attachments: MailAttachment[];
 };
 
+export type MailHeaderField = {
+  name: string;
+  value: string;
+};
+
+export type MailMessageHeaders = {
+  folder: string;
+  messageId: string;
+  subject: string;
+  sender: string;
+  recipients: string;
+  date: string;
+  messageIdHeader: string;
+  replyTo: string;
+  authenticationResults: string[];
+  listUnsubscribe: string;
+  receivedCount: number;
+  headers: MailHeaderField[];
+};
+
 export type MailboxSnapshot = {
   email: string;
   folders: MailFolder[];
@@ -269,6 +289,16 @@ export async function loadMailboxMessage(
   messageId: string,
 ): Promise<MailMessageDetail> {
   const path = `/api/v1/mailbox/message?folder=${encodeURIComponent(folder)}&message_id=${encodeURIComponent(messageId)}`;
+  const response = await request(session.apiBaseUrl, path, { headers: mailboxHeaders(session) });
+  return response.json();
+}
+
+export async function loadMailboxMessageHeaders(
+  session: MailboxSession,
+  folder: string,
+  messageId: string,
+): Promise<MailMessageHeaders> {
+  const path = `/api/v1/mailbox/message/headers?folder=${encodeURIComponent(folder)}&message_id=${encodeURIComponent(messageId)}`;
   const response = await request(session.apiBaseUrl, path, { headers: mailboxHeaders(session) });
   return response.json();
 }

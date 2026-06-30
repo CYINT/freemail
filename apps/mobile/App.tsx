@@ -32,6 +32,7 @@ import {
   loadMailboxAttachment,
   loadMailboxContacts,
   loadMailboxMessage,
+  loadMailboxMessageHeaders,
   loadMailboxMessageSource,
   loadMailboxPreferences,
   loadMailboxPushDevices,
@@ -46,6 +47,7 @@ import {
   MailFolder,
   MailMessage,
   MailMessageDetail,
+  MailMessageHeaders,
   MailboxPushDevice,
   MailboxPushNotification,
   moveMailboxMessage,
@@ -754,6 +756,23 @@ export default function App() {
     }
   }
 
+  async function showSelectedMessageHeaders() {
+    if (!session || !selectedMessage) {
+      return;
+    }
+    setLoading(true);
+    setStatus("Loading message headers...");
+    try {
+      const headers = await loadMailboxMessageHeaders(session, selectedMessage.folder, selectedMessage.messageId);
+      Alert.alert("Message headers", headerSummary(headers));
+      setStatus("Message headers loaded.");
+    } catch (error) {
+      setStatus(readableError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function archiveSelectedMessage() {
     if (!session || !selectedMessage) {
       return;
@@ -1021,6 +1040,9 @@ export default function App() {
                   <Pressable style={styles.secondaryButton} onPress={loadSelectedThread}>
                     <Text>Conversation</Text>
                   </Pressable>
+                  <Pressable style={styles.secondaryButton} onPress={showSelectedMessageHeaders}>
+                    <Text>Headers</Text>
+                  </Pressable>
                   {isDraftMessage(selectedMessage) ? (
                     <Pressable style={styles.secondaryButton} onPress={editSelectedDraft}>
                       <Text>Edit draft</Text>
@@ -1237,6 +1259,20 @@ function quoteBody(body: string): string {
   return body
     .split("\n")
     .map((line) => `> ${line}`)
+    .join("\n");
+}
+
+function headerSummary(headers: MailMessageHeaders): string {
+  return [
+    `From: ${headers.sender || "Unknown"}`,
+    `To: ${headers.recipients || ""}`,
+    headers.replyTo ? `Reply-To: ${headers.replyTo}` : "",
+    headers.messageIdHeader ? `Message-ID: ${headers.messageIdHeader}` : "",
+    `Received hops: ${headers.receivedCount}`,
+    headers.authenticationResults?.length ? `Authentication: ${headers.authenticationResults.join(" | ")}` : "",
+    headers.listUnsubscribe ? `List-Unsubscribe: ${headers.listUnsubscribe}` : "",
+  ]
+    .filter(Boolean)
     .join("\n");
 }
 
