@@ -4,6 +4,7 @@ const messageList = document.querySelector("#message-list");
 const statusNode = document.querySelector("#mailbox-status");
 const readerSubject = document.querySelector("#reader-subject");
 const readerMeta = document.querySelector("#reader-meta");
+const messageBody = document.querySelector("#message-body");
 const composeForm = document.querySelector("#compose-form");
 
 let mailboxSession = {
@@ -123,6 +124,7 @@ function renderMessages(messages) {
     messageList.replaceChildren(emptyMessage());
     readerSubject.textContent = "No messages";
     readerMeta.textContent = "Select another folder or refresh the mailbox.";
+    renderMessageBody("This folder is empty.");
     return;
   }
   const rows = messages.map((message, index) => messageRow(message, index === 0));
@@ -150,13 +152,56 @@ function messageRow(message, selected) {
   return row;
 }
 
-function selectMessage(message, row) {
+async function selectMessage(message, row) {
   document.querySelectorAll(".message-row.selected").forEach((selectedRow) => {
     selectedRow.classList.remove("selected");
   });
   row.classList.add("selected");
   readerSubject.textContent = message.subject || "(no subject)";
   readerMeta.textContent = `From ${message.sender || "Unknown sender"} to ${message.recipients || mailboxSession.email}`;
+  renderMessageBody("Loading message...");
+  try {
+    const detail = await loadMailboxMessage(message.folder, message.messageId);
+    readerSubject.textContent = detail.subject || "(no subject)";
+    readerMeta.textContent = `From ${detail.sender || "Unknown sender"} to ${detail.recipients || mailboxSession.email}`;
+    renderMessageBody(detail.body || "(No plain text body)");
+  } catch (error) {
+    renderMessageBody(`Message load failed: ${readableError(error)}`);
+  }
+}
+
+async function loadMailboxMessage(folder, messageId) {
+  const url = new URL("/api/v1/mailbox/message", mailboxSession.apiBaseUrl);
+  url.searchParams.set("folder", folder);
+  url.searchParams.set("message_id", messageId);
+  const response = await fetch(url, {
+    headers: {
+      "X-FreeMail-Mailbox-Email": mailboxSession.email,
+      "X-FreeMail-Mailbox-Password": mailboxSession.password,
+    },
+  });
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+  return response.json();
+}
+
+function renderMessageBody(body) {
+  if (!messageBody) {
+    return;
+  }
+  const paragraphs = String(body || "")
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+  messageBody.replaceChildren(
+    ...(paragraphs.length ? paragraphs : [""])
+      .map((paragraph) => {
+        const node = document.createElement("p");
+        node.textContent = paragraph;
+        return node;
+      }),
+  );
 }
 
 function emptyMessage() {

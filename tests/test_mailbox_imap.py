@@ -1,9 +1,14 @@
+from email.message import EmailMessage
+
 from freemail_api.mailbox_imap import (
     MailboxFolder,
     MailboxMessage,
+    MailboxMessageDetail,
     MailboxSnapshot,
+    _body_from_message,
     _count_from_select,
     _flags_from_fetch,
+    _get_message,
     _list_folders,
     _list_messages,
     _parse_folder,
@@ -25,6 +30,7 @@ class FakeImap:
         return "OK", [b"1 2 3"]
 
     def fetch(self, message_id, query):
+        body = b"Body text\r\n"
         headers = (
             b"Subject: Hello\r\n"
             b"From: sender@example.com\r\n"
@@ -32,8 +38,9 @@ class FakeImap:
             b"Date: Mon, 01 Jan 2024 00:00:00 +0000\r\n"
             b"\r\n"
         )
-        prefix = b"3 (FLAGS (\\Seen) BODY[HEADER] {%d}" % len(headers)
-        return "OK", [(prefix, headers)]
+        payload = headers + body if "BODY.PEEK[]" in query else headers
+        prefix = b"3 (FLAGS (\\Seen) BODY[HEADER] {%d}" % len(payload)
+        return "OK", [(prefix, payload)]
 
 
 def test_parse_folder_extracts_folder_name():
@@ -74,6 +81,21 @@ def test_snapshot_serializes_nested_records():
     }
 
 
+def test_message_detail_serializes_body():
+    detail = MailboxMessageDetail(
+        folder="INBOX",
+        message_id="1",
+        subject="Hello",
+        sender="sender@example.com",
+        recipients="admin@example.com",
+        date="Mon, 01 Jan 2024 00:00:00 +0000",
+        unread=False,
+        body="Body text",
+    )
+
+    assert detail.as_dict()["body"] == "Body text"
+
+
 def test_list_folders_counts_messages_and_unread():
     folders = _list_folders(FakeImap())
 
@@ -90,6 +112,22 @@ def test_list_messages_parses_headers_and_seen_flag():
     assert messages[0].sender == "sender@example.com"
     assert messages[0].recipients == "admin@example.com"
     assert messages[0].unread is False
+
+
+def test_get_message_parses_body_and_headers():
+    message = _get_message(FakeImap(), folder="INBOX", message_id="3")
+
+    assert message.subject == "Hello"
+    assert message.body == "Body text"
+    assert message.unread is False
+
+
+def test_body_from_message_prefers_plain_text_part():
+    message = EmailMessage()
+    message.set_content("Plain body")
+    message.add_alternative("<p>HTML body</p>", subtype="html")
+
+    assert _body_from_message(message) == "Plain body"
 
 
 def test_count_from_select_handles_invalid_data():

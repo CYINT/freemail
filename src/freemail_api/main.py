@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from . import database
 from . import dkim
 from .mail_core import probe_mail_core
+from .mailbox_imap import get_mailbox_message
 from .mailbox_imap import list_mailbox_snapshot
 from .mailbox_smtp import send_mailbox_message
 from .schemas import (
@@ -26,6 +27,7 @@ from .schemas import (
     DomainCreate,
     DomainRecord,
     MailboxCreate,
+    MailboxMessageDetailRecord,
     MailboxRecord,
     MailboxSendCreate,
     MailboxSendRecord,
@@ -162,6 +164,30 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except imaplib.IMAP4.error as error:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Mailbox authentication failed") from error
         return snapshot.as_dict()
+
+    @app.get("/api/v1/mailbox/message", response_model=MailboxMessageDetailRecord)
+    def mailbox_message(
+        folder: str,
+        message_id: str,
+        x_freemail_mailbox_email: str | None = Header(default=None),
+        x_freemail_mailbox_password: str | None = Header(default=None),
+    ) -> dict[str, object]:
+        if not x_freemail_mailbox_email or not x_freemail_mailbox_password:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Mailbox credentials required")
+        try:
+            message = get_mailbox_message(
+                email=x_freemail_mailbox_email,
+                password=x_freemail_mailbox_password,
+                host=active_settings.mail_core_host,
+                port=active_settings.imap_port,
+                folder=folder,
+                message_id=message_id,
+            )
+        except OSError as error:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+        except imaplib.IMAP4.error as error:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mailbox message not found") from error
+        return message.as_dict()
 
     @app.post("/api/v1/mailbox/send", response_model=MailboxSendRecord)
     def mailbox_send(

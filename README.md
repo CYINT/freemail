@@ -100,6 +100,7 @@ The first read-only mailbox API uses per-request IMAP credentials and does not s
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\qa_mailbox_snapshot_api.py --email admin@example.com --secrets-json secrets\mail-core-users.json
+.\.venv\Scripts\python.exe scripts\qa_mailbox_message_api.py --email admin@example.com --secrets-json secrets\mail-core-users.json
 ```
 
 The first mailbox send API uses the same per-request credential posture and submits through authenticated implicit-TLS SMTP:

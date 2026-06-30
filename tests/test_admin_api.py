@@ -293,6 +293,51 @@ def test_mailbox_snapshot_returns_imap_adapter_payload(tmp_path, monkeypatch):
     assert response.json()["messages"][0]["subject"] == "Hello"
 
 
+def test_mailbox_message_requires_mailbox_credentials(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.get("/api/v1/mailbox/message?folder=INBOX&message_id=1")
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Mailbox credentials required"
+
+
+def test_mailbox_message_returns_imap_detail_payload(tmp_path, monkeypatch):
+    class Detail:
+        def as_dict(self):
+            return {
+                "folder": "INBOX",
+                "message_id": "1",
+                "subject": "Hello",
+                "sender": "sender@example.net",
+                "recipients": "admin@example.com",
+                "date": "",
+                "unread": False,
+                "body": "Body text",
+            }
+
+    def fake_message(**kwargs):
+        assert kwargs["email"] == "admin@example.com"
+        assert kwargs["password"] == "secret"
+        assert kwargs["folder"] == "INBOX"
+        assert kwargs["message_id"] == "1"
+        return Detail()
+
+    monkeypatch.setattr("freemail_api.main.get_mailbox_message", fake_message)
+
+    with make_client(tmp_path) as client:
+        response = client.get(
+            "/api/v1/mailbox/message?folder=INBOX&message_id=1",
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["subject"] == "Hello"
+    assert response.json()["body"] == "Body text"
+
+
 def test_mailbox_send_requires_mailbox_credentials(tmp_path):
     with make_client(tmp_path) as client:
         response = client.post(

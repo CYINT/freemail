@@ -142,6 +142,10 @@ class MailboxMessageSummary(ApiModel):
     unread: bool
 
 
+class MailboxMessageDetailRecord(MailboxMessageSummary):
+    body: str
+
+
 class MailboxSnapshotRecord(ApiModel):
     email: EmailStr
     folders: list[MailboxFolderSummary]
