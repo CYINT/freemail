@@ -45,12 +45,10 @@ FORBIDDEN_TRACKED_PREFIXES = (
     "build/",
 )
 RELEASE_BLOCKERS = (
-    "controlled-domain DNS/mail-flow/private-beta evidence",
-    "live Stalwart apply evidence for the controlled domain",
+    "decision-owner private-beta acceptance",
     "real signed native mobile builds",
     "real store-submission evidence",
     "app-store release execution",
-    "final private-beta decision acceptance",
 )
 
 

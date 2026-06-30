@@ -717,7 +717,7 @@ def valid_product_readiness():
             "mobile": {"status": "source-ready"},
         },
         "releaseBlockers": [
-            "controlled-domain DNS/mail-flow evidence",
+            "decision-owner private-beta acceptance",
             "real signed native mobile builds",
         ],
     }

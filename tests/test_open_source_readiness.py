@@ -12,7 +12,7 @@ def test_open_source_readiness_passes_for_current_repo():
     assert payload["license"] == "AGPL-3.0-or-later"
     assert payload["credentialFreePublicRepo"] is True
     assert payload["releaseReady"] is False
-    assert "controlled-domain DNS/mail-flow/private-beta evidence" in payload["releaseBlockers"]
+    assert "decision-owner private-beta acceptance" in payload["releaseBlockers"]
     assert all(check["status"] == "pass" for check in payload["checks"])
 
 

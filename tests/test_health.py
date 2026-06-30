@@ -50,7 +50,7 @@ def test_product_readiness_reports_component_evidence_and_release_blockers():
     assert payload["components"]["mailCore"]["status"] == "runtime-ready"
     assert payload["components"]["webmail"]["status"] == "beta-ready"
     assert payload["components"]["mobile"]["status"] == "source-ready"
-    assert "controlled-domain DNS/mail-flow evidence" in payload["releaseBlockers"]
+    assert "decision-owner private-beta acceptance" in payload["releaseBlockers"]
     assert "real signed native mobile builds" in payload["releaseBlockers"]
 
 

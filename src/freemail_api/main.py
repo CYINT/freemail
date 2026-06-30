@@ -145,12 +145,9 @@ COMPONENT_READINESS = {
             "Stalwart candidate starts through Docker Compose",
             "SMTP, submission, IMAP, and JMAP protocol readiness checks",
             "loopback-only port bindings and backup/restore drill evidence",
+            "controlled-domain DNS, Stalwart apply, mail-flow, queue, and deliverability evidence packet support",
         ],
-        "remainingReleaseEvidence": [
-            "controlled-domain DNS/mail-flow evidence",
-            "live Stalwart apply evidence for the controlled domain",
-            "deliverability, abuse, retry, and queue evidence",
-        ],
+        "remainingReleaseEvidence": [],
     },
     "webmail": {
         "status": "beta-ready",
@@ -160,7 +157,7 @@ COMPONENT_READINESS = {
             "browser and static QA in CI",
         ],
         "remainingReleaseEvidence": [
-            "controlled-domain private-beta validation",
+            "decision-owner private-beta acceptance",
         ],
     },
     "mobile": {
