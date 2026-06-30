@@ -67,6 +67,10 @@ class UserRecord(ApiModel):
     model_config = ConfigDict(alias_generator=to_camel, from_attributes=True, populate_by_name=True)
 
 
+class UserPasswordUpdate(ApiModel):
+    new_password: str = Field(min_length=12, max_length=512)
+
+
 class AdminSessionCreate(ApiModel):
     email: EmailStr
     password: str = Field(min_length=1, max_length=512)

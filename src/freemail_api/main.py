@@ -116,6 +116,7 @@ from .schemas import (
     SavedMailboxContactsRecord,
     StoredUserCreate,
     UserCreate,
+    UserPasswordUpdate,
     UserRecord,
 )
 from .sessions import bearer_token
@@ -165,7 +166,7 @@ COMPONENT_READINESS = {
         "status": "ready",
         "evidence": [
             "administrator bootstrap and bearer-session login",
-            "domain, user, mailbox quota, alias, DKIM, DNS, status, and audit APIs",
+            "domain, user, user-password rotation, mailbox quota, alias, DKIM, DNS, status, and audit APIs",
             "metadata readiness endpoint and backup/restore coverage",
         ],
         "remainingReleaseEvidence": [],
@@ -188,7 +189,7 @@ COMPONENT_READINESS = {
             "persistent mailbox preferences with default compose signatures and saved address-book contacts",
             "server-side Drafts persistence and compose reopen support for saved drafts",
             "server-side Sent Items persistence for accepted outbound messages",
-            "token-gated admin console for bootstrap, users, domains, mailboxes, aliases, DKIM, DNS guidance, status actions, sync status, and audit logs",
+            "token-gated admin console for bootstrap, users, password rotation, domains, mailboxes, aliases, DKIM, DNS guidance, status actions, sync status, and audit logs",
             "browser and static QA in CI",
         ],
         "remainingReleaseEvidence": [
@@ -1491,6 +1492,29 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             require_permission(principal, "admin.grant")
         return _row_to_dict(
             _create_or_raise(lambda: database.update_status(connection, "users", user_id, payload.status, principal.actor))
+        )
+
+    @app.patch("/api/v1/admin/users/{user_id}/password", response_model=UserRecord)
+    def update_user_password(
+        user_id: int,
+        payload: UserPasswordUpdate,
+        principal: AdminPrincipal = Depends(require_admin),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        require_permission(principal, "admin.users")
+        target = _create_or_raise(lambda: database.get_user(connection, user_id))
+        if int(target["is_admin"]):
+            require_permission(principal, "admin.grant")
+        password_hash = hash_initial_password(payload.new_password)
+        return _row_to_dict(
+            _create_or_raise(
+                lambda: database.update_user_password(
+                    connection,
+                    user_id=user_id,
+                    password_hash=password_hash,
+                    actor=principal.actor,
+                )
+            )
         )
 
     @app.get("/api/v1/admin/mailboxes", response_model=list[MailboxRecord])

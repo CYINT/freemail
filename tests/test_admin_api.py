@@ -5,6 +5,7 @@ import sqlite3
 from fastapi.testclient import TestClient
 
 from freemail_api.main import create_app
+from freemail_api.passwords import verify_password_hash
 from freemail_api.push_delivery import PushDeliveryResult
 from freemail_api.settings import Settings
 
@@ -266,6 +267,133 @@ def test_suspended_admin_blocks_existing_bearer_admin_session(tmp_path):
     assert login.status_code == 200
     assert response.status_code == 401
     assert response.json()["detail"] == "Invalid admin session"
+
+
+def test_admin_can_rotate_user_password_without_returning_hash(tmp_path):
+    database_path = tmp_path / "freemail.sqlite"
+    settings = Settings(
+        database_path=str(database_path),
+        admin_api_token=ADMIN_TOKEN,
+        bootstrap_token=BOOTSTRAP_TOKEN,
+        release_commit="test",
+    )
+    with TestClient(create_app(settings)) as client:
+        user = client.post(
+            "/api/v1/admin/users",
+            headers=admin_headers(),
+            json={
+                "email": "member@example.com",
+                "displayName": "Member User",
+                "initialPassword": "correct horse battery",
+            },
+        ).json()
+        response = client.patch(
+            f"/api/v1/admin/users/{user['id']}/password",
+            headers=admin_headers(),
+            json={"newPassword": "new correct horse battery"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["email"] == "member@example.com"
+    assert "passwordHash" not in response.json()
+    assert "newPassword" not in response.text
+    with sqlite3.connect(database_path) as connection:
+        stored = connection.execute("SELECT password_hash FROM users WHERE id = ?", [user["id"]]).fetchone()[0]
+        audit_actions = [
+            row[0]
+            for row in connection.execute(
+                "SELECT action FROM audit_log WHERE target_type = 'user' AND target_id = ? ORDER BY id",
+                [user["id"]],
+            )
+        ]
+    assert verify_password_hash(stored, "new correct horse battery")
+    assert audit_actions == ["user.invite", "user.password.update"]
+
+
+def test_rotating_admin_password_revokes_existing_admin_sessions(tmp_path):
+    settings = Settings(
+        database_path=str(tmp_path / "freemail.sqlite"),
+        admin_api_token=ADMIN_TOKEN,
+        bootstrap_token=BOOTSTRAP_TOKEN,
+        release_commit="test",
+    )
+    with TestClient(create_app(settings)) as client:
+        client.post(
+            "/api/v1/bootstrap/admin",
+            headers=bootstrap_headers(),
+            json={
+                "domainName": "example.com",
+                "email": "admin@example.com",
+                "displayName": "Admin User",
+                "initialPassword": "correct horse battery",
+                "mailboxLocalPart": "admin",
+            },
+        )
+        old_login = client.post(
+            "/api/v1/admin/session",
+            json={"email": "admin@example.com", "password": "correct horse battery"},
+        )
+        rotated = client.patch(
+            "/api/v1/admin/users/1/password",
+            headers=admin_headers(),
+            json={"newPassword": "new correct horse battery"},
+        )
+        old_session_response = client.get(
+            "/api/v1/admin/users",
+            headers={"Authorization": f"Bearer {old_login.json()['token']}"},
+        )
+        old_password_login = client.post(
+            "/api/v1/admin/session",
+            json={"email": "admin@example.com", "password": "correct horse battery"},
+        )
+        new_password_login = client.post(
+            "/api/v1/admin/session",
+            json={"email": "admin@example.com", "password": "new correct horse battery"},
+        )
+
+    assert old_login.status_code == 200
+    assert rotated.status_code == 200
+    assert old_session_response.status_code == 401
+    assert old_password_login.status_code == 401
+    assert new_password_login.status_code == 200
+
+
+def test_admin_role_cannot_rotate_administrator_password(tmp_path):
+    with make_client(tmp_path) as client:
+        client.post(
+            "/api/v1/admin/users",
+            headers=admin_headers(),
+            json={
+                "email": "target@example.com",
+                "displayName": "Target Admin",
+                "initialPassword": "correct horse battery",
+                "isAdmin": True,
+                "adminRole": "operator",
+            },
+        )
+        client.post(
+            "/api/v1/admin/users",
+            headers=admin_headers(),
+            json={
+                "email": "manager@example.com",
+                "displayName": "Manager User",
+                "initialPassword": "correct horse battery",
+                "isAdmin": True,
+                "adminRole": "admin",
+            },
+        )
+        login = client.post(
+            "/api/v1/admin/session",
+            json={"email": "manager@example.com", "password": "correct horse battery"},
+        )
+        denied = client.patch(
+            "/api/v1/admin/users/1/password",
+            headers={"Authorization": f"Bearer {login.json()['token']}"},
+            json={"newPassword": "new correct horse battery"},
+        )
+
+    assert denied.status_code == 403
+    assert denied.json()["detail"] == "Admin role lacks admin.grant permission"
 
 
 def test_owner_can_create_scoped_admin_and_role_is_returned(tmp_path):

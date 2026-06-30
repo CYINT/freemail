@@ -371,6 +371,21 @@ def create_user(connection: sqlite3.Connection, payload: StoredUserCreate, actor
     return _get_row(connection, "users", row_id)
 
 
+def update_user_password(
+    connection: sqlite3.Connection,
+    *,
+    user_id: int,
+    password_hash: str,
+    actor: str,
+) -> sqlite3.Row:
+    _get_row(connection, "users", user_id)
+    connection.execute("UPDATE users SET password_hash = ? WHERE id = ?", [password_hash, user_id])
+    connection.execute("DELETE FROM admin_sessions WHERE user_id = ?", [user_id])
+    _audit(connection, actor, "user.password.update", "user", user_id)
+    connection.commit()
+    return _get_row(connection, "users", user_id)
+
+
 def create_mailbox(connection: sqlite3.Connection, payload: MailboxCreate, actor: str) -> sqlite3.Row:
     domain = _get_row(connection, "domains", payload.domain_id)
     _get_row(connection, "users", payload.user_id)

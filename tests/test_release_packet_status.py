@@ -172,10 +172,19 @@ def test_release_packet_status_script_exits_nonzero_until_packet_ready(tmp_path)
     assert "--metadata-backup" in payload["missingArtifacts"]
 
 
-def test_release_packet_status_script_uses_default_release_notes():
+def test_release_packet_status_script_uses_default_release_notes(tmp_path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    copy_script_tree(workspace)
+    release_notes = workspace / "docs" / "release-notes" / "v0.1.0-private-beta.md"
+    release_notes.parent.mkdir(parents=True)
+    write_release_notes(release_notes)
+
     completed = subprocess.run(
         [sys.executable, "scripts/release_packet_status.py"],
+        cwd=workspace,
         capture_output=True,
+        env={**os.environ, "PYTHONPATH": str(ROOT / "src")},
         text=True,
         check=False,
     )

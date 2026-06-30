@@ -16,11 +16,11 @@ The implementation should not become one mail-server blob. Keep the mail-core ca
 
 ## Admin API And Metadata Store
 
-The admin API owns FreeMail metadata for domains, users, mailboxes, aliases, and audit logs. The current implementation uses SQLite through explicit repository functions so the early product can keep a small dependency surface while still proving persistence and API contracts.
+The admin API owns FreeMail metadata for domains, users, user-password rotation, mailboxes, aliases, and audit logs. The current implementation uses SQLite through explicit repository functions so the early product can keep a small dependency surface while still proving persistence and API contracts.
 
 Admin endpoints accept bearer tokens from `POST /api/v1/admin/session` or the legacy `X-FreeMail-Admin-Token` header. Static admin-token access remains unavailable until `FREEMAIL_ADMIN_API_TOKEN` is configured. The first-admin bootstrap endpoint separately requires `X-FreeMail-Bootstrap-Token` and refuses to run once an administrator exists. This keeps the open-source default from shipping an active hardcoded credential while still supporting day-to-day administrator email/password login after bootstrap.
 
-Admin password login verifies active administrator users against stored Argon2id password hashes, creates a hashed bearer session, and stores no admin password material in runtime session tables. Suspending an administrator prevents existing bearer sessions from resolving because the session lookup rechecks the user record.
+Admin password login verifies active administrator users against stored Argon2id password hashes, creates a hashed bearer session, and stores no admin password material in runtime session tables. Admin password rotation replaces the stored Argon2id hash, revokes existing admin sessions for the target user, and records an audit event. Suspending an administrator prevents existing bearer sessions from resolving because the session lookup rechecks the user record.
 
 Administrator roles are intentionally coarse for private beta. `owner` can perform every admin action, including granting or suspending administrators. `admin` can read admin metadata and invite normal users but cannot grant administrator access. `operator` can read metadata and operate domains, mailboxes, aliases, DKIM keys, DNS verification, and status changes but cannot invite users. `auditor` is read-only.
 

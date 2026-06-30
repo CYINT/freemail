@@ -82,6 +82,7 @@ def test_static_web_validation_flags_credential_storage():
         "fetch('/api/v1/mailbox/message/star-state'); "
         "fetch('/api/v1/mailbox/message/bulk'); "
         "fetch('/api/v1/admin/mailboxes/${mailboxId}/quota'); admin-mailbox-quota-form; quotaBytes; "
+        "fetch('/api/v1/admin/users/${userId}/password'); admin-user-password-form; newPassword; "
         "renderMessageBody('body'); renderMessageAttachments({}); downloadMailboxAttachment({}, {}); "
         "downloadMailboxMessageSource({}); download-source-action; Download EML; "
         "importMailboxMessageSource({}); import-source-action; import-source-file; Import EML; "

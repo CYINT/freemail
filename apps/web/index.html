@@ -224,6 +224,13 @@
               <button type="submit">Create mailbox</button>
             </form>
 
+            <form class="admin-card" id="admin-user-password-form" aria-label="Rotate user password">
+              <h3>Rotate user password</h3>
+              <label>User ID <input name="userId" type="number" min="1" required></label>
+              <label>New password <input name="newPassword" type="password" minlength="12" autocomplete="new-password" required></label>
+              <button type="submit">Rotate password</button>
+            </form>
+
             <form class="admin-card" id="admin-mailbox-quota-form" aria-label="Update mailbox quota">
               <h3>Update mailbox quota</h3>
               <label>Mailbox ID <input name="mailboxId" type="number" min="1" required></label>

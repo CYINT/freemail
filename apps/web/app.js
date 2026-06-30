@@ -66,6 +66,7 @@ const adminRefreshAction = document.querySelector("#admin-refresh-action");
 const bootstrapAdminForm = document.querySelector("#bootstrap-admin-form");
 const adminDomainForm = document.querySelector("#admin-domain-form");
 const adminUserForm = document.querySelector("#admin-user-form");
+const adminUserPasswordForm = document.querySelector("#admin-user-password-form");
 const adminMailboxForm = document.querySelector("#admin-mailbox-form");
 const adminMailboxQuotaForm = document.querySelector("#admin-mailbox-quota-form");
 const adminAliasForm = document.querySelector("#admin-alias-form");
@@ -362,6 +363,19 @@ adminUserForm?.addEventListener("submit", async (event) => {
     },
     "User invited.",
   );
+});
+
+adminUserPasswordForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = new FormData(adminUserPasswordForm);
+  const userId = Number(form.get("userId"));
+  await createAdminRecord(
+    `/api/v1/admin/users/${userId}/password`,
+    { newPassword: String(form.get("newPassword") || "") },
+    "User password rotated.",
+    "PATCH",
+  );
+  adminUserPasswordForm.reset();
 });
 
 adminMailboxForm?.addEventListener("submit", async (event) => {
