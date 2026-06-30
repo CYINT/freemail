@@ -25,7 +25,7 @@ The FreeMail program includes:
 This repository is at the implementation baseline. It contains:
 
 - A FastAPI admin/runtime API with persistent SQLite-backed domain, user, mailbox, alias, and audit-log surfaces.
-- A static webmail preview shell with inbox, search, message reader, compose, folder navigation, and responsive layout QA.
+- A static webmail preview shell with inbox, search, message reader, compose, folder navigation, token-gated admin setup, and responsive layout QA.
 - An Expo/React Native mobile client scaffold with secure session storage, mailbox workflows, and static QA.
 - A Docker Compose stack with VPN-only loopback bindings by default.
 - A Stalwart mail-core candidate profile for the first architecture spike.
@@ -63,7 +63,7 @@ Run repository hygiene scans before publishing changes:
 
 ## Admin API
 
-Admin endpoints require `X-FreeMail-Admin-Token` and remain disabled until `FREEMAIL_ADMIN_API_TOKEN` is set. Do not commit a real token.
+Admin endpoints require `X-FreeMail-Admin-Token` and remain disabled until `FREEMAIL_ADMIN_API_TOKEN` is set. Do not commit a real token. The webmail preview includes an operator admin console for bootstrap, domain, user, mailbox, alias, DKIM, and audit-log workflows; it requires the operator to provide the API URL and tokens at runtime.
 
 Initial endpoints:
 

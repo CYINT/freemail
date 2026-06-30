@@ -120,6 +120,77 @@
             </form>
           </article>
         </section>
+
+        <section class="admin-console" aria-label="Admin console">
+          <header class="admin-header">
+            <div>
+              <p class="eyebrow">Admin console</p>
+              <h2>Private beta setup</h2>
+            </div>
+            <button id="admin-refresh-action" type="button">Refresh</button>
+          </header>
+
+          <form class="admin-auth" id="admin-auth" aria-label="Admin API settings">
+            <label>API <input id="admin-api-base-url" name="apiBaseUrl" type="url" value="http://127.0.0.1:18090" required></label>
+            <label>Admin token <input id="admin-token" name="adminToken" type="password" autocomplete="off"></label>
+            <label>Bootstrap token <input id="bootstrap-token" name="bootstrapToken" type="password" autocomplete="off"></label>
+            <button type="submit">Save admin session</button>
+            <p class="form-status" id="admin-status" role="status">Admin tokens are operator-provided and never bundled with FreeMail.</p>
+          </form>
+
+          <div class="admin-grid">
+            <form class="admin-card" id="bootstrap-admin-form" aria-label="Bootstrap administrator">
+              <h3>Bootstrap administrator</h3>
+              <label>Domain <input name="domainName" type="text" placeholder="example.com" required></label>
+              <label>Email <input name="email" type="email" placeholder="admin@example.com" required></label>
+              <label>Display name <input name="displayName" type="text" placeholder="Admin User" required></label>
+              <label>Password hash <input name="passwordHash" type="text" minlength="20" required></label>
+              <label>Mailbox local part <input name="mailboxLocalPart" type="text" placeholder="admin" required></label>
+              <button type="submit">Bootstrap</button>
+            </form>
+
+            <form class="admin-card" id="admin-domain-form" aria-label="Create domain">
+              <h3>Create domain</h3>
+              <label>Domain <input name="name" type="text" placeholder="example.com" required></label>
+              <button type="submit">Create domain</button>
+            </form>
+
+            <form class="admin-card" id="admin-user-form" aria-label="Create user">
+              <h3>Create user</h3>
+              <label>Email <input name="email" type="email" placeholder="user@example.com" required></label>
+              <label>Display name <input name="displayName" type="text" required></label>
+              <label>Password hash <input name="passwordHash" type="text" minlength="20" required></label>
+              <label class="checkbox-field"><input name="isAdmin" type="checkbox"> Administrator</label>
+              <button type="submit">Invite user</button>
+            </form>
+
+            <form class="admin-card" id="admin-mailbox-form" aria-label="Create mailbox">
+              <h3>Create mailbox</h3>
+              <label>User ID <input name="userId" type="number" min="1" required></label>
+              <label>Domain ID <input name="domainId" type="number" min="1" required></label>
+              <label>Local part <input name="localPart" type="text" placeholder="user" required></label>
+              <button type="submit">Create mailbox</button>
+            </form>
+
+            <form class="admin-card" id="admin-alias-form" aria-label="Create alias">
+              <h3>Create alias</h3>
+              <label>Source <input name="source" type="email" placeholder="info@example.com" required></label>
+              <label>Destination <input name="destination" type="email" placeholder="user@example.com" required></label>
+              <button type="submit">Create alias</button>
+            </form>
+
+            <form class="admin-card" id="admin-dkim-form" aria-label="Create DKIM key">
+              <h3>Create DKIM key</h3>
+              <label>Domain ID <input name="domainId" type="number" min="1" required></label>
+              <label>Selector <input name="selector" type="text" placeholder="default" required></label>
+              <button type="submit">Generate key</button>
+            </form>
+          </div>
+
+          <div class="admin-results" id="admin-results" aria-live="polite">
+            <p>Save an admin session, then refresh to load domains, users, mailboxes, aliases, DKIM keys, and audit events.</p>
+          </div>
+        </section>
       </main>
     </div>
     <script src="./app.js" defer></script>

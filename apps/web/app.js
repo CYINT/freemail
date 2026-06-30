@@ -25,8 +25,22 @@ const composeTo = document.querySelector("#compose-to");
 const composeSubject = document.querySelector("#compose-subject");
 const composeBody = document.querySelector("#compose-body");
 const composeAttachments = document.querySelector("#compose-attachments");
+const adminAuthForm = document.querySelector("#admin-auth");
+const adminApiBaseUrl = document.querySelector("#admin-api-base-url");
+const adminTokenInput = document.querySelector("#admin-token");
+const bootstrapTokenInput = document.querySelector("#bootstrap-token");
+const adminStatus = document.querySelector("#admin-status");
+const adminRefreshAction = document.querySelector("#admin-refresh-action");
+const bootstrapAdminForm = document.querySelector("#bootstrap-admin-form");
+const adminDomainForm = document.querySelector("#admin-domain-form");
+const adminUserForm = document.querySelector("#admin-user-form");
+const adminMailboxForm = document.querySelector("#admin-mailbox-form");
+const adminAliasForm = document.querySelector("#admin-alias-form");
+const adminDkimForm = document.querySelector("#admin-dkim-form");
+const adminResults = document.querySelector("#admin-results");
 
 const mailboxSessionStorageKey = "freemail.mailboxSession";
+const adminSessionStorageKey = "freemail.adminSession";
 const protectedFolders = ["inbox", "sent items", "drafts", "junk mail", "deleted items", "archive"];
 
 let mailboxSession = {
@@ -35,9 +49,15 @@ let mailboxSession = {
   apiBaseUrl: "",
   folder: "INBOX",
 };
+let adminSession = {
+  apiBaseUrl: "",
+  adminToken: "",
+  bootstrapToken: "",
+};
 let selectedMessageDetail = null;
 
 restoreMailboxSession();
+restoreAdminSession();
 
 loginForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -129,6 +149,95 @@ contactsAction?.addEventListener("click", async () => {
 
 logoutAction?.addEventListener("click", async () => {
   await revokeMailboxSession();
+});
+
+adminAuthForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const form = new FormData(adminAuthForm);
+  adminSession = {
+    apiBaseUrl: String(form.get("apiBaseUrl") || "").trim().replace(/\/+$/, ""),
+    adminToken: String(form.get("adminToken") || ""),
+    bootstrapToken: String(form.get("bootstrapToken") || ""),
+  };
+  persistAdminSession(adminSession);
+  setAdminStatus("Admin session saved in this browser profile.", "ready");
+});
+
+adminRefreshAction?.addEventListener("click", async () => {
+  await loadAdminOverview();
+});
+
+bootstrapAdminForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = new FormData(bootstrapAdminForm);
+  await bootstrapAdministrator({
+    domainName: String(form.get("domainName") || "").trim(),
+    email: String(form.get("email") || "").trim(),
+    displayName: String(form.get("displayName") || "").trim(),
+    passwordHash: String(form.get("passwordHash") || "").trim(),
+    mailboxLocalPart: String(form.get("mailboxLocalPart") || "").trim(),
+  });
+});
+
+adminDomainForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = new FormData(adminDomainForm);
+  await createAdminRecord("/api/v1/admin/domains", { name: String(form.get("name") || "").trim() }, "Domain created.");
+});
+
+adminUserForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = new FormData(adminUserForm);
+  await createAdminRecord(
+    "/api/v1/admin/users",
+    {
+      email: String(form.get("email") || "").trim(),
+      displayName: String(form.get("displayName") || "").trim(),
+      passwordHash: String(form.get("passwordHash") || "").trim(),
+      isAdmin: form.get("isAdmin") === "on",
+    },
+    "User invited.",
+  );
+});
+
+adminMailboxForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = new FormData(adminMailboxForm);
+  await createAdminRecord(
+    "/api/v1/admin/mailboxes",
+    {
+      userId: Number(form.get("userId")),
+      domainId: Number(form.get("domainId")),
+      localPart: String(form.get("localPart") || "").trim(),
+    },
+    "Mailbox created.",
+  );
+});
+
+adminAliasForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = new FormData(adminAliasForm);
+  await createAdminRecord(
+    "/api/v1/admin/aliases",
+    {
+      source: String(form.get("source") || "").trim(),
+      destination: String(form.get("destination") || "").trim(),
+    },
+    "Alias created.",
+  );
+});
+
+adminDkimForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = new FormData(adminDkimForm);
+  await createAdminRecord(
+    "/api/v1/admin/dkim-keys",
+    {
+      domainId: Number(form.get("domainId")),
+      selector: String(form.get("selector") || "").trim(),
+    },
+    "DKIM key generated. Store the returned private key outside Git.",
+  );
 });
 
 async function createMailboxSession({ email, password, apiBaseUrl }) {
@@ -780,6 +889,212 @@ function forgetMailboxSession() {
   clearSearch();
 }
 
+async function bootstrapAdministrator(payload) {
+  if (!adminSession.apiBaseUrl || !adminSession.bootstrapToken) {
+    setAdminStatus("Save API and bootstrap token before bootstrapping.", "error");
+    return;
+  }
+  setAdminStatus("Bootstrapping administrator...", "loading");
+  try {
+    const response = await fetch(new URL("/api/v1/bootstrap/admin", adminSession.apiBaseUrl), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-FreeMail-Bootstrap-Token": adminSession.bootstrapToken,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const result = await response.json();
+    renderAdminResult("Bootstrap administrator", result);
+    setAdminStatus("Administrator bootstrapped.", "ready");
+    await loadAdminOverview({ quiet: true });
+  } catch (error) {
+    setAdminStatus(`Bootstrap failed: ${readableError(error)}`, "error");
+  }
+}
+
+async function createAdminRecord(path, payload, successMessage) {
+  if (!adminSession.apiBaseUrl || !adminSession.adminToken) {
+    setAdminStatus("Save API and admin token before making admin changes.", "error");
+    return;
+  }
+  setAdminStatus("Saving admin change...", "loading");
+  try {
+    const response = await fetch(new URL(path, adminSession.apiBaseUrl), {
+      method: "POST",
+      headers: adminHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const result = await response.json();
+    renderAdminResult(successMessage, result);
+    setAdminStatus(successMessage, "ready");
+    await loadAdminOverview({ quiet: true });
+  } catch (error) {
+    setAdminStatus(`Admin change failed: ${readableError(error)}`, "error");
+  }
+}
+
+async function loadAdminOverview({ quiet = false } = {}) {
+  if (!adminSession.apiBaseUrl || !adminSession.adminToken) {
+    setAdminStatus("Save API and admin token before loading admin metadata.", "error");
+    return;
+  }
+  if (!quiet) {
+    setAdminStatus("Loading admin metadata...", "loading");
+  }
+  try {
+    const [domains, users, mailboxes, aliases, dkimKeys, auditLog] = await Promise.all(
+      [
+        "/api/v1/admin/domains",
+        "/api/v1/admin/users",
+        "/api/v1/admin/mailboxes",
+        "/api/v1/admin/aliases",
+        "/api/v1/admin/dkim-keys",
+        "/api/v1/admin/audit-log",
+      ].map(fetchAdminJson),
+    );
+    renderAdminOverview({ domains, users, mailboxes, aliases, dkimKeys, auditLog });
+    if (!quiet) {
+      setAdminStatus("Admin metadata loaded.", "ready");
+    }
+  } catch (error) {
+    setAdminStatus(`Admin load failed: ${readableError(error)}`, "error");
+  }
+}
+
+async function fetchAdminJson(path) {
+  const response = await fetch(new URL(path, adminSession.apiBaseUrl), {
+    headers: adminHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+  return response.json();
+}
+
+function adminHeaders() {
+  return {
+    "Content-Type": "application/json",
+    "X-FreeMail-Admin-Token": adminSession.adminToken,
+  };
+}
+
+function renderAdminOverview({ domains, users, mailboxes, aliases, dkimKeys, auditLog }) {
+  if (!adminResults) {
+    return;
+  }
+  adminResults.replaceChildren(
+    adminTable("Domains", domains, ["id", "name", "status"]),
+    adminTable("Users", users, ["id", "email", "displayName", "isAdmin", "status"]),
+    adminTable("Mailboxes", mailboxes, ["id", "address", "userId", "status"]),
+    adminTable("Aliases", aliases, ["id", "source", "destination", "status"]),
+    adminTable("DKIM keys", dkimKeys, ["id", "domainId", "selector", "dnsName", "status"]),
+    adminTable("Audit log", auditLog.slice(0, 10), ["id", "actor", "action", "targetType", "targetId", "createdAt"]),
+  );
+}
+
+function renderAdminResult(title, result) {
+  if (!adminResults) {
+    return;
+  }
+  const section = document.createElement("section");
+  section.className = "admin-result-card";
+  const heading = document.createElement("h3");
+  heading.textContent = title;
+  const pre = document.createElement("pre");
+  pre.textContent = JSON.stringify(result, null, 2);
+  section.replaceChildren(heading, pre);
+  adminResults.replaceChildren(section);
+}
+
+function adminTable(title, rows, columns) {
+  const section = document.createElement("section");
+  section.className = "admin-result-card";
+  const heading = document.createElement("h3");
+  heading.textContent = `${title} (${rows.length})`;
+  if (!rows.length) {
+    const empty = document.createElement("p");
+    empty.textContent = "No records yet.";
+    section.replaceChildren(heading, empty);
+    return section;
+  }
+  const table = document.createElement("table");
+  const thead = document.createElement("thead");
+  const headerRow = document.createElement("tr");
+  headerRow.replaceChildren(...columns.map(tableHeader));
+  thead.replaceChildren(headerRow);
+  const tbody = document.createElement("tbody");
+  tbody.replaceChildren(
+    ...rows.map((row) => {
+      const tableRow = document.createElement("tr");
+      tableRow.replaceChildren(...columns.map((column) => tableCell(row[column])));
+      return tableRow;
+    }),
+  );
+  table.replaceChildren(thead, tbody);
+  section.replaceChildren(heading, table);
+  return section;
+}
+
+function tableHeader(value) {
+  const cell = document.createElement("th");
+  cell.textContent = value;
+  return cell;
+}
+
+function tableCell(value) {
+  const cell = document.createElement("td");
+  cell.textContent = value === undefined || value === null ? "" : String(value);
+  return cell;
+}
+
+function restoreAdminSession() {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(adminSessionStorageKey) || "null");
+    if (!stored?.apiBaseUrl) {
+      return;
+    }
+    adminSession = {
+      apiBaseUrl: String(stored.apiBaseUrl).replace(/\/+$/, ""),
+      adminToken: String(stored.adminToken || ""),
+      bootstrapToken: String(stored.bootstrapToken || ""),
+    };
+    if (adminApiBaseUrl) {
+      adminApiBaseUrl.value = adminSession.apiBaseUrl;
+    }
+    if (adminTokenInput) {
+      adminTokenInput.value = adminSession.adminToken;
+    }
+    if (bootstrapTokenInput) {
+      bootstrapTokenInput.value = adminSession.bootstrapToken;
+    }
+  } catch (_error) {
+    forgetAdminSession();
+  }
+}
+
+function persistAdminSession(session) {
+  window.localStorage.setItem(
+    adminSessionStorageKey,
+    JSON.stringify({
+      apiBaseUrl: session.apiBaseUrl,
+      adminToken: session.adminToken,
+      bootstrapToken: session.bootstrapToken,
+    }),
+  );
+}
+
+function forgetAdminSession() {
+  window.localStorage.removeItem(adminSessionStorageKey);
+  adminSession = { apiBaseUrl: "", adminToken: "", bootstrapToken: "" };
+}
+
 function clearSearch() {
   if (searchQuery) {
     searchQuery.value = "";
@@ -838,6 +1153,14 @@ function setStatus(message, state) {
   }
   statusNode.textContent = message;
   statusNode.dataset.state = state;
+}
+
+function setAdminStatus(message, state) {
+  if (!adminStatus) {
+    return;
+  }
+  adminStatus.textContent = message;
+  adminStatus.dataset.state = state;
 }
 
 function shortDate(value) {

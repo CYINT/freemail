@@ -57,6 +57,8 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         "reader",
         "compose-panel",
         "mailbox-login",
+        "admin-console",
+        "admin-card",
     }
     missing_classes = sorted(required_classes - parser.classes)
     if missing_classes:
@@ -110,6 +112,19 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         "archive-action",
         "spam-action",
         "delete-action",
+        "admin-auth",
+        "admin-api-base-url",
+        "admin-token",
+        "bootstrap-token",
+        "admin-status",
+        "admin-refresh-action",
+        "bootstrap-admin-form",
+        "admin-domain-form",
+        "admin-user-form",
+        "admin-mailbox-form",
+        "admin-alias-form",
+        "admin-dkim-form",
+        "admin-results",
     ]:
         if marker not in " ".join(parser.attributes.get("id", [])):
             failures.append(f"missing live mailbox UI marker: {marker}")
@@ -125,6 +140,13 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         "/api/v1/mailbox/message/archive",
         "/api/v1/mailbox/message/move",
         "/api/v1/mailbox/send",
+        "/api/v1/bootstrap/admin",
+        "/api/v1/admin/domains",
+        "/api/v1/admin/users",
+        "/api/v1/admin/mailboxes",
+        "/api/v1/admin/aliases",
+        "/api/v1/admin/dkim-keys",
+        "/api/v1/admin/audit-log",
         "archiveMailboxMessage",
         "moveMailboxMessage",
         "searchMailboxMessages",
@@ -149,6 +171,12 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         "restoreMailboxSession",
         "persistMailboxSession",
         "forgetMailboxSession",
+        "restoreAdminSession",
+        "persistAdminSession",
+        "bootstrapAdministrator",
+        "createAdminRecord",
+        "loadAdminOverview",
+        "renderAdminOverview",
         "clearSearch",
     ]:
         if marker not in js_text:

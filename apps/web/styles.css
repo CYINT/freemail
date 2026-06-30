@@ -468,6 +468,136 @@ h2 {
   justify-content: flex-end;
 }
 
+.admin-console {
+  display: grid;
+  gap: 1rem;
+  border-top: 1px solid #cfd8e2;
+  background: #f8fafc;
+  padding: 1.25rem;
+}
+
+.admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.admin-auth,
+.admin-card,
+.admin-result-card {
+  border: 1px solid #d6e0e8;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 0.85rem;
+}
+
+.admin-auth {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  align-items: end;
+  gap: 0.75rem;
+}
+
+.admin-auth .form-status {
+  grid-column: 1 / -1;
+}
+
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.admin-card {
+  display: grid;
+  align-content: start;
+  gap: 0.65rem;
+}
+
+.admin-card h3,
+.admin-result-card h3 {
+  margin: 0;
+  color: #243140;
+  font-size: 0.95rem;
+}
+
+.admin-auth label,
+.admin-card label {
+  display: grid;
+  gap: 0.25rem;
+  color: #3a4856;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.admin-auth input,
+.admin-card input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid #c8d2dc;
+  border-radius: 7px;
+  color: #18212b;
+  padding: 0.45rem 0.55rem;
+}
+
+.checkbox-field {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  justify-content: start;
+}
+
+.checkbox-field input {
+  width: 18px;
+  min-height: 18px;
+}
+
+.admin-results {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.admin-results > p {
+  margin: 0;
+  color: #596875;
+}
+
+.admin-result-card {
+  overflow: auto;
+}
+
+.admin-result-card table {
+  width: 100%;
+  min-width: 34rem;
+  border-collapse: collapse;
+  margin-top: 0.65rem;
+  font-size: 0.84rem;
+}
+
+.admin-result-card th,
+.admin-result-card td {
+  border-bottom: 1px solid #e0e7ee;
+  padding: 0.45rem 0.5rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.admin-result-card th {
+  color: #3a4856;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.admin-result-card pre {
+  max-height: 22rem;
+  overflow: auto;
+  border-radius: 7px;
+  background: #18212b;
+  color: #f8fafc;
+  padding: 0.75rem;
+  white-space: pre-wrap;
+}
+
 @media (max-width: 920px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -507,6 +637,11 @@ h2 {
   .search {
     width: min(100%, 24rem);
   }
+
+  .admin-auth,
+  .admin-grid {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 @media (max-width: 640px) {
@@ -542,5 +677,15 @@ h2 {
   .reader-actions button,
   .compose-actions button {
     flex: 1 1 8rem;
+  }
+
+  .admin-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-auth,
+  .admin-grid {
+    grid-template-columns: 1fr;
   }
 }
