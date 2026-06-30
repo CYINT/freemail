@@ -337,6 +337,20 @@ The exporter matches DKIM signatures by selector to avoid duplicate Stalwart sig
 
 Read `docs/backup-restore.md` before relying on backups. The metadata backup tools export API metadata, audit logs, and DKIM key material; they intentionally exclude admin sessions, mailbox sessions, outbound rate-limit counters, push-device registrations, and Stalwart mail-store data.
 
+Collect both release-packet backup artifacts into one ignored directory:
+
+```powershell
+docker compose --profile mail-core stop mail-core
+.\.venv\Scripts\python.exe scripts\collect_backup_evidence.py `
+  --database data\freemail.sqlite `
+  --output-dir .freemail-qa\backups `
+  --mail-store-volume freemail_freemail_stalwart `
+  --force
+docker compose --profile mail-core up -d mail-core
+```
+
+The collector writes `metadata.json`, `stalwart-mail-store.tar.gz`, and `backup-evidence-manifest.json` with checksums. These files are sensitive and must stay encrypted/outside Git.
+
 Export metadata:
 
 ```powershell

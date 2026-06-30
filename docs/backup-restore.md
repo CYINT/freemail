@@ -9,6 +9,29 @@ The metadata backup tools cover domains, users, mailboxes, aliases, DKIM keys, a
 
 Metadata backups include DKIM private keys and password hashes. Treat every backup file as sensitive operational material: encrypt it at rest, keep it out of Git, and restrict access to administrators.
 
+## Release Evidence Collection
+
+For release-candidate evidence, collect the metadata backup and mail-store archive into one ignored directory:
+
+```powershell
+docker inspect freemail-mail-core-1 --format '{{json .Mounts}}'
+docker compose --profile mail-core stop mail-core
+.\.venv\Scripts\python.exe scripts\collect_backup_evidence.py `
+  --database data\freemail.sqlite `
+  --output-dir .freemail-qa\backups `
+  --mail-store-volume freemail_freemail_stalwart `
+  --force
+docker compose --profile mail-core up -d mail-core
+```
+
+The collector writes:
+
+- `metadata.json`: API metadata backup.
+- `stalwart-mail-store.tar.gz`: Docker-volume mail-store archive.
+- `backup-evidence-manifest.json`: artifact paths, byte counts, and SHA-256 checksums for release-packet wiring.
+
+The manifest records relative release-gate input names, but the backup files themselves remain sensitive because they may include DKIM private keys, password hashes, mailbox contents, attachments, indexes, and queue state.
+
 ## Export API Metadata
 
 ```powershell

@@ -18,6 +18,20 @@ After collecting backups, mobile evidence, private-beta gate output, and release
 
 The manifest is credential-free. It stores release-packet paths relative to the manifest location when possible, plus the candidate version and mobile store-submission requirement. Keep the evidence files themselves outside Git unless the file is intentionally public, such as release notes.
 
+Backup artifacts can be collected before manifest creation with:
+
+```powershell
+docker compose --profile mail-core stop mail-core
+.\.venv\Scripts\python.exe scripts\collect_backup_evidence.py `
+  --database data\freemail.sqlite `
+  --output-dir .freemail-qa\backups `
+  --mail-store-volume freemail_freemail_stalwart `
+  --force
+docker compose --profile mail-core up -d mail-core
+```
+
+The backup collector writes sensitive artifacts plus `backup-evidence-manifest.json` with byte counts and SHA-256 checksums. Keep the backup directory encrypted and outside Git.
+
 Before the hard gate, inspect the local release packet without touching Docker, GitHub, or live runtime URLs:
 
 ```powershell
