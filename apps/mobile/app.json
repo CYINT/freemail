@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "FreeMail",
+    "slug": "freemail-mobile",
+    "scheme": "freemail",
+    "version": "0.1.0-dev",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "technology.cyint.freemail"
+    },
+    "android": {
+      "package": "technology.cyint.freemail"
+    },
+    "extra": {
+      "apiBaseUrl": "https://freemail.kuzuryu.ai"
+    }
+  }
+}

@@ -1,20 +1,40 @@
 # FreeMail Mobile
 
-This directory owns the future FreeMail mobile client.
+FreeMail Mobile is the iOS and Android client lane for the FreeMail platform. It is an Expo/React Native app scaffold that consumes the same mailbox API used by the webmail client.
 
-The mobile client is part of the FreeMail product scope, but it should start after the server/admin/web API contracts are stable enough to avoid throwaway native work.
+The current mobile implementation is a source-level foundation, not a production app-store build. It defines project metadata, API client, secure session storage, and the first mailbox screen flow so contributors can build native UI without inventing new server contracts.
 
-Expected scope:
+## Scope
 
 - iOS and Android client.
-- Secure session management.
-- Inbox, message read, compose, reply, forward, search, folders/labels, and attachments.
-- Offline-capable mail cache.
-- Push notification path after server event contracts are available.
+- VPN-only self-hosted API target.
+- Secure bearer-session persistence through `expo-secure-store`.
+- Inbox snapshot, message read, compose/send, and sign-out workflows.
+- Future attachment, folder, contacts, search, push, and offline cache workflows.
 
-Candidate stacks:
+## Development
 
-- React Native with Expo.
-- Flutter.
+```powershell
+cd apps\mobile
+npm install
+npm run typecheck
+npm run start
+```
 
-The implementation decision belongs in a future ADR before the first mobile code lands.
+The default API target is:
+
+```text
+https://freemail.kuzuryu.ai
+```
+
+Devices must be on the Dragonscale/VPN network. Do not point a production mobile build at public internet ingress during the current release phase.
+
+## QA
+
+Static mobile QA runs from the repository root and does not require a native toolchain:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\qa_mobile_static.py
+```
+
+The static gate checks that the mobile client uses provider-neutral FreeMail language, references the expected mailbox API endpoints, defaults to the VPN hostname, and does not persist mailbox passwords or bearer sessions in insecure browser-style storage.

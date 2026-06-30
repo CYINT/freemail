@@ -1,0 +1,70 @@
+from pathlib import Path
+import json
+import sys
+
+
+def main() -> int:
+    root = Path(__file__).resolve().parents[1]
+    failures = validate_mobile(root)
+    if failures:
+        for failure in failures:
+            print(failure, file=sys.stderr)
+        return 1
+    print("static mobile QA passed")
+    return 0
+
+
+def validate_mobile(root: Path) -> list[str]:
+    mobile = root / "apps" / "mobile"
+    files = {
+        "README.md": mobile / "README.md",
+        "package.json": mobile / "package.json",
+        "app.json": mobile / "app.json",
+        "App.tsx": mobile / "App.tsx",
+        "src/api.ts": mobile / "src" / "api.ts",
+        "src/sessionStore.ts": mobile / "src" / "sessionStore.ts",
+    }
+    failures = [f"missing mobile file: {name}" for name, path in files.items() if not path.is_file()]
+    if failures:
+        return failures
+
+    package = json.loads(files["package.json"].read_text(encoding="utf-8"))
+    app_config = json.loads(files["app.json"].read_text(encoding="utf-8"))
+    combined = "\n".join(path.read_text(encoding="utf-8") for path in files.values())
+
+    if package.get("license") != "AGPL-3.0-or-later":
+        failures.append("mobile package must declare AGPL-3.0-or-later")
+    dependencies = package.get("dependencies", {})
+    for dependency in ["expo", "react-native", "expo-secure-store"]:
+        if dependency not in dependencies:
+            failures.append(f"missing mobile dependency: {dependency}")
+    if app_config.get("expo", {}).get("extra", {}).get("apiBaseUrl") != "https://freemail.kuzuryu.ai":
+        failures.append("mobile app must default to the VPN hostname")
+
+    for marker in [
+        "/api/v1/mailbox/session",
+        "/api/v1/mailbox/snapshot",
+        "/api/v1/mailbox/message",
+        "/api/v1/mailbox/send",
+        "Authorization",
+        "Bearer",
+        "SecureStore.setItemAsync",
+        "SecureStore.getItemAsync",
+        "SecureStore.deleteItemAsync",
+        "WHEN_UNLOCKED_THIS_DEVICE_ONLY",
+        "VPN-only mobile client",
+        "https://freemail.kuzuryu.ai",
+    ]:
+        if marker not in combined:
+            failures.append(f"missing mobile marker: {marker}")
+
+    for marker in ["Gmail", "Google", "AsyncStorage", "localStorage", "sessionStorage", "document.cookie"]:
+        if marker.lower() in combined.lower():
+            failures.append(f"forbidden mobile marker found: {marker}")
+    if "password" in files["src/sessionStore.ts"].read_text(encoding="utf-8").lower():
+        failures.append("mobile session store must not persist mailbox passwords")
+    return failures
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -71,3 +71,17 @@ The exporter intentionally requires a separate ignored secrets JSON file for acc
 The exported plan uses Stalwart CLI upsert operations grouped by object type. It is intended to run after Stalwart's initial `Bootstrap` singleton has been completed; while the server remains in bootstrap mode, Stalwart rejects all object access except `Bootstrap`.
 
 The exporter currently matches DKIM signatures by selector to avoid duplicate signatures on repeated `apply` runs with the current Stalwart CLI. Operators should use unique selectors per hosted domain until reference-based matching on `DkimSignature.domainId` is proven reliable across supported Stalwart versions.
+
+## Mobile Client
+
+`apps/mobile` is the iOS/Android client lane. It uses Expo/React Native and the same bearer-session mailbox APIs as the webmail preview.
+
+The current mobile foundation covers:
+
+- VPN-only default API target at `https://freemail.kuzuryu.ai`
+- mailbox session creation and revocation
+- SecureStore-backed bearer-session persistence
+- inbox snapshot, message read, and compose/send API calls
+- static QA that forbids provider trade-dress references and insecure browser-style credential storage
+
+Native build, app-store signing, push notifications, offline cache, attachment UX, and folder/search/contacts screens remain future mobile milestones.

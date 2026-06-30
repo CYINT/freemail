@@ -58,3 +58,12 @@ Current progress: API metadata export and restore tooling exists for domains, us
 - VPN/private access boundary accepted.
 - External inbound/outbound smoke tests.
 - Deliverability evidence recorded.
+
+## M7 - Mobile Client
+
+- iOS and Android client foundation.
+- Secure mobile session storage.
+- Inbox, read, compose, reply, forward, search, folders, contacts, and attachments.
+- Offline cache and push notification path.
+
+Current progress: Expo/React Native scaffold exists under `apps/mobile` with typed mailbox API client, SecureStore-backed bearer-session persistence, default VPN hostname `https://freemail.kuzuryu.ai`, first inbox/read/compose/sign-out UI, AGPL package metadata, and static QA in `scripts/qa_mobile_static.py`. Remaining work is native build verification, attachment/search/folder/contact mobile surfaces, offline cache, push notification contracts, and app-store/release signing.

@@ -29,6 +29,8 @@ jobs:
           python -m coverage xml
       - name: Browser webmail QA
         run: python scripts/qa_web_browser.py
+      - name: Mobile static QA
+        run: python scripts/qa_mobile_static.py
       - name: Upload coverage to Codecov
         if: ${{ env.CODECOV_TOKEN != '' }}
         uses: codecov/codecov-action@v5
