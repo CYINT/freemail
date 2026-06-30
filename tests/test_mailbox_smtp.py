@@ -172,6 +172,7 @@ def test_send_mailbox_message_appends_accepted_message_to_sent_folder(monkeypatc
     assert sent.sent_folder_saved is True
     assert FakeImap.appended[0]["folder"] == "Sent Items"
     assert FakeImap.appended[0]["flags"] == r"(\Seen)"
+    assert FakeImap.appended[0]["dateTime"] is None
     assert b"Subject: Hello" in FakeImap.appended[0]["message"]
 
 

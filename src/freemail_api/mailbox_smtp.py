@@ -3,7 +3,6 @@ from __future__ import annotations
 import base64
 from dataclasses import asdict, dataclass
 from email.message import EmailMessage
-from email.utils import formatdate
 from email.utils import make_msgid
 import imaplib
 import smtplib
@@ -138,9 +137,9 @@ def _append_sent_message(
         with imaplib.IMAP4_SSL(host, port, ssl_context=tls_context, timeout=timeout_seconds) as imap:
             imap.login(email, password)
             _ensure_imap_folder(imap, folder)
-            status, _data = imap.append(f'"{folder}"', r"(\Seen)", formatdate(localtime=True), message.as_bytes())
+            status, _data = imap.append(f'"{folder}"', r"(\Seen)", None, message.as_bytes())
             return status == "OK"
-    except (OSError, imaplib.IMAP4.error):
+    except (OSError, ValueError, imaplib.IMAP4.error):
         return False
 
 
