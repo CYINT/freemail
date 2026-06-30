@@ -121,9 +121,10 @@ def validate_mobile(root: Path) -> list[str]:
         "macos-15",
         "scripts/qa_mobile_native_prebuild.py --link-node-modules --platform ios",
         "scripts/mobile_release_gate.py",
-        "mobile signed-build release evidence",
+        "mobile signed-build, store-submission, and real-device validation evidence",
         "--require-store-submission",
         "storeSubmissions",
+        "deviceValidation",
         "privateBetaBoundary",
     ]:
         if marker not in combined:

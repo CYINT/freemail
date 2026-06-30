@@ -135,6 +135,58 @@ def test_mobile_release_gate_rejects_wrong_android_identifier(tmp_path):
     assert android_check["status"] == "fail"
 
 
+def test_mobile_release_gate_rejects_missing_device_validation(tmp_path):
+    app_config = tmp_path / "app.json"
+    evidence = tmp_path / "mobile-release.json"
+    write_json(
+        app_config,
+        {
+            "expo": {
+                "name": "FreeMail",
+                "version": "0.1.0-dev",
+                "ios": {"bundleIdentifier": "technology.cyint.freemail"},
+                "android": {"package": "technology.cyint.freemail"},
+                "extra": {"apiBaseUrl": "https://freemail.kuzuryu.ai"},
+            }
+        },
+    )
+    payload = valid_evidence()
+    payload["deviceValidation"]["android"]["tested"] = False
+    write_json(evidence, payload)
+
+    result = run_mobile_release_gate(MobileReleaseGateOptions(evidence=evidence, app_config=app_config))
+
+    android_check = next(check for check in result["checks"] if check["name"] == "android-device-validation")
+    assert result["passed"] is False
+    assert android_check["status"] == "fail"
+
+
+def test_mobile_release_gate_rejects_device_validation_without_vpn_boundary(tmp_path):
+    app_config = tmp_path / "app.json"
+    evidence = tmp_path / "mobile-release.json"
+    write_json(
+        app_config,
+        {
+            "expo": {
+                "name": "FreeMail",
+                "version": "0.1.0-dev",
+                "ios": {"bundleIdentifier": "technology.cyint.freemail"},
+                "android": {"package": "technology.cyint.freemail"},
+                "extra": {"apiBaseUrl": "https://freemail.kuzuryu.ai"},
+            }
+        },
+    )
+    payload = valid_evidence()
+    payload["deviceValidation"]["ios"]["networkBoundary"] = "public internet"
+    write_json(evidence, payload)
+
+    result = run_mobile_release_gate(MobileReleaseGateOptions(evidence=evidence, app_config=app_config))
+
+    ios_check = next(check for check in result["checks"] if check["name"] == "ios-device-validation")
+    assert result["passed"] is False
+    assert ios_check["status"] == "fail"
+
+
 def test_mobile_release_gate_rejects_malformed_artifact_hash(tmp_path):
     app_config = tmp_path / "app.json"
     evidence = tmp_path / "mobile-release.json"
@@ -297,12 +349,39 @@ def valid_evidence():
                 "artifact": {"type": "aab", "bytes": 456, "sha256": "b" * 64},
             },
         },
+        "deviceValidation": {
+            "ios": valid_device_validation("ios"),
+            "android": valid_device_validation("android"),
+        },
         "privateBetaBoundary": {
             "hostname": "freemail.kuzuryu.ai",
             "vpnOnly": True,
             "publicInternet": False,
             "requiredBoundary": "Dragonscale/VPN clients only",
         },
+    }
+
+
+def valid_device_validation(platform):
+    return {
+        "platform": platform,
+        "tested": True,
+        "testedAt": "2026-06-30T00:00:00Z",
+        "tester": "release operator",
+        "deviceModel": "iPhone 15" if platform == "ios" else "Pixel 8",
+        "osVersion": "iOS 18" if platform == "ios" else "Android 15",
+        "appVersion": "0.1.0-dev",
+        "hostname": "freemail.kuzuryu.ai",
+        "networkBoundary": "Dragonscale/VPN clients only",
+        "evidenceUrl": f"https://example.invalid/{platform}-device-validation",
+        "checks": [
+            {"name": "vpn-dns-resolution", "status": "pass"},
+            {"name": "auth-login", "status": "pass"},
+            {"name": "inbox-sync", "status": "pass"},
+            {"name": "message-read", "status": "pass"},
+            {"name": "compose-send", "status": "pass"},
+            {"name": "offline-cache", "status": "pass"},
+        ],
     }
 
 

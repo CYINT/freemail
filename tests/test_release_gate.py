@@ -766,12 +766,39 @@ def valid_mobile_release_evidence():
                 "reviewState": "draft-release-created",
             },
         },
+        "deviceValidation": {
+            "ios": valid_mobile_device_validation("ios"),
+            "android": valid_mobile_device_validation("android"),
+        },
         "privateBetaBoundary": {
             "hostname": "freemail.kuzuryu.ai",
             "vpnOnly": True,
             "publicInternet": False,
             "requiredBoundary": "Dragonscale/VPN clients only",
         },
+    }
+
+
+def valid_mobile_device_validation(platform):
+    return {
+        "platform": platform,
+        "tested": True,
+        "testedAt": "2026-06-30T00:00:00Z",
+        "tester": "release operator",
+        "deviceModel": "iPhone 15" if platform == "ios" else "Pixel 8",
+        "osVersion": "iOS 18" if platform == "ios" else "Android 15",
+        "appVersion": "0.1.0-dev",
+        "hostname": "freemail.kuzuryu.ai",
+        "networkBoundary": "Dragonscale/VPN clients only",
+        "evidenceUrl": f"https://example.invalid/{platform}-device-validation",
+        "checks": [
+            {"name": "vpn-dns-resolution", "status": "pass"},
+            {"name": "auth-login", "status": "pass"},
+            {"name": "inbox-sync", "status": "pass"},
+            {"name": "message-read", "status": "pass"},
+            {"name": "compose-send", "status": "pass"},
+            {"name": "offline-cache", "status": "pass"},
+        ],
     }
 
 

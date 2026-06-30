@@ -153,9 +153,9 @@ Pop-Location
 The mobile scaffold lives in `apps\mobile`, uses Expo/React Native, defaults to `https://freemail.kuzuryu.ai`, and persists bearer sessions through `expo-secure-store` rather than browser-style storage. It currently covers sign-in, inbox/folder snapshots, message reading, compose/send with bounded document-picker attachments, reply/forward drafts, folder-scoped search, contacts, non-core folder management, attachment metadata plus authenticated download/share handling, secure offline metadata caching for the last loaded mailbox views, bearer-authenticated push-device registration, and provider-neutral push notification delivery status.
 
 Mobile native release posture is documented in `docs\mobile-release.md`. The open-source repo keeps signing credentials, provisioning profiles, keystores, store API keys, and generated native projects out of source control; CI validates the Expo config, Android native prebuild drill, static release checklist, and macOS iOS native prebuild drill.
-Signed mobile builds and app-store submission evidence are validated with `scripts\mobile_release_gate.py` from credential-free evidence stored outside Git.
-Use `scripts\create_mobile_release_evidence_template.py` to create a failing credential-free draft evidence file before private signing and store-submission runs.
-Use `scripts\mobile_release_status.py --require-store-submission` to inspect that evidence packet before the hard release gate; it is read-only and reports missing or failing signed-build/store-submission checks.
+Signed mobile builds, app-store submission evidence, and real-device private-beta validation are validated with `scripts\mobile_release_gate.py` from credential-free evidence stored outside Git.
+Use `scripts\create_mobile_release_evidence_template.py` to create a failing credential-free draft evidence file before private signing, store-submission, and device-validation runs.
+Use `scripts\mobile_release_status.py --require-store-submission` to inspect that evidence packet before the hard release gate; it is read-only and reports missing or failing signed-build, store-submission, and device-validation checks.
 
 The push contract stores hashed provider tokens for lookup and, when `FREEMAIL_PUSH_TOKEN_SECRET` is configured, stores encrypted provider tokens for runtime dispatch. Raw and encrypted provider tokens are never returned by the API and runtime push tables are excluded from metadata backups. Native clients use stable register/list/revoke plus provider-neutral notification status APIs:
 

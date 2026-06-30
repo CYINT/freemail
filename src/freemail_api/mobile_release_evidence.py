@@ -84,6 +84,16 @@ def _mobile_release_template(app_config: dict[str, Any], generated_at: str) -> d
                 evidence_note="Fill after Play Console internal-testing or closed-testing submission is complete.",
             ),
         },
+        "deviceValidation": {
+            "ios": _device_validation_template(
+                platform="ios",
+                evidence_note="Fill after a real iOS device validates the private-beta workflow over VPN.",
+            ),
+            "android": _device_validation_template(
+                platform="android",
+                evidence_note="Fill after a real Android device validates the private-beta workflow over VPN.",
+            ),
+        },
         "privateBetaBoundary": {
             "hostname": "freemail.kuzuryu.ai",
             "vpnOnly": True,
@@ -92,7 +102,7 @@ def _mobile_release_template(app_config: dict[str, Any], generated_at: str) -> d
         },
         "notes": [
             "Credential-free draft only; do not add signing material, passwords, service-account JSON, or raw tokens.",
-            "The mobile release gate must fail until signed build and store-submission evidence is filled in.",
+            "The mobile release gate must fail until signed build, store-submission, and device-validation evidence is filled in.",
         ],
     }
 
@@ -117,6 +127,30 @@ def _submission_template(*, store: str, identifier: str, track: str, evidence_no
         "submissionUrl": "",
         "submittedAt": "",
         "reviewState": "",
+        "evidenceNote": evidence_note,
+    }
+
+
+def _device_validation_template(*, platform: str, evidence_note: str) -> dict[str, Any]:
+    return {
+        "platform": platform,
+        "tested": False,
+        "testedAt": "",
+        "tester": "",
+        "deviceModel": "",
+        "osVersion": "",
+        "appVersion": "",
+        "hostname": "freemail.kuzuryu.ai",
+        "networkBoundary": "Dragonscale/VPN clients only",
+        "evidenceUrl": "",
+        "checks": [
+            {"name": "vpn-dns-resolution", "status": "pending"},
+            {"name": "auth-login", "status": "pending"},
+            {"name": "inbox-sync", "status": "pending"},
+            {"name": "message-read", "status": "pending"},
+            {"name": "compose-send", "status": "pending"},
+            {"name": "offline-cache", "status": "pending"},
+        ],
         "evidenceNote": evidence_note,
     }
 

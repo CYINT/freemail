@@ -13,6 +13,7 @@ def test_open_source_readiness_passes_for_current_repo():
     assert payload["credentialFreePublicRepo"] is True
     assert payload["releaseReady"] is False
     assert "decision-owner private-beta acceptance" in payload["releaseBlockers"]
+    assert "private-beta device validation" in payload["releaseBlockers"]
     assert all(check["status"] == "pass" for check in payload["checks"])
 
 

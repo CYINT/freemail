@@ -43,6 +43,8 @@ def test_mobile_release_evidence_template_uses_app_config_and_failing_defaults(t
     assert payload["builds"]["ios"]["signed"] is False
     assert payload["builds"]["android"]["artifact"]["type"] == "aab"
     assert payload["storeSubmissions"]["ios"]["submitted"] is False
+    assert payload["deviceValidation"]["ios"]["tested"] is False
+    assert payload["deviceValidation"]["android"]["checks"][0]["name"] == "vpn-dns-resolution"
     assert payload["privateBetaBoundary"]["vpnOnly"] is True
 
 
@@ -80,6 +82,8 @@ def test_mobile_release_evidence_template_does_not_accidentally_pass_gate(tmp_pa
     assert checks["private-beta-boundary"]["status"] == "pass"
     assert checks["ios-signed-build"]["status"] == "fail"
     assert checks["android-signed-build"]["status"] == "fail"
+    assert checks["ios-device-validation"]["status"] == "fail"
+    assert checks["android-device-validation"]["status"] == "fail"
     assert checks["ios-store-submission"]["status"] == "fail"
     assert checks["android-store-submission"]["status"] == "fail"
 

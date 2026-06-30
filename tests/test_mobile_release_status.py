@@ -44,6 +44,8 @@ def test_mobile_release_status_reports_failed_gate_checks_for_draft(tmp_path):
     assert result["failedChecks"] == [
         "ios-signed-build",
         "android-signed-build",
+        "ios-device-validation",
+        "android-device-validation",
         "ios-store-submission",
         "android-store-submission",
     ]
@@ -60,7 +62,7 @@ def test_mobile_release_status_accepts_complete_store_submission_packet(tmp_path
 
     assert result["ready"] is True
     assert result["failedChecks"] == []
-    assert [check["status"] for check in result["checks"]] == ["pass"] * 7
+    assert [check["status"] for check in result["checks"]] == ["pass"] * 9
 
 
 def test_mobile_release_status_script_exits_nonzero_until_ready(tmp_path):
@@ -124,6 +126,10 @@ def complete_evidence():
                 "artifact": {"type": "aab", "bytes": 456, "sha256": "b" * 64},
             },
         },
+        "deviceValidation": {
+            "ios": valid_device_validation("ios"),
+            "android": valid_device_validation("android"),
+        },
         "storeSubmissions": {
             "ios": {
                 "store": "app-store-connect",
@@ -150,6 +156,29 @@ def complete_evidence():
             "publicInternet": False,
             "requiredBoundary": "Dragonscale/VPN clients only",
         },
+    }
+
+
+def valid_device_validation(platform):
+    return {
+        "platform": platform,
+        "tested": True,
+        "testedAt": "2026-06-30T00:00:00Z",
+        "tester": "release operator",
+        "deviceModel": "iPhone 15" if platform == "ios" else "Pixel 8",
+        "osVersion": "iOS 18" if platform == "ios" else "Android 15",
+        "appVersion": "0.1.0-dev",
+        "hostname": "freemail.kuzuryu.ai",
+        "networkBoundary": "Dragonscale/VPN clients only",
+        "evidenceUrl": f"https://example.invalid/{platform}-device-validation",
+        "checks": [
+            {"name": "vpn-dns-resolution", "status": "pass"},
+            {"name": "auth-login", "status": "pass"},
+            {"name": "inbox-sync", "status": "pass"},
+            {"name": "message-read", "status": "pass"},
+            {"name": "compose-send", "status": "pass"},
+            {"name": "offline-cache", "status": "pass"},
+        ],
     }
 
 

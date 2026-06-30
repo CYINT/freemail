@@ -20,7 +20,7 @@ REQUIRED_FILES = {
     ".env.example": ("FREEMAIL_",),
     "docs/deployment-vpn.md": ("VPN", "freemail.kuzuryu.ai"),
     "docs/release-gates.md": ("release gate", "private-beta"),
-    "docs/mobile-release.md": ("signing", "store"),
+    "docs/mobile-release.md": ("signing", "store", "device validation"),
 }
 REQUIRED_CI_STEPS = (
     "Repository secret scan",
@@ -46,6 +46,7 @@ FORBIDDEN_TRACKED_PREFIXES = (
 )
 RELEASE_BLOCKERS = (
     "decision-owner private-beta acceptance",
+    "private-beta device validation",
     "real signed native mobile builds",
     "real store-submission evidence",
     "app-store release execution",

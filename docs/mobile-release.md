@@ -65,7 +65,7 @@ Keep signing material outside Git:
 
 ## Signed Build Evidence
 
-This is the mobile signed-build release evidence gate for private beta and store-candidate builds. The gate output records the mobile evidence JSON path, byte count, and SHA-256 checksum.
+This is the mobile signed-build, store-submission, and real-device validation evidence gate for private beta and store-candidate builds. The gate output records the mobile evidence JSON path, byte count, and SHA-256 checksum.
 
 After signed iOS and Android builds complete in the private signing environment, capture a credential-free JSON evidence file outside Git and validate it with:
 
@@ -80,7 +80,7 @@ Create a draft evidence file before the signing run so the required fields are e
   --output .freemail-qa\mobile-release-evidence.json
 ```
 
-The generated file is a credential-free draft. It intentionally keeps `signed` and `submitted` false, artifact hashes empty, artifact byte counts zero, and evidence URLs empty until real signed-build and store-submission evidence is recorded.
+The generated file is a credential-free draft. It intentionally keeps `signed`, `submitted`, and device `tested` values false, artifact hashes empty, artifact byte counts zero, and evidence URLs empty until real signed-build, store-submission, and device-validation evidence is recorded.
 
 Inspect the evidence packet before using it in a release candidate:
 
@@ -88,7 +88,7 @@ Inspect the evidence packet before using it in a release candidate:
 .\.venv\Scripts\python.exe scripts\mobile_release_status.py --evidence .freemail-qa\mobile-release-evidence.json --require-store-submission
 ```
 
-The status command is read-only. It reports the evidence file path, checksum, failed mobile-release checks, and whether the packet is ready for the hard release gate. It does not run native builds, access app-store APIs, or sign artifacts.
+The status command is read-only. It reports the evidence file path, checksum, failed mobile-release checks, and whether the packet is ready for the hard release gate. It does not run native builds, access app-store APIs, sign artifacts, or connect to real devices.
 
 After TestFlight and Play internal-testing submission, require store submission evidence too:
 
@@ -96,7 +96,7 @@ After TestFlight and Play internal-testing submission, require store submission 
 .\.venv\Scripts\python.exe scripts\mobile_release_gate.py --evidence .freemail-qa\mobile-release-evidence.json --require-store-submission
 ```
 
-The evidence must not include API keys, Apple certificates, provisioning profiles, keystores, passwords, private keys, service-account JSON, or raw tokens. It must include both signed build records and the VPN-only private-beta boundary. Build and submission URLs must be HTTPS URLs to credential-free build or store evidence. Store submission `submittedAt` values must be timezone-aware ISO-8601 timestamps. Artifact `sha256` values must be full 64-character SHA-256 hex strings:
+The evidence must not include API keys, Apple certificates, provisioning profiles, keystores, passwords, private keys, service-account JSON, or raw tokens. It must include signed build records, store-submission records when `--require-store-submission` is used, real-device validation records for iOS and Android, and the VPN-only private-beta boundary. Build, submission, and device evidence URLs must be HTTPS URLs to credential-free evidence. Store submission `submittedAt` and device validation `testedAt` values must be timezone-aware ISO-8601 timestamps. Artifact `sha256` values must be full 64-character SHA-256 hex strings:
 
 ```json
 {
@@ -149,6 +149,48 @@ The evidence must not include API keys, Apple certificates, provisioning profile
       "reviewState": "draft-release-created"
     }
   },
+  "deviceValidation": {
+    "ios": {
+      "platform": "ios",
+      "tested": true,
+      "testedAt": "2026-06-30T00:00:00Z",
+      "tester": "release operator",
+      "deviceModel": "iPhone 15",
+      "osVersion": "iOS 18",
+      "appVersion": "0.1.0-dev",
+      "hostname": "freemail.kuzuryu.ai",
+      "networkBoundary": "Dragonscale/VPN clients only",
+      "evidenceUrl": "https://example.invalid/ios-device-validation",
+      "checks": [
+        {"name": "vpn-dns-resolution", "status": "pass"},
+        {"name": "auth-login", "status": "pass"},
+        {"name": "inbox-sync", "status": "pass"},
+        {"name": "message-read", "status": "pass"},
+        {"name": "compose-send", "status": "pass"},
+        {"name": "offline-cache", "status": "pass"}
+      ]
+    },
+    "android": {
+      "platform": "android",
+      "tested": true,
+      "testedAt": "2026-06-30T00:00:00Z",
+      "tester": "release operator",
+      "deviceModel": "Pixel 8",
+      "osVersion": "Android 15",
+      "appVersion": "0.1.0-dev",
+      "hostname": "freemail.kuzuryu.ai",
+      "networkBoundary": "Dragonscale/VPN clients only",
+      "evidenceUrl": "https://example.invalid/android-device-validation",
+      "checks": [
+        {"name": "vpn-dns-resolution", "status": "pass"},
+        {"name": "auth-login", "status": "pass"},
+        {"name": "inbox-sync", "status": "pass"},
+        {"name": "message-read", "status": "pass"},
+        {"name": "compose-send", "status": "pass"},
+        {"name": "offline-cache", "status": "pass"}
+      ]
+    }
+  },
   "privateBetaBoundary": {
     "hostname": "freemail.kuzuryu.ai",
     "vpnOnly": true,
@@ -159,6 +201,8 @@ The evidence must not include API keys, Apple certificates, provisioning profile
 ```
 
 Store submission evidence must be credential-free. It records what was submitted, where, when, and its review state; it must not include App Store Connect API keys, Play service-account JSON, passwords, private keys, provisioning profiles, keystores, or raw tokens.
+
+Real-device validation evidence must also be credential-free. The device validation record stores the platform, tester label, device model, OS version, app version, VPN hostname, evidence URL, and pass/fail results for VPN DNS resolution, auth login, inbox sync, message read, compose/send, and offline cache behavior. Do not include mailbox passwords, bearer tokens, raw push-provider tokens, profile screenshots containing secrets, or private network configuration exports.
 
 ## Private Beta Boundary
 

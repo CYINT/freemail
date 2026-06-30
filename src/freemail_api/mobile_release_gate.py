@@ -47,6 +47,8 @@ def run_mobile_release_gate(options: MobileReleaseGateOptions) -> dict[str, Any]
         _check_app_metadata(app_config, evidence),
         _check_platform_build(evidence, platform="ios"),
         _check_platform_build(evidence, platform="android"),
+        _check_device_validation(evidence, app_config, platform="ios"),
+        _check_device_validation(evidence, app_config, platform="android"),
         _check_private_beta_boundary(evidence),
     ]
     if options.require_store_submission:
@@ -161,6 +163,59 @@ def _check_private_beta_boundary(evidence: dict[str, Any]) -> dict[str, Any]:
             "vpnOnly": boundary.get("vpnOnly"),
             "publicInternet": boundary.get("publicInternet"),
             "requiredBoundary": boundary.get("requiredBoundary"),
+        },
+    )
+
+
+def _check_device_validation(evidence: dict[str, Any], app_config: dict[str, Any], *, platform: str) -> dict[str, Any]:
+    validation = evidence.get("deviceValidation", {}).get(platform, {})
+    checks = validation.get("checks", [])
+    check_names = [check.get("name") for check in checks if isinstance(check, dict)] if isinstance(checks, list) else []
+    failed_checks = [
+        check.get("name")
+        for check in checks
+        if isinstance(check, dict) and check.get("status") != "pass"
+    ] if isinstance(checks, list) else ["checks"]
+    required_checks = {
+        "vpn-dns-resolution",
+        "auth-login",
+        "inbox-sync",
+        "message-read",
+        "compose-send",
+        "offline-cache",
+    }
+    app = evidence.get("app", {})
+    passed = (
+        validation.get("platform") == platform
+        and validation.get("tested") is True
+        and _is_timezone_aware_iso8601(validation.get("testedAt"))
+        and bool(str(validation.get("tester", "")).strip())
+        and bool(str(validation.get("deviceModel", "")).strip())
+        and bool(str(validation.get("osVersion", "")).strip())
+        and validation.get("appVersion") == app.get("version") == app_config.get("version")
+        and str(validation.get("hostname", "")).lower() == "freemail.kuzuryu.ai"
+        and "vpn" in str(validation.get("networkBoundary", "")).lower()
+        and _is_https_url(validation.get("evidenceUrl"))
+        and isinstance(checks, list)
+        and not required_checks.difference(check_names)
+        and not failed_checks
+    )
+    return _check(
+        f"{platform}-device-validation",
+        passed,
+        {
+            "platform": validation.get("platform"),
+            "tested": validation.get("tested"),
+            "testedAt": validation.get("testedAt"),
+            "tester": validation.get("tester"),
+            "deviceModel": validation.get("deviceModel"),
+            "osVersion": validation.get("osVersion"),
+            "appVersion": validation.get("appVersion"),
+            "hostname": validation.get("hostname"),
+            "networkBoundary": validation.get("networkBoundary"),
+            "evidenceUrl": validation.get("evidenceUrl"),
+            "missingChecks": sorted(required_checks.difference(check_names)),
+            "failedChecks": failed_checks,
         },
     )
 
