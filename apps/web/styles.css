@@ -211,6 +211,20 @@ textarea:focus-visible,
   padding: 0.25rem 0.55rem;
 }
 
+.saved-contact-form {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.saved-contact-form input {
+  width: 100%;
+}
+
+.saved-contact-form button {
+  min-height: 32px;
+  padding: 0.25rem 0.55rem;
+}
+
 .contacts-list {
   display: grid;
   gap: 0.35rem;
@@ -233,6 +247,11 @@ textarea:focus-visible,
   background: #ffffff;
   padding: 0.35rem 0.55rem;
   text-align: left;
+}
+
+.contact-item.saved-contact {
+  border-color: #99c9be;
+  background: #f3fbf8;
 }
 
 .contact-item span,

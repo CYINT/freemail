@@ -24,6 +24,7 @@ import {
   createMailboxPushNotification,
   createMailboxFolder,
   createMailboxSession,
+  deleteMailboxContact,
   deleteMailboxFolder,
   loadMailboxAttachment,
   loadMailboxContacts,
@@ -33,6 +34,7 @@ import {
   loadMailboxPushNotifications,
   loadMailboxSnapshot,
   loadMailboxThread,
+  loadSavedMailboxContacts,
   MailAttachment,
   MailboxPreferences,
   MailboxSession,
@@ -49,6 +51,8 @@ import {
   revokeMailboxPushDevice,
   searchMailbox,
   saveMailboxDraft,
+  saveMailboxContact,
+  SavedMailContact,
   sendMailboxMessage,
   setMailboxMessageReadState,
   setMailboxMessageStarState,
@@ -92,12 +96,15 @@ export default function App() {
   });
   const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([]);
   const [contacts, setContacts] = useState<MailContact[]>([]);
+  const [savedContacts, setSavedContacts] = useState<SavedMailContact[]>([]);
   const [pushDevices, setPushDevices] = useState<MailboxPushDevice[]>([]);
   const [pushNotifications, setPushNotifications] = useState<MailboxPushNotification[]>([]);
   const [selectedMessage, setSelectedMessage] = useState<MailMessageDetail | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [newFolderName, setNewFolderName] = useState("");
   const [renameFolderName, setRenameFolderName] = useState("");
+  const [savedContactName, setSavedContactName] = useState("");
+  const [savedContactEmail, setSavedContactEmail] = useState("");
   const [pushDeviceId, setPushDeviceId] = useState("");
   const [pushToken, setPushToken] = useState("");
   const [mailboxPreferences, setMailboxPreferences] = useState<MailboxPreferences | null>(null);
@@ -147,6 +154,7 @@ export default function App() {
     setMessages([]);
     setMailboxPagination({ mode: "folder", query: "", nextOffset: null, hasMore: false });
     setContacts([]);
+    setSavedContacts([]);
     setPushDevices([]);
     setPushNotifications([]);
     setMailboxPreferences(null);
@@ -183,6 +191,7 @@ export default function App() {
         loadMailboxContacts(activeSession, targetFolder),
         loadMailboxPreferences(activeSession),
       ]);
+      const savedContactList = await loadSavedMailboxContacts(activeSession);
       const devices = await loadMailboxPushDevices(activeSession);
       const notifications = await loadMailboxPushNotifications(activeSession);
       setFolder(targetFolder);
@@ -199,6 +208,7 @@ export default function App() {
         hasMore: Boolean(snapshot.hasMore),
       });
       setContacts(contactList.contacts || []);
+      setSavedContacts(savedContactList.contacts || []);
       setPushDevices(devices || []);
       setPushNotifications(notifications || []);
       setMailboxPreferences(preferences);
@@ -234,6 +244,45 @@ export default function App() {
       setPreferenceDisplayName(saved.displayName || "");
       setPreferenceSignature(saved.signature || "");
       setStatus("Preferences saved.");
+    } catch (error) {
+      setStatus(readableError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function saveContact() {
+    if (!session || !savedContactEmail.trim()) {
+      setStatus("Enter a contact email before saving.");
+      return;
+    }
+    setLoading(true);
+    setStatus("Saving contact...");
+    try {
+      await saveMailboxContact(session, savedContactEmail.trim(), savedContactName.trim());
+      const saved = await loadSavedMailboxContacts(session);
+      setSavedContacts(saved.contacts || []);
+      setSavedContactName("");
+      setSavedContactEmail("");
+      setStatus("Contact saved.");
+    } catch (error) {
+      setStatus(readableError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function deleteContact(contactId: number) {
+    if (!session) {
+      return;
+    }
+    setLoading(true);
+    setStatus("Deleting contact...");
+    try {
+      await deleteMailboxContact(session, contactId);
+      const saved = await loadSavedMailboxContacts(session);
+      setSavedContacts(saved.contacts || []);
+      setStatus("Contact deleted.");
     } catch (error) {
       setStatus(readableError(error));
     } finally {
@@ -911,6 +960,36 @@ export default function App() {
 
             <View style={styles.panel}>
               <Text style={styles.sectionTitle}>Contacts</Text>
+              <View style={styles.inlineControls}>
+                <TextInput
+                  value={savedContactName}
+                  onChangeText={setSavedContactName}
+                  style={[styles.input, styles.flexInput]}
+                  placeholder="Name"
+                />
+                <TextInput
+                  value={savedContactEmail}
+                  onChangeText={setSavedContactEmail}
+                  style={[styles.input, styles.flexInput]}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  placeholder="person@example.com"
+                />
+              </View>
+              <Pressable style={styles.secondaryButton} onPress={saveContact}>
+                <Text>Save contact</Text>
+              </Pressable>
+              {savedContacts.slice(0, 8).map((contact) => (
+                <View key={contact.id} style={styles.contactRow}>
+                  <Pressable onPress={() => addContactToDraft({ name: contact.displayName, email: contact.contactEmail, messageCount: 1 })}>
+                    <Text style={styles.sender}>{contact.displayName || contact.contactEmail}</Text>
+                    <Text style={styles.meta}>{contact.contactEmail} - saved</Text>
+                  </Pressable>
+                  <Pressable style={styles.secondaryButton} onPress={() => deleteContact(contact.id)}>
+                    <Text>Delete</Text>
+                  </Pressable>
+                </View>
+              ))}
               {contacts.slice(0, 8).map((contact) => (
                 <Pressable key={contact.email} style={styles.contactRow} onPress={() => addContactToDraft(contact)}>
                   <Text style={styles.sender}>{contact.name || contact.email}</Text>

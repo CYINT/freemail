@@ -25,8 +25,8 @@ The FreeMail program includes:
 This repository is at the implementation baseline. It contains:
 
 - A FastAPI admin/runtime API with persistent SQLite-backed domain, user, mailbox, alias, and audit-log surfaces.
-- A static webmail preview shell with inbox, paginated search and folder loading, thread-aware conversation lookup, message reader, read/unread and star controls, bulk message actions, persistent preferences/signatures, compose, draft saving and editing, folder navigation, token-gated admin setup, and responsive layout QA.
-- An Expo/React Native mobile client scaffold with secure session storage, paginated and thread-aware mailbox workflows, conversation lookup, persistent preferences/signatures, draft saving and editing, read/unread and star controls, bulk archive/spam/delete/read/star actions, and static QA.
+- A static webmail preview shell with inbox, paginated search and folder loading, thread-aware conversation lookup, saved and extracted contacts, message reader, read/unread and star controls, bulk message actions, persistent preferences/signatures, compose, draft saving and editing, folder navigation, token-gated admin setup, and responsive layout QA.
+- An Expo/React Native mobile client scaffold with secure session storage, paginated and thread-aware mailbox workflows, conversation lookup, saved and extracted contacts, persistent preferences/signatures, draft saving and editing, read/unread and star controls, bulk archive/spam/delete/read/star actions, and static QA.
 - A Docker Compose stack with VPN-only loopback bindings by default.
 - A Stalwart mail-core candidate profile for the first architecture spike.
 - CI for linting, tests, repository secret scanning, dependency audit, Compose validation, and image build.
@@ -150,7 +150,7 @@ npm audit --audit-level=moderate
 Pop-Location
 ```
 
-The mobile scaffold lives in `apps\mobile`, uses Expo/React Native, defaults to `https://freemail.kuzuryu.ai`, and persists bearer sessions through `expo-secure-store` rather than browser-style storage. It currently covers sign-in, inbox/folder snapshots with load-more pagination, thread-aware conversation lookup, message reading, persistent mailbox preferences and default compose signatures, read/unread and star state, bulk read/unread/star/unstar/archive/spam/delete actions, compose/send, draft saving and draft reopen into compose with bounded document-picker attachments, reply/forward drafts, folder-scoped paginated search, contacts, non-core folder management, attachment metadata plus authenticated download/share handling, secure offline metadata caching for the last loaded mailbox views, bearer-authenticated push-device registration, and provider-neutral push notification delivery status.
+The mobile scaffold lives in `apps\mobile`, uses Expo/React Native, defaults to `https://freemail.kuzuryu.ai`, and persists bearer sessions through `expo-secure-store` rather than browser-style storage. It currently covers sign-in, inbox/folder snapshots with load-more pagination, thread-aware conversation lookup, message reading, persistent mailbox preferences and default compose signatures, read/unread and star state, bulk read/unread/star/unstar/archive/spam/delete actions, compose/send, draft saving and draft reopen into compose with bounded document-picker attachments, reply/forward drafts, folder-scoped paginated search, saved address-book contacts, extracted contacts, non-core folder management, attachment metadata plus authenticated download/share handling, secure offline metadata caching for the last loaded mailbox views, bearer-authenticated push-device registration, and provider-neutral push notification delivery status.
 
 Mobile native release posture is documented in `docs\mobile-release.md`. The open-source repo keeps signing credentials, provisioning profiles, keystores, store API keys, and generated native projects out of source control; CI validates the Expo config, Android native prebuild drill, static release checklist, and macOS iOS native prebuild drill.
 Signed mobile builds, app-store submission evidence, and real-device private-beta validation are validated with `scripts\mobile_release_gate.py` from credential-free evidence stored outside Git.
@@ -226,6 +226,14 @@ GET /api/v1/mailbox/contacts?folder=INBOX&limit=100
 ```
 
 The webmail contacts panel can load those records from the browser's bearer session and click a contact into the compose recipient field.
+
+Saved contacts are durable mailbox metadata and are included in metadata backups:
+
+```text
+GET /api/v1/mailbox/saved-contacts
+PUT /api/v1/mailbox/saved-contacts
+DELETE /api/v1/mailbox/saved-contacts/{contactId}
+```
 
 Folder management uses the browser bearer session or per-request mailbox credentials:
 

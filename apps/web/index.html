@@ -45,6 +45,11 @@
             <strong>Contacts</strong>
             <button id="contacts-action" type="button">Load</button>
           </div>
+          <form class="saved-contact-form" id="saved-contact-form" aria-label="Save contact">
+            <input id="saved-contact-name" name="displayName" type="text" placeholder="Name" maxlength="160">
+            <input id="saved-contact-email" name="email" type="email" placeholder="person@example.com">
+            <button type="submit">Save</button>
+          </form>
           <div class="contacts-list" id="contacts-list">
             <p>Load contacts from mailbox headers.</p>
           </div>

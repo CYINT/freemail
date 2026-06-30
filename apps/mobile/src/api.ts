@@ -71,10 +71,25 @@ export type MailContact = {
   messageCount: number;
 };
 
+export type SavedMailContact = {
+  id: number;
+  mailboxEmail: string;
+  contactEmail: string;
+  displayName: string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type MailboxContacts = {
   email: string;
   folder: string;
   contacts: MailContact[];
+};
+
+export type SavedMailboxContacts = {
+  mailboxEmail: string;
+  contacts: SavedMailContact[];
 };
 
 export type MailboxPushDevice = {
@@ -208,6 +223,37 @@ export async function loadMailboxContacts(session: MailboxSession, folder: strin
   const path = `/api/v1/mailbox/contacts?folder=${encodeURIComponent(folder)}&limit=100`;
   const response = await request(session.apiBaseUrl, path, { headers: mailboxHeaders(session) });
   return response.json();
+}
+
+export async function loadSavedMailboxContacts(session: MailboxSession): Promise<SavedMailboxContacts> {
+  const response = await request(session.apiBaseUrl, "/api/v1/mailbox/saved-contacts", {
+    headers: mailboxHeaders(session),
+  });
+  return response.json();
+}
+
+export async function saveMailboxContact(
+  session: MailboxSession,
+  email: string,
+  displayName = "",
+  notes = "",
+): Promise<SavedMailContact> {
+  const response = await request(session.apiBaseUrl, "/api/v1/mailbox/saved-contacts", {
+    method: "PUT",
+    headers: {
+      ...mailboxHeaders(session),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email, displayName, notes }),
+  });
+  return response.json();
+}
+
+export async function deleteMailboxContact(session: MailboxSession, contactId: number): Promise<void> {
+  await request(session.apiBaseUrl, `/api/v1/mailbox/saved-contacts/${contactId}`, {
+    method: "DELETE",
+    headers: mailboxHeaders(session),
+  });
 }
 
 export async function loadMailboxMessage(

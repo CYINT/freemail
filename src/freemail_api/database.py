@@ -142,6 +142,20 @@ CREATE TABLE IF NOT EXISTS mailbox_preferences (
     signature TEXT NOT NULL DEFAULT '',
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS mailbox_contacts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mailbox_email TEXT NOT NULL,
+    contact_email TEXT NOT NULL,
+    display_name TEXT NOT NULL DEFAULT '',
+    notes TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(mailbox_email, contact_email)
+);
+
+CREATE INDEX IF NOT EXISTS idx_mailbox_contacts_mailbox
+ON mailbox_contacts(mailbox_email, contact_email);
 """
 
 
@@ -212,6 +226,15 @@ REQUIRED_TABLE_COLUMNS = {
         "delivered_at",
     },
     "mailbox_preferences": {"mailbox_email", "display_name", "signature", "updated_at"},
+    "mailbox_contacts": {
+        "id",
+        "mailbox_email",
+        "contact_email",
+        "display_name",
+        "notes",
+        "created_at",
+        "updated_at",
+    },
 }
 
 
@@ -258,10 +281,19 @@ def metadata_readiness(connection: sqlite3.Connection) -> dict[str, Any]:
 
 
 def list_rows(connection: sqlite3.Connection, table: str) -> list[sqlite3.Row]:
-    allowed_tables = {"domains", "users", "mailboxes", "aliases", "audit_log", "dkim_keys", "mailbox_preferences"}
+    allowed_tables = {
+        "domains",
+        "users",
+        "mailboxes",
+        "aliases",
+        "audit_log",
+        "dkim_keys",
+        "mailbox_preferences",
+        "mailbox_contacts",
+    }
     if table not in allowed_tables:
         raise ValueError(f"Unsupported table: {table}")
-    order_column = "mailbox_email" if table == "mailbox_preferences" else "id"
+    order_column = _metadata_order_column(table)
     return list(connection.execute(f"SELECT * FROM {table} ORDER BY {order_column}"))
 
 
@@ -610,6 +642,64 @@ def upsert_mailbox_preferences(
     return get_mailbox_preferences(connection, email=normalized_email)
 
 
+def list_saved_mailbox_contacts(connection: sqlite3.Connection, *, email: str) -> list[sqlite3.Row]:
+    return list(
+        connection.execute(
+            """
+            SELECT id, mailbox_email, contact_email, display_name, notes, created_at, updated_at
+            FROM mailbox_contacts
+            WHERE mailbox_email = ?
+            ORDER BY display_name COLLATE NOCASE, contact_email COLLATE NOCASE
+            """,
+            [email.lower()],
+        )
+    )
+
+
+def upsert_saved_mailbox_contact(
+    connection: sqlite3.Connection,
+    *,
+    email: str,
+    contact_email: str,
+    display_name: str,
+    notes: str,
+) -> sqlite3.Row:
+    normalized_email = email.lower()
+    normalized_contact = contact_email.lower()
+    connection.execute(
+        """
+        INSERT INTO mailbox_contacts (mailbox_email, contact_email, display_name, notes, updated_at)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(mailbox_email, contact_email) DO UPDATE SET
+            display_name = excluded.display_name,
+            notes = excluded.notes,
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        [normalized_email, normalized_contact, display_name.strip(), notes.strip()],
+    )
+    connection.commit()
+    row = connection.execute(
+        """
+        SELECT id, mailbox_email, contact_email, display_name, notes, created_at, updated_at
+        FROM mailbox_contacts
+        WHERE mailbox_email = ? AND contact_email = ?
+        """,
+        [normalized_email, normalized_contact],
+    ).fetchone()
+    if row is None:
+        raise MissingRecordError(f"contact {contact_email} was not found")
+    return row
+
+
+def delete_saved_mailbox_contact(connection: sqlite3.Connection, *, email: str, contact_id: int) -> bool:
+    cursor = connection.execute(
+        "DELETE FROM mailbox_contacts WHERE mailbox_email = ? AND id = ?",
+        [email.lower(), contact_id],
+    )
+    connection.commit()
+    return cursor.rowcount > 0
+
+
 def upsert_mailbox_push_device(
     connection: sqlite3.Connection,
     *,
@@ -771,6 +861,14 @@ def _execute_insert(connection: sqlite3.Connection, statement: str, values: Iter
     return int(cursor.lastrowid)
 
 
+def _metadata_order_column(table: str) -> str:
+    if table == "mailbox_contacts":
+        return "mailbox_email, contact_email"
+    if table == "mailbox_preferences":
+        return "mailbox_email"
+    return "id"
+
+
 def _migrate_schema(connection: sqlite3.Connection) -> None:
     user_columns = {row["name"] for row in connection.execute("PRAGMA table_info(users)")}
     if "admin_role" not in user_columns:
@@ -801,6 +899,24 @@ def _migrate_schema(connection: sqlite3.Connection) -> None:
     if "encrypted_push_token" not in notification_columns:
         connection.execute("ALTER TABLE mailbox_push_notifications ADD COLUMN encrypted_push_token TEXT")
         connection.commit()
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS mailbox_contacts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            mailbox_email TEXT NOT NULL,
+            contact_email TEXT NOT NULL,
+            display_name TEXT NOT NULL DEFAULT '',
+            notes TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(mailbox_email, contact_email)
+        )
+        """
+    )
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_mailbox_contacts_mailbox ON mailbox_contacts(mailbox_email, contact_email)"
+    )
+    connection.commit()
 
 
 def _audit(connection: sqlite3.Connection, actor: str, action: str, target_type: str, target_id: int) -> None:

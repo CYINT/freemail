@@ -99,6 +99,10 @@ from .schemas import (
     MailboxStarStateCreate,
     MailboxStarStateRecord,
     MailboxThreadRecord,
+    SavedMailboxContactCreate,
+    SavedMailboxContactDeleteRecord,
+    SavedMailboxContactRecord,
+    SavedMailboxContactsRecord,
     StoredUserCreate,
     UserCreate,
     UserRecord,
@@ -170,7 +174,7 @@ COMPONENT_READINESS = {
         "evidence": [
             "mailbox session login, paginated and thread-aware folder navigation and search, conversation lookup, contacts, message read, read/unread state, star state, compose, attachments, archive, move, and delete controls",
             "bulk message actions for read/unread, star/unstar, archive, spam, delete, and move",
-            "persistent mailbox preferences with default compose signatures",
+            "persistent mailbox preferences with default compose signatures and saved address-book contacts",
             "server-side Drafts persistence and compose reopen support for saved drafts",
             "server-side Sent Items persistence for accepted outbound messages",
             "token-gated admin console for bootstrap, users, domains, mailboxes, aliases, DKIM, DNS guidance, status actions, sync status, and audit logs",
@@ -183,7 +187,7 @@ COMPONENT_READINESS = {
     "mobile": {
         "status": "source-ready",
         "evidence": [
-            "Expo/React Native client with VPN API target, mailbox sessions, paginated and thread-aware message workflows, conversation lookup, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder controls, contacts, attachments, offline metadata cache, and push-device flows",
+            "Expo/React Native client with VPN API target, mailbox sessions, paginated and thread-aware message workflows, conversation lookup, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder controls, extracted and saved contacts, attachments, offline metadata cache, and push-device flows",
             "bulk read/star/archive/spam/delete/move client controls over the shared mailbox API",
             "mobile preference controls for default compose signatures",
             "compose/send path uses the shared mailbox API contract with Sent Items persistence status",
@@ -507,6 +511,71 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             display_name=payload.display_name,
             signature=payload.signature,
         )
+
+    @app.get("/api/v1/mailbox/saved-contacts", response_model=SavedMailboxContactsRecord)
+    def mailbox_saved_contacts_list(
+        authorization: str | None = Header(default=None),
+        x_freemail_mailbox_email: str | None = Header(default=None),
+        x_freemail_mailbox_password: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=x_freemail_mailbox_email,
+            x_freemail_mailbox_password=x_freemail_mailbox_password,
+            connection=connection,
+        )
+        normalized_email = credentials.email.lower()
+        return {
+            "mailbox_email": normalized_email,
+            "contacts": _rows_to_dicts(database.list_saved_mailbox_contacts(connection, email=normalized_email)),
+        }
+
+    @app.put("/api/v1/mailbox/saved-contacts", response_model=SavedMailboxContactRecord)
+    def mailbox_saved_contact_upsert(
+        payload: SavedMailboxContactCreate,
+        authorization: str | None = Header(default=None),
+        x_freemail_mailbox_email: str | None = Header(default=None),
+        x_freemail_mailbox_password: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=x_freemail_mailbox_email,
+            x_freemail_mailbox_password=x_freemail_mailbox_password,
+            connection=connection,
+        )
+        contact = database.upsert_saved_mailbox_contact(
+            connection,
+            email=credentials.email,
+            contact_email=str(payload.email),
+            display_name=payload.display_name,
+            notes=payload.notes,
+        )
+        return dict(contact)
+
+    @app.delete("/api/v1/mailbox/saved-contacts/{contact_id}", response_model=SavedMailboxContactDeleteRecord)
+    def mailbox_saved_contact_delete(
+        contact_id: int,
+        authorization: str | None = Header(default=None),
+        x_freemail_mailbox_email: str | None = Header(default=None),
+        x_freemail_mailbox_password: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=x_freemail_mailbox_email,
+            x_freemail_mailbox_password=x_freemail_mailbox_password,
+            connection=connection,
+        )
+        return {
+            "deleted": database.delete_saved_mailbox_contact(
+                connection,
+                email=credentials.email,
+                contact_id=contact_id,
+            ),
+            "contact_id": contact_id,
+        }
 
     @app.post("/api/v1/mailbox/push/devices", response_model=MailboxPushDeviceRecord)
     def mailbox_push_device_register(

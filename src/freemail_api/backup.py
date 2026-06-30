@@ -7,7 +7,16 @@ from typing import Any
 
 
 BACKUP_SCHEMA_VERSION = 1
-BACKUP_TABLES = ("domains", "users", "mailboxes", "aliases", "dkim_keys", "audit_log", "mailbox_preferences")
+BACKUP_TABLES = (
+    "domains",
+    "users",
+    "mailboxes",
+    "aliases",
+    "dkim_keys",
+    "audit_log",
+    "mailbox_preferences",
+    "mailbox_contacts",
+)
 RESTORE_DELETE_ORDER = tuple(reversed(BACKUP_TABLES))
 
 
@@ -57,9 +66,17 @@ def restore_metadata_backup(
 
 
 def _export_table(connection: sqlite3.Connection, table: str) -> list[dict[str, Any]]:
-    order_column = "mailbox_email" if table == "mailbox_preferences" else "id"
+    order_column = _order_column(table)
     rows = connection.execute(f"SELECT * FROM {table} ORDER BY {order_column}").fetchall()
     return [dict(row) for row in rows]
+
+
+def _order_column(table: str) -> str:
+    if table == "mailbox_contacts":
+        return "mailbox_email, contact_email"
+    if table == "mailbox_preferences":
+        return "mailbox_email"
+    return "id"
 
 
 def _validated_tables(payload: Mapping[str, Any]) -> dict[str, list[dict[str, Any]]]:
@@ -72,6 +89,8 @@ def _validated_tables(payload: Mapping[str, Any]) -> dict[str, list[dict[str, An
     tables: dict[str, list[dict[str, Any]]] = {}
     for table in BACKUP_TABLES:
         raw_rows = raw_tables.get(table)
+        if raw_rows is None and table == "mailbox_contacts":
+            raw_rows = []
         if not isinstance(raw_rows, list):
             raise BackupError(f"backup payload must contain a {table} row list")
         tables[table] = [_validated_row(table, row) for row in raw_rows]

@@ -52,6 +52,13 @@ def test_metadata_backup_round_trip_preserves_core_metadata_and_key_material(tmp
             display_name="Admin User",
             signature="Regards,\nAdmin",
         )
+        database.upsert_saved_mailbox_contact(
+            connection,
+            email="admin@example.com",
+            contact_email="saved@example.net",
+            display_name="Saved Contact",
+            notes="Release contact",
+        )
         backup = export_metadata_backup(connection, generated_at="2026-06-30T00:00:00+00:00")
 
     assert backup["schemaVersion"] == 1
@@ -68,6 +75,7 @@ def test_metadata_backup_round_trip_preserves_core_metadata_and_key_material(tmp
     assert "mailbox_push_notifications" not in backup["tables"]
     assert backup["tables"]["dkim_keys"][0]["private_key_pem"] == "private-key-pem"
     assert backup["tables"]["mailbox_preferences"][0]["signature"] == "Regards,\nAdmin"
+    assert backup["tables"]["mailbox_contacts"][0]["contact_email"] == "saved@example.net"
 
     with database.connect(str(target_path)) as connection:
         restore_metadata_backup(connection, backup)
@@ -81,6 +89,9 @@ def test_metadata_backup_round_trip_preserves_core_metadata_and_key_material(tmp
         assert [dict(row) for row in database.list_rows(connection, "audit_log")] == backup["tables"]["audit_log"]
         assert [dict(row) for row in database.list_rows(connection, "mailbox_preferences")] == backup["tables"][
             "mailbox_preferences"
+        ]
+        assert [dict(row) for row in database.list_rows(connection, "mailbox_contacts")] == backup["tables"][
+            "mailbox_contacts"
         ]
         assert connection.execute("SELECT COUNT(*) FROM admin_sessions").fetchone()[0] == 0
         assert connection.execute("SELECT COUNT(*) FROM mailbox_sessions").fetchone()[0] == 0
@@ -156,6 +167,25 @@ def test_metadata_restore_refuses_non_empty_database_without_force(tmp_path):
         domains = database.list_rows(connection, "domains")
 
     assert [domain["name"] for domain in domains] == ["example.com"]
+
+
+def test_metadata_restore_accepts_schema_one_backup_without_saved_contacts(tmp_path):
+    source_path = tmp_path / "source.sqlite"
+    target_path = tmp_path / "target.sqlite"
+    database.initialize(str(source_path))
+    database.initialize(str(target_path))
+
+    with database.connect(str(source_path)) as connection:
+        _seed_metadata(connection)
+        backup = export_metadata_backup(connection)
+
+    del backup["tables"]["mailbox_contacts"]
+
+    with database.connect(str(target_path)) as connection:
+        restore_metadata_backup(connection, backup)
+        contacts = database.list_rows(connection, "mailbox_contacts")
+
+    assert contacts == []
 
 
 def test_metadata_restore_validates_schema_version(tmp_path):

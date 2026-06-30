@@ -1850,6 +1850,46 @@ def test_mailbox_preferences_default_and_update_persist(tmp_path):
     assert loaded_response.json()["updatedAt"]
 
 
+def test_mailbox_saved_contacts_require_mailbox_credentials(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.get("/api/v1/mailbox/saved-contacts")
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Mailbox credentials required"
+
+
+def test_mailbox_saved_contacts_upsert_list_and_delete(tmp_path):
+    headers = {
+        "X-FreeMail-Mailbox-Email": "Admin@Example.com",
+        "X-FreeMail-Mailbox-Password": "secret",
+    }
+
+    with make_client(tmp_path) as client:
+        empty_response = client.get("/api/v1/mailbox/saved-contacts", headers=headers)
+        saved_response = client.put(
+            "/api/v1/mailbox/saved-contacts",
+            headers=headers,
+            json={"email": "Friend@Example.net", "displayName": "Friend", "notes": "Beta tester"},
+        )
+        listed_response = client.get("/api/v1/mailbox/saved-contacts", headers=headers)
+        contact_id = saved_response.json()["id"]
+        delete_response = client.delete(f"/api/v1/mailbox/saved-contacts/{contact_id}", headers=headers)
+        deleted_list_response = client.get("/api/v1/mailbox/saved-contacts", headers=headers)
+
+    assert empty_response.status_code == 200
+    assert empty_response.json() == {"mailboxEmail": "admin@example.com", "contacts": []}
+    assert saved_response.status_code == 200
+    assert saved_response.json()["mailboxEmail"] == "admin@example.com"
+    assert saved_response.json()["contactEmail"] == "friend@example.net"
+    assert saved_response.json()["displayName"] == "Friend"
+    assert saved_response.json()["notes"] == "Beta tester"
+    assert listed_response.status_code == 200
+    assert listed_response.json()["contacts"][0]["contactEmail"] == "friend@example.net"
+    assert delete_response.status_code == 200
+    assert delete_response.json() == {"deleted": True, "contactId": contact_id}
+    assert deleted_list_response.json()["contacts"] == []
+
+
 def test_mailbox_message_requires_mailbox_credentials(tmp_path):
     with make_client(tmp_path) as client:
         response = client.get("/api/v1/mailbox/message?folder=INBOX&message_id=1")

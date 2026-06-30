@@ -352,6 +352,34 @@ class MailboxContactsRecord(ApiModel):
     contacts: list[MailboxContactRecord]
 
 
+class SavedMailboxContactCreate(ApiModel):
+    email: EmailStr
+    display_name: str = Field(default="", max_length=160)
+    notes: str = Field(default="", max_length=2000)
+
+
+class SavedMailboxContactRecord(ApiModel):
+    id: int
+    mailbox_email: EmailStr
+    contact_email: EmailStr
+    display_name: str
+    notes: str
+    created_at: str
+    updated_at: str
+
+    model_config = ConfigDict(alias_generator=to_camel, from_attributes=True, populate_by_name=True)
+
+
+class SavedMailboxContactsRecord(ApiModel):
+    mailbox_email: EmailStr
+    contacts: list[SavedMailboxContactRecord]
+
+
+class SavedMailboxContactDeleteRecord(ApiModel):
+    deleted: bool
+    contact_id: int
+
+
 class MailboxSessionCreate(ApiModel):
     email: EmailStr
     password: str = Field(min_length=1, max_length=512)

@@ -37,6 +37,9 @@ const bulkSpamAction = document.querySelector("#bulk-spam-action");
 const bulkDeleteAction = document.querySelector("#bulk-delete-action");
 const contactsAction = document.querySelector("#contacts-action");
 const contactsList = document.querySelector("#contacts-list");
+const savedContactForm = document.querySelector("#saved-contact-form");
+const savedContactName = document.querySelector("#saved-contact-name");
+const savedContactEmail = document.querySelector("#saved-contact-email");
 const preferencesForm = document.querySelector("#mailbox-preferences");
 const preferenceDisplayName = document.querySelector("#preference-display-name");
 const preferenceSignature = document.querySelector("#preference-signature");
@@ -243,6 +246,15 @@ bulkDeleteAction?.addEventListener("click", async () => bulkMailboxMessages("del
 
 contactsAction?.addEventListener("click", async () => {
   await loadMailboxContacts();
+});
+
+savedContactForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = new FormData(savedContactForm);
+  await saveMailboxContact({
+    email: String(form.get("email") || "").trim(),
+    displayName: String(form.get("displayName") || "").trim(),
+  });
 });
 
 logoutAction?.addEventListener("click", async () => {
@@ -774,24 +786,89 @@ async function loadMailboxContacts({ quiet = false } = {}) {
     setStatus("Loading contacts...", "loading");
   }
   try {
-    const url = new URL("/api/v1/mailbox/contacts", mailboxSession.apiBaseUrl);
-    url.searchParams.set("folder", mailboxSession.folder || "INBOX");
-    url.searchParams.set("limit", "100");
-    const response = await fetch(url, {
-      headers: mailboxHeaders(),
-    });
-    if (!response.ok) {
-      throw new Error(await response.text());
+    const extractedUrl = new URL("/api/v1/mailbox/contacts", mailboxSession.apiBaseUrl);
+    extractedUrl.searchParams.set("folder", mailboxSession.folder || "INBOX");
+    extractedUrl.searchParams.set("limit", "100");
+    const savedUrl = new URL("/api/v1/mailbox/saved-contacts", mailboxSession.apiBaseUrl);
+    const [extractedResponse, savedResponse] = await Promise.all([
+      fetch(extractedUrl, { headers: mailboxHeaders() }),
+      fetch(savedUrl, { headers: mailboxHeaders() }),
+    ]);
+    if (!extractedResponse.ok) {
+      throw new Error(await extractedResponse.text());
     }
-    const result = await response.json();
-    renderContacts(result.contacts || []);
+    if (!savedResponse.ok) {
+      throw new Error(await savedResponse.text());
+    }
+    const extracted = await extractedResponse.json();
+    const saved = await savedResponse.json();
+    renderContacts({
+      extracted: extracted.contacts || [],
+      saved: saved.contacts || [],
+    });
     if (!quiet) {
-      setStatus(`Loaded ${result.contacts?.length || 0} contacts.`, "ready");
+      setStatus(`Loaded ${saved.contacts?.length || 0} saved and ${extracted.contacts?.length || 0} extracted contacts.`, "ready");
     }
   } catch (error) {
     if (!quiet) {
       setStatus(`Contacts load failed: ${readableError(error)}`, "error");
     }
+  }
+}
+
+async function saveMailboxContact(contact) {
+  if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
+    setStatus("Sign in before saving contacts.", "error");
+    return;
+  }
+  if (!contact.email) {
+    setStatus("Enter an email address before saving a contact.", "error");
+    return;
+  }
+  setStatus("Saving contact...", "loading");
+  try {
+    const response = await fetch(new URL("/api/v1/mailbox/saved-contacts", mailboxSession.apiBaseUrl), {
+      method: "PUT",
+      headers: {
+        ...mailboxHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(contact),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    if (savedContactName) {
+      savedContactName.value = "";
+    }
+    if (savedContactEmail) {
+      savedContactEmail.value = "";
+    }
+    await loadMailboxContacts({ quiet: true });
+    setStatus(`Saved ${contact.email}.`, "ready");
+  } catch (error) {
+    setStatus(`Save contact failed: ${readableError(error)}`, "error");
+  }
+}
+
+async function deleteMailboxContact(contactId) {
+  if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
+    setStatus("Sign in before deleting contacts.", "error");
+    return;
+  }
+  setStatus("Deleting contact...", "loading");
+  try {
+    const response = await fetch(new URL(`/api/v1/mailbox/saved-contacts/${contactId}`, mailboxSession.apiBaseUrl), {
+      method: "DELETE",
+      headers: mailboxHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    await loadMailboxContacts({ quiet: true });
+    setStatus("Contact deleted.", "ready");
+  } catch (error) {
+    setStatus(`Delete contact failed: ${readableError(error)}`, "error");
   }
 }
 
@@ -944,31 +1021,55 @@ async function saveMailboxDraft(message) {
   }
 }
 
-function renderContacts(contacts) {
+function renderContacts({ extracted = [], saved = [] } = {}) {
   if (!contactsList) {
     return;
   }
-  if (!contacts.length) {
+  if (!extracted.length && !saved.length) {
     contactsList.replaceChildren(emptyContactsMessage());
     return;
   }
-  contactsList.replaceChildren(
-    ...contacts.slice(0, 12).map((contact) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "contact-item";
-      button.title = contact.email;
-      button.innerHTML = `
-        <span>${escapeHtml(contact.name || contact.email)}</span>
-        <small>${escapeHtml(contact.email)} - ${contact.messageCount || 1}</small>
-      `;
-      button.addEventListener("click", () => {
-        addComposeRecipient(contact.email);
-        setStatus(`Added ${contact.email} to compose.`, "ready");
-      });
-      return button;
-    }),
-  );
+  const savedRows = saved.slice(0, 12).map(savedContactRow);
+  const extractedRows = extracted.slice(0, 12).map(extractedContactRow);
+  contactsList.replaceChildren(...savedRows, ...extractedRows);
+}
+
+function savedContactRow(contact) {
+  const row = document.createElement("div");
+  row.className = "contact-item saved-contact";
+  row.innerHTML = `
+    <span>${escapeHtml(contact.displayName || contact.contactEmail)}</span>
+    <small>${escapeHtml(contact.contactEmail)} - saved</small>
+  `;
+  row.addEventListener("click", () => {
+    addComposeRecipient(contact.contactEmail);
+    setStatus(`Added ${contact.contactEmail} to compose.`, "ready");
+  });
+  const deleteButton = document.createElement("button");
+  deleteButton.type = "button";
+  deleteButton.textContent = "Delete";
+  deleteButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    deleteMailboxContact(contact.id);
+  });
+  row.append(deleteButton);
+  return row;
+}
+
+function extractedContactRow(contact) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "contact-item";
+  button.title = contact.email;
+  button.innerHTML = `
+    <span>${escapeHtml(contact.name || contact.email)}</span>
+    <small>${escapeHtml(contact.email)} - ${contact.messageCount || 1}</small>
+  `;
+  button.addEventListener("click", () => {
+    addComposeRecipient(contact.email);
+    setStatus(`Added ${contact.email} to compose.`, "ready");
+  });
+  return button;
 }
 
 function renderFolders(folders, activeFolder) {
