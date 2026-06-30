@@ -298,6 +298,7 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         "persistMailboxSession",
         "forgetMailboxSession",
         "loadMailboxSessions",
+        "revokeMailboxSessionById",
         "revokeAllMailboxSessions",
         "mailbox-sessions-refresh",
         "mailbox-sessions-revoke-all",

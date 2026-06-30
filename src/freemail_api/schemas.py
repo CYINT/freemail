@@ -489,6 +489,11 @@ class MailboxSessionsDeleteRecord(ApiModel):
     revoked: int
 
 
+class MailboxSessionRevokeRecord(ApiModel):
+    revoked: bool
+    session_id: int
+
+
 class MailboxPreferencesUpdate(ApiModel):
     display_name: str = Field(default="", max_length=160)
     signature: str = Field(default="", max_length=4000)

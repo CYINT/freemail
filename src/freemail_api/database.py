@@ -720,6 +720,15 @@ def revoke_mailbox_sessions_for_email(connection: sqlite3.Connection, *, email: 
     return int(cursor.rowcount)
 
 
+def revoke_mailbox_session_for_email(connection: sqlite3.Connection, *, email: str, session_id: int) -> bool:
+    cursor = connection.execute(
+        "DELETE FROM mailbox_sessions WHERE email = ? AND id = ?",
+        [email.lower(), session_id],
+    )
+    connection.commit()
+    return int(cursor.rowcount) > 0
+
+
 def delete_expired_mailbox_sessions(connection: sqlite3.Connection, now: int) -> None:
     connection.execute("DELETE FROM mailbox_sessions WHERE expires_at <= ?", [now])
     connection.commit()

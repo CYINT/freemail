@@ -1525,6 +1525,83 @@ def test_mailbox_sessions_delete_revokes_all_mailbox_sessions(tmp_path, monkeypa
     assert second_snapshot.status_code == 401
 
 
+def test_mailbox_session_revoke_by_id_revokes_only_selected_session(tmp_path, monkeypatch):
+    class Snapshot:
+        def as_dict(self):
+            return {"email": "admin@example.com", "folders": [], "messages": []}
+
+    monkeypatch.setattr("freemail_api.main.list_mailbox_snapshot", lambda **_kwargs: Snapshot())
+
+    with make_client(tmp_path) as client:
+        first_session = client.post(
+            "/api/v1/mailbox/session",
+            json={"email": "admin@example.com", "password": "secret"},
+        )
+        second_session = client.post(
+            "/api/v1/mailbox/session",
+            json={"email": "admin@example.com", "password": "secret"},
+        )
+        sessions_response = client.get(
+            "/api/v1/mailbox/sessions",
+            headers={"Authorization": f"Bearer {first_session.json()['token']}"},
+        )
+        selected_session_id = next(
+            session["id"] for session in sessions_response.json()["sessions"] if not session["current"]
+        )
+        delete_response = client.delete(
+            f"/api/v1/mailbox/sessions/{selected_session_id}",
+            headers={"Authorization": f"Bearer {first_session.json()['token']}"},
+        )
+        first_snapshot = client.get(
+            "/api/v1/mailbox/snapshot",
+            headers={"Authorization": f"Bearer {first_session.json()['token']}"},
+        )
+        second_snapshot = client.get(
+            "/api/v1/mailbox/snapshot",
+            headers={"Authorization": f"Bearer {second_session.json()['token']}"},
+        )
+
+    assert delete_response.status_code == 200
+    assert delete_response.json() == {"revoked": True, "sessionId": selected_session_id}
+    assert first_snapshot.status_code == 200
+    assert second_snapshot.status_code == 401
+
+
+def test_mailbox_session_revoke_by_id_is_scoped_to_mailbox(tmp_path, monkeypatch):
+    class Snapshot:
+        def as_dict(self):
+            return {"email": "user@example.com", "folders": [], "messages": []}
+
+    monkeypatch.setattr("freemail_api.main.list_mailbox_snapshot", lambda **_kwargs: Snapshot())
+
+    with make_client(tmp_path) as client:
+        admin_session = client.post(
+            "/api/v1/mailbox/session",
+            json={"email": "admin@example.com", "password": "secret"},
+        )
+        user_session = client.post(
+            "/api/v1/mailbox/session",
+            json={"email": "user@example.com", "password": "secret"},
+        )
+        user_sessions = client.get(
+            "/api/v1/mailbox/sessions",
+            headers={"Authorization": f"Bearer {user_session.json()['token']}"},
+        )
+        user_session_id = user_sessions.json()["sessions"][0]["id"]
+        delete_response = client.delete(
+            f"/api/v1/mailbox/sessions/{user_session_id}",
+            headers={"Authorization": f"Bearer {admin_session.json()['token']}"},
+        )
+        user_snapshot = client.get(
+            "/api/v1/mailbox/snapshot",
+            headers={"Authorization": f"Bearer {user_session.json()['token']}"},
+        )
+
+    assert delete_response.status_code == 200
+    assert delete_response.json() == {"revoked": False, "sessionId": user_session_id}
+    assert user_snapshot.status_code == 200
+
+
 def test_mailbox_push_devices_require_bearer_session(tmp_path):
     with make_client(tmp_path) as client:
         response = client.post(

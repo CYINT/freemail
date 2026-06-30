@@ -241,6 +241,15 @@ export async function revokeAllMailboxSessions(session: MailboxSession): Promise
   return Number(payload.revoked || 0);
 }
 
+export async function revokeMailboxSessionById(session: MailboxSession, sessionId: number): Promise<boolean> {
+  const response = await request(session.apiBaseUrl, `/api/v1/mailbox/sessions/${sessionId}`, {
+    method: "DELETE",
+    headers: mailboxHeaders(session),
+  });
+  const payload = await response.json();
+  return Boolean(payload.revoked);
+}
+
 export async function loadMailboxSnapshot(
   session: MailboxSession,
   folder = "INBOX",

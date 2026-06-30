@@ -9,7 +9,7 @@ import sqlite3
 import time
 from urllib.parse import quote
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Path, Query, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import database
@@ -111,6 +111,7 @@ from .schemas import (
     MailboxSessionCreate,
     MailboxSessionDeleteRecord,
     MailboxSessionRecord,
+    MailboxSessionRevokeRecord,
     MailboxSessionsDeleteRecord,
     MailboxSessionsRecord,
     MailboxSnapshotRecord,
@@ -195,7 +196,7 @@ COMPONENT_READINESS = {
     "webmail": {
         "status": "beta-ready",
         "evidence": [
-            "mailbox session login, session inspection/revoke-all, paginated and thread-aware folder navigation and search, conversation lookup, contacts, message read, header inspection, EML import/export, read/unread state, star state, compose, attachments, archive, move, delete, and empty-folder controls",
+            "mailbox session login, session inspection, targeted and bulk session revocation, paginated and thread-aware folder navigation and search, conversation lookup, contacts, message read, header inspection, EML import/export, read/unread state, star state, compose, attachments, archive, move, delete, and empty-folder controls",
             "bulk message actions for read/unread, star/unstar, archive, spam, delete, and move",
             "persistent mailbox preferences with default compose signatures and saved address-book contacts",
             "server-side Drafts persistence and compose reopen support for saved drafts",
@@ -210,7 +211,7 @@ COMPONENT_READINESS = {
     "mobile": {
         "status": "source-ready",
         "evidence": [
-            "Expo/React Native client with VPN API target, mailbox sessions, session inspection/revoke-all, paginated and thread-aware message workflows, conversation lookup, header inspection, EML import/export/share, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder and empty-folder controls, extracted and saved contacts, attachments, offline metadata cache, and push-device flows",
+            "Expo/React Native client with VPN API target, mailbox sessions, targeted and bulk session revocation, paginated and thread-aware message workflows, conversation lookup, header inspection, EML import/export/share, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder and empty-folder controls, extracted and saved contacts, attachments, offline metadata cache, and push-device flows",
             "bulk read/star/archive/spam/delete/move client controls over the shared mailbox API",
             "mobile preference controls for default compose signatures",
             "compose/send path uses the shared mailbox API contract with Sent Items persistence status",
@@ -628,6 +629,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             secret=active_settings.session_secret,
         )
         return {"revoked": database.revoke_mailbox_sessions_for_email(connection, email=credentials.email)}
+
+    @app.delete("/api/v1/mailbox/sessions/{session_id}", response_model=MailboxSessionRevokeRecord)
+    def mailbox_session_revoke(
+        session_id: int = Path(ge=1),
+        authorization: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        token = _mailbox_bearer_token_or_raise(authorization)
+        credentials = _mailbox_credentials_from_token(
+            connection=connection,
+            token=token,
+            secret=active_settings.session_secret,
+        )
+        revoked = database.revoke_mailbox_session_for_email(
+            connection,
+            email=credentials.email,
+            session_id=session_id,
+        )
+        return {"revoked": revoked, "session_id": session_id}
 
     @app.get("/api/v1/mailbox/preferences", response_model=MailboxPreferencesRecord)
     def mailbox_preferences_get(

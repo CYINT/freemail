@@ -239,11 +239,24 @@ textarea:focus-visible,
   list-style: none;
 }
 
-.sessions-panel li,
+.sessions-panel li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.sessions-panel li span,
 .sessions-panel p {
   margin: 0;
   color: #667584;
   font-size: 0.82rem;
+}
+
+.sessions-panel li button {
+  min-height: 28px;
+  padding: 0.18rem 0.5rem;
+  font-size: 0.78rem;
 }
 
 .saved-contact-form {

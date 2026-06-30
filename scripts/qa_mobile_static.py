@@ -98,6 +98,7 @@ def validate_mobile(root: Path) -> list[str]:
         "Preferences saved",
         "MailboxSessionSummary",
         "loadMailboxSessions",
+        "revokeMailboxSessionById",
         "revokeAllMailboxSessions",
         "Sign out everywhere",
         "withSignature",

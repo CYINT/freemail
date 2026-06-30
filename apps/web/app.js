@@ -645,6 +645,43 @@ async function revokeAllMailboxSessions() {
   }
 }
 
+async function revokeMailboxSessionById(session) {
+  if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
+    setStatus("Sign in before revoking sessions.", "error");
+    return;
+  }
+  const apiBaseUrl = mailboxSession.apiBaseUrl;
+  const headers = mailboxHeaders();
+  setStatus("Revoking session...", "loading");
+  try {
+    const response = await fetch(new URL(`/api/v1/mailbox/sessions/${session.id}`, apiBaseUrl), {
+      method: "DELETE",
+      headers,
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const result = await response.json();
+    if (!result.revoked) {
+      setStatus("Session was already signed out.", "idle");
+      await loadMailboxSessions({ quiet: true });
+      return;
+    }
+    if (session.current) {
+      forgetMailboxSession();
+      renderFolders([], "INBOX");
+      renderMessages([]);
+      renderMailboxSessions([]);
+      setStatus("Current session signed out.", "idle");
+      return;
+    }
+    await loadMailboxSessions({ quiet: true });
+    setStatus("Session revoked.", "ready");
+  } catch (error) {
+    setStatus(`Session revoke failed: ${readableError(error)}`, "error");
+  }
+}
+
 function renderMailboxSessions(sessions) {
   if (!mailboxSessionsList) {
     return;
@@ -659,8 +696,14 @@ function renderMailboxSessions(sessions) {
   list.replaceChildren(
     ...sessions.map((session) => {
       const item = document.createElement("li");
+      const description = document.createElement("span");
       const label = session.current ? "Current session" : "Active session";
-      item.textContent = `${label} - expires ${formatSessionExpiry(session.expiresAt)}`;
+      description.textContent = `${label} - expires ${formatSessionExpiry(session.expiresAt)}`;
+      const revokeButton = document.createElement("button");
+      revokeButton.type = "button";
+      revokeButton.textContent = "Revoke";
+      revokeButton.addEventListener("click", () => revokeMailboxSessionById(session));
+      item.replaceChildren(description, revokeButton);
       return item;
     }),
   );

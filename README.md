@@ -59,6 +59,7 @@ Mailbox session endpoints:
 - `POST /api/v1/mailbox/session`
 - `DELETE /api/v1/mailbox/session`
 - `GET /api/v1/mailbox/sessions`
+- `DELETE /api/v1/mailbox/sessions/{sessionId}`
 - `DELETE /api/v1/mailbox/sessions`
 
 Run repository hygiene scans before publishing changes:
@@ -165,7 +166,7 @@ npm audit --audit-level=moderate
 Pop-Location
 ```
 
-The mobile scaffold lives in `apps\mobile`, uses Expo/React Native, defaults to `https://freemail.kuzuryu.ai`, and persists bearer sessions through `expo-secure-store` rather than browser-style storage. It currently covers sign-in, inbox/folder snapshots with load-more pagination, thread-aware conversation lookup, message reading, header inspection, EML import/export/share, persistent mailbox preferences and default compose signatures, read/unread and star state, bulk read/unread/star/unstar/archive/spam/delete actions, compose/send, draft saving and draft reopen into compose with bounded document-picker attachments, reply/forward drafts, folder-scoped paginated search, saved address-book contacts, extracted contacts, non-core folder management plus Trash/Junk/custom-folder emptying, attachment metadata plus authenticated download/share handling, secure offline metadata caching for the last loaded mailbox views, bearer-authenticated push-device registration, and provider-neutral push notification delivery status.
+The mobile scaffold lives in `apps\mobile`, uses Expo/React Native, defaults to `https://freemail.kuzuryu.ai`, and persists bearer sessions through `expo-secure-store` rather than browser-style storage. It currently covers sign-in, inbox/folder snapshots with load-more pagination, thread-aware conversation lookup, message reading, header inspection, EML import/export/share, persistent mailbox preferences and default compose signatures, read/unread and star state, targeted and bulk mailbox session revocation, bulk read/unread/star/unstar/archive/spam/delete actions, compose/send, draft saving and draft reopen into compose with bounded document-picker attachments, reply/forward drafts, folder-scoped paginated search, saved address-book contacts, extracted contacts, non-core folder management plus Trash/Junk/custom-folder emptying, attachment metadata plus authenticated download/share handling, secure offline metadata caching for the last loaded mailbox views, bearer-authenticated push-device registration, and provider-neutral push notification delivery status.
 
 Mobile native release posture is documented in `docs\mobile-release.md`. The open-source repo keeps signing credentials, provisioning profiles, keystores, store API keys, and generated native projects out of source control; CI validates the Expo config, Android native prebuild drill, static release checklist, and macOS iOS native prebuild drill.
 Signed mobile builds, app-store submission evidence, and real-device private-beta validation are validated with `scripts\mobile_release_gate.py` from credential-free evidence stored outside Git.
@@ -208,7 +209,7 @@ FREEMAIL_APNS_USE_SANDBOX=false
 
 Keep all provider credentials out of Git and configure them only through deployment secrets.
 
-The webmail preview can load live mailbox folders and message headers from the API. Start `admin-api`, `mail-core`, and `web`, open `http://127.0.0.1:18091`, enter a mailbox address/password, and keep the API field pointed at `http://127.0.0.1:18090`. The browser client exchanges the mailbox password for a bearer session at `POST /api/v1/mailbox/session`, stores only the bearer token in `localStorage`, and revokes it with `DELETE /api/v1/mailbox/session` on sign out. The API stores mailbox passwords only as encrypted session material using `FREEMAIL_SESSION_SECRET`. For a different local web origin, set `FREEMAIL_WEB_CORS_ORIGINS`.
+The webmail preview can load live mailbox folders and message headers from the API. Start `admin-api`, `mail-core`, and `web`, open `http://127.0.0.1:18091`, enter a mailbox address/password, and keep the API field pointed at `http://127.0.0.1:18090`. The browser client exchanges the mailbox password for a bearer session at `POST /api/v1/mailbox/session`, stores only the bearer token in `localStorage`, and revokes the current session with `DELETE /api/v1/mailbox/session`, one active mailbox session with `DELETE /api/v1/mailbox/sessions/{sessionId}`, or all active sessions with `DELETE /api/v1/mailbox/sessions`. The API stores mailbox passwords only as encrypted session material using `FREEMAIL_SESSION_SECRET`. For a different local web origin, set `FREEMAIL_WEB_CORS_ORIGINS`.
 
 The first read-only mailbox API uses per-request IMAP credentials and does not store mailbox passwords:
 

@@ -56,6 +56,7 @@ import {
   renameMailboxFolder,
   registerMailboxPushDevice,
   revokeAllMailboxSessions,
+  revokeMailboxSessionById,
   revokeMailboxSession,
   revokeMailboxPushDevice,
   searchMailbox,
@@ -224,6 +225,48 @@ export default function App() {
       await clearStoredMailboxSession();
       await clearCachedMailboxSnapshots(activeSession.email).catch(() => undefined);
       setStatus(`Signed out ${revoked} session${revoked === 1 ? "" : "s"}.`);
+    } catch (error) {
+      setStatus(readableError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function revokeSessionById(item: MailboxSessionSummary) {
+    const activeSession = session;
+    if (!activeSession) {
+      return;
+    }
+    setLoading(true);
+    setStatus("Revoking session...");
+    try {
+      const revoked = await revokeMailboxSessionById(activeSession, item.id);
+      if (!revoked) {
+        setStatus("Session was already signed out.");
+        await refreshMailboxSessions(activeSession);
+        return;
+      }
+      if (item.current) {
+        setSession(null);
+        setFolders([]);
+        setMessages([]);
+        setMailboxSessions([]);
+        setMailboxPagination({ mode: "folder", query: "", nextOffset: null, hasMore: false });
+        setContacts([]);
+        setSavedContacts([]);
+        setPushDevices([]);
+        setPushNotifications([]);
+        setMailboxPreferences(null);
+        setPreferenceDisplayName("");
+        setPreferenceSignature("");
+        setSelectedMessage(null);
+        await clearStoredMailboxSession();
+        await clearCachedMailboxSnapshots(activeSession.email).catch(() => undefined);
+        setStatus("Current session signed out.");
+        return;
+      }
+      await refreshMailboxSessions(activeSession);
+      setStatus("Session revoked.");
     } catch (error) {
       setStatus(readableError(error));
     } finally {
@@ -1267,9 +1310,15 @@ export default function App() {
                   : "No active sessions loaded."}
               </Text>
               {mailboxSessions.map((item) => (
-                <Text key={item.id} style={styles.meta}>
-                  {item.current ? "Current session" : "Active session"} - expires {formatSessionExpiry(item.expiresAt)}
-                </Text>
+                <View key={item.id} style={styles.pushDeviceRow}>
+                  <View>
+                    <Text style={styles.sender}>{item.current ? "Current session" : "Active session"}</Text>
+                    <Text style={styles.meta}>Expires {formatSessionExpiry(item.expiresAt)}</Text>
+                  </View>
+                  <Pressable style={styles.secondaryButton} onPress={() => revokeSessionById(item)}>
+                    <Text>Revoke</Text>
+                  </Pressable>
+                </View>
               ))}
               <Pressable style={styles.dangerButton} onPress={signOutEverywhere}>
                 <Text style={styles.dangerButtonText}>Sign out everywhere</Text>
