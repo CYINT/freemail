@@ -20,6 +20,7 @@ from .dns_policy import domain_dns_records
 from .dns_policy import verify_dns_posture
 from .mail_core import probe_mail_core
 from .mailbox_imap import archive_mailbox_message
+from .mailbox_imap import bulk_mailbox_message_action
 from .mailbox_imap import create_mailbox_folder
 from .mailbox_imap import delete_mailbox_folder
 from .mailbox_imap import get_mailbox_attachment
@@ -62,6 +63,8 @@ from .schemas import (
     DomainRecord,
     MailboxArchiveCreate,
     MailboxArchiveRecord,
+    MailboxBulkActionCreate,
+    MailboxBulkActionRecord,
     MailboxContactsRecord,
     MailboxCreate,
     MailboxDraftCreate,
@@ -162,6 +165,7 @@ COMPONENT_READINESS = {
         "status": "beta-ready",
         "evidence": [
             "mailbox session login, folder navigation, search, contacts, message read, read/unread state, star state, compose, attachments, archive, move, and delete controls",
+            "bulk message actions for read/unread, star/unstar, archive, spam, delete, and move",
             "server-side Drafts persistence and compose reopen support for saved drafts",
             "server-side Sent Items persistence for accepted outbound messages",
             "token-gated admin console for bootstrap, users, domains, mailboxes, aliases, DKIM, DNS guidance, status actions, sync status, and audit logs",
@@ -175,6 +179,7 @@ COMPONENT_READINESS = {
         "status": "source-ready",
         "evidence": [
             "Expo/React Native client with VPN API target, mailbox sessions, message workflows, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder controls, contacts, attachments, offline metadata cache, and push-device flows",
+            "bulk read/star/archive/spam/delete/move client controls over the shared mailbox API",
             "compose/send path uses the shared mailbox API contract with Sent Items persistence status",
             "mobile static QA, config validation, native prebuild drill, typecheck, and dependency audit in CI",
         ],
@@ -954,6 +959,37 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except imaplib.IMAP4.error as error:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mailbox message not found") from error
         return state.as_dict()
+
+    @app.post("/api/v1/mailbox/message/bulk", response_model=MailboxBulkActionRecord)
+    def mailbox_bulk_action(
+        payload: MailboxBulkActionCreate,
+        authorization: str | None = Header(default=None),
+        x_freemail_mailbox_email: str | None = Header(default=None),
+        x_freemail_mailbox_password: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=x_freemail_mailbox_email,
+            x_freemail_mailbox_password=x_freemail_mailbox_password,
+            connection=connection,
+        )
+        try:
+            result = bulk_mailbox_message_action(
+                email=credentials.email,
+                password=credentials.password,
+                host=active_settings.mail_core_host,
+                port=active_settings.imap_port,
+                folder=payload.folder,
+                message_ids=payload.message_ids,
+                action=payload.action,
+                target_folder=payload.target_folder,
+            )
+        except OSError as error:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+        except imaplib.IMAP4.error as error:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+        return result.as_dict()
 
     @app.post("/api/v1/mailbox/send", response_model=MailboxSendRecord)
     def mailbox_send(

@@ -5,6 +5,7 @@ const folderNameInput = document.querySelector("#folder-name");
 const folderRenameAction = document.querySelector("#folder-rename-action");
 const folderDeleteAction = document.querySelector("#folder-delete-action");
 const messageList = document.querySelector("#message-list");
+const bulkToolbar = document.querySelector(".bulk-toolbar");
 const statusNode = document.querySelector("#mailbox-status");
 const readerSubject = document.querySelector("#reader-subject");
 const readerMeta = document.querySelector("#reader-meta");
@@ -25,6 +26,13 @@ const markUnreadAction = document.querySelector("#mark-unread-action");
 const archiveAction = document.querySelector("#archive-action");
 const spamAction = document.querySelector("#spam-action");
 const deleteAction = document.querySelector("#delete-action");
+const bulkReadAction = document.querySelector("#bulk-read-action");
+const bulkUnreadAction = document.querySelector("#bulk-unread-action");
+const bulkStarAction = document.querySelector("#bulk-star-action");
+const bulkUnstarAction = document.querySelector("#bulk-unstar-action");
+const bulkArchiveAction = document.querySelector("#bulk-archive-action");
+const bulkSpamAction = document.querySelector("#bulk-spam-action");
+const bulkDeleteAction = document.querySelector("#bulk-delete-action");
 const contactsAction = document.querySelector("#contacts-action");
 const contactsList = document.querySelector("#contacts-list");
 const composeTo = document.querySelector("#compose-to");
@@ -67,6 +75,7 @@ let adminSession = {
   bootstrapToken: "",
 };
 let selectedMessageDetail = null;
+let selectedMessageIds = new Set();
 
 restoreMailboxSession();
 restoreAdminSession();
@@ -189,6 +198,14 @@ deleteAction?.addEventListener("click", async () => {
   }
   await moveMailboxMessage(selectedMessageDetail, "Deleted Items", "Message moved to trash.");
 });
+
+bulkReadAction?.addEventListener("click", async () => bulkMailboxMessages("read", "Bulk messages marked read."));
+bulkUnreadAction?.addEventListener("click", async () => bulkMailboxMessages("unread", "Bulk messages marked unread."));
+bulkStarAction?.addEventListener("click", async () => bulkMailboxMessages("star", "Bulk messages starred."));
+bulkUnstarAction?.addEventListener("click", async () => bulkMailboxMessages("unstar", "Bulk messages unstarred."));
+bulkArchiveAction?.addEventListener("click", async () => bulkMailboxMessages("archive", "Bulk messages archived."));
+bulkSpamAction?.addEventListener("click", async () => bulkMailboxMessages("spam", "Bulk messages moved to spam."));
+bulkDeleteAction?.addEventListener("click", async () => bulkMailboxMessages("delete", "Bulk messages moved to trash."));
 
 contactsAction?.addEventListener("click", async () => {
   await loadMailboxContacts();
@@ -365,6 +382,7 @@ async function loadMailboxSnapshot(folder) {
     const snapshot = await response.json();
     mailboxSession.folder = folder;
     persistMailboxSession(mailboxSession);
+    selectedMessageIds = new Set();
     clearSearch();
     renderFolders(snapshot.folders || [], folder);
     renderMessages(snapshot.messages || []);
@@ -397,6 +415,7 @@ async function searchMailboxMessages(query) {
       throw new Error(await response.text());
     }
     const result = await response.json();
+    selectedMessageIds = new Set();
     renderMessages(result.messages || []);
     setStatus(`Found ${result.messages?.length || 0} messages for "${query}".`, "ready");
   } catch (error) {
@@ -527,6 +546,46 @@ async function setMailboxMessageStarState(message, starred) {
     await loadMailboxSnapshot(mailboxSession.folder);
   } catch (error) {
     setStatus(`Star state update failed: ${readableError(error)}`, "error");
+  }
+}
+
+async function bulkMailboxMessages(action, successMessage, targetFolder = null) {
+  if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
+    setStatus("Load a mailbox before changing selected messages.", "error");
+    return;
+  }
+  const messageIds = [...selectedMessageIds];
+  if (!messageIds.length) {
+    setStatus("Select messages before using bulk actions.", "error");
+    return;
+  }
+  setStatus(`Applying ${action} to ${messageIds.length} messages...`, "loading");
+  try {
+    const url = new URL("/api/v1/mailbox/message/bulk", mailboxSession.apiBaseUrl);
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        ...mailboxHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        folder: mailboxSession.folder,
+        messageIds,
+        action,
+        targetFolder,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const result = await response.json();
+    selectedMessageIds = new Set();
+    selectedMessageDetail = null;
+    renderDraftActions(null);
+    setStatus(`${successMessage} ${result.succeeded || 0}/${messageIds.length} updated.`, "ready");
+    await loadMailboxSnapshot(mailboxSession.folder);
+  } catch (error) {
+    setStatus(`Bulk action failed: ${readableError(error)}`, "error");
   }
 }
 
@@ -765,7 +824,8 @@ function renderMessages(messages) {
   }
   if (!messages.length) {
     selectedMessageDetail = null;
-    messageList.replaceChildren(emptyMessage());
+    selectedMessageIds = new Set();
+    replaceMessageListChildren(emptyMessage());
     readerSubject.textContent = "No messages";
     readerMeta.textContent = "Select another folder or refresh the mailbox.";
     renderMessageBody("This folder is empty.");
@@ -774,20 +834,47 @@ function renderMessages(messages) {
     return;
   }
   const rows = messages.map((message, index) => messageRow(message, index === 0));
-  messageList.replaceChildren(...rows);
+  replaceMessageListChildren(...rows);
   selectMessage(messages[0], rows[0]);
+}
+
+function replaceMessageListChildren(...children) {
+  if (bulkToolbar) {
+    messageList.replaceChildren(bulkToolbar, ...children);
+    return;
+  }
+  messageList.replaceChildren(...children);
 }
 
 function messageRow(message, selected) {
   const row = document.createElement("article");
   row.className = `message-row${selected ? " selected" : ""}${message.unread ? " unread" : ""}`;
   row.tabIndex = 0;
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.className = "message-select";
+  checkbox.checked = selectedMessageIds.has(message.messageId);
+  checkbox.setAttribute("aria-label", `Select ${message.subject || "message"}`);
+  checkbox.addEventListener("click", (event) => {
+    event.stopPropagation();
+  });
+  checkbox.addEventListener("change", () => {
+    if (checkbox.checked) {
+      selectedMessageIds.add(message.messageId);
+    } else {
+      selectedMessageIds.delete(message.messageId);
+    }
+  });
+  const content = document.createElement("div");
+  content.className = "message-row-content";
   row.innerHTML = `
     <span class="sender">${escapeHtml(message.sender || "Unknown sender")}</span>
     <strong>${escapeHtml(message.starred ? `* ${message.subject || "(no subject)"}` : message.subject || "(no subject)")}</strong>
     <p>${escapeHtml(message.recipients || "")}</p>
     <time>${escapeHtml(shortDate(message.date))}</time>
   `;
+  content.append(...Array.from(row.childNodes));
+  row.replaceChildren(checkbox, content);
   row.addEventListener("click", () => selectMessage(message, row));
   row.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === " ") {
@@ -1075,6 +1162,7 @@ function forgetMailboxSession() {
   window.localStorage.removeItem(mailboxSessionStorageKey);
   mailboxSession = { email: "", token: "", apiBaseUrl: "", folder: "INBOX" };
   selectedMessageDetail = null;
+  selectedMessageIds = new Set();
   renderDraftActions(null);
   clearSearch();
 }

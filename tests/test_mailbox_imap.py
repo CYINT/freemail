@@ -2,6 +2,7 @@ from email.message import EmailMessage
 
 from freemail_api.mailbox_imap import (
     ArchivedMailboxMessage,
+    BulkActionMailboxMessages,
     MailboxAttachment,
     MailboxContact,
     MailboxContacts,
@@ -18,6 +19,10 @@ from freemail_api.mailbox_imap import (
     _attachment_contents_from_message,
     _attachments_from_message,
     _body_from_message,
+    _bulk_flag_command,
+    _bulk_move_messages,
+    _bulk_store_flags,
+    _bulk_target_folder,
     _contacts_from_header,
     _count_from_select,
     _create_folder,
@@ -29,6 +34,7 @@ from freemail_api.mailbox_imap import (
     _list_contacts,
     _list_folders,
     _list_messages,
+    _message_ids_for_move,
     _move_message,
     _parse_folder,
     _quote_search_value,
@@ -242,6 +248,24 @@ def test_star_state_message_serializes_flag_result():
     }
 
 
+def test_bulk_action_message_serializes_bulk_result():
+    result = BulkActionMailboxMessages(
+        folder="INBOX",
+        action="archive",
+        message_ids=["1", "2"],
+        target_folder="Archive",
+        succeeded=2,
+    )
+
+    assert result.as_dict() == {
+        "folder": "INBOX",
+        "action": "archive",
+        "message_ids": ["1", "2"],
+        "target_folder": "Archive",
+        "succeeded": 2,
+    }
+
+
 def test_mutated_folder_serializes_folder_action():
     mutation = MutatedMailboxFolder(folder="Clients", target_folder="Customers", action="rename", success=True)
 
@@ -428,6 +452,44 @@ def test_set_message_flagged_removes_flagged_flag_for_unstar_state():
 
     assert imap.selected_folders == [('"INBOX"', False)]
     assert imap.stored_flags == [(b"6", "-FLAGS", r"(\Flagged)")]
+
+
+def test_bulk_store_flags_updates_each_message_with_one_select():
+    imap = FakeImap()
+
+    succeeded = _bulk_store_flags(imap, folder="INBOX", message_ids=["1", "2"], action="star")
+
+    assert succeeded == 2
+    assert imap.selected_folders == [('"INBOX"', False)]
+    assert imap.stored_flags == [(b"1", "+FLAGS", r"(\Flagged)"), (b"2", "+FLAGS", r"(\Flagged)")]
+
+
+def test_bulk_move_messages_processes_sequence_ids_descending_then_expunges_once():
+    imap = FakeImap()
+
+    succeeded = _bulk_move_messages(imap, folder="INBOX", message_ids=["1", "3", "2"], target_folder="Archive")
+
+    assert succeeded == 3
+    assert imap.selected_folders == [('"INBOX"', False), ('"Archive"', True), ('"INBOX"', False)]
+    assert imap.copied_messages == [(b"3", '"Archive"'), (b"2", '"Archive"'), (b"1", '"Archive"')]
+    assert imap.stored_flags == [
+        (b"3", "+FLAGS", r"(\Deleted)"),
+        (b"2", "+FLAGS", r"(\Deleted)"),
+        (b"1", "+FLAGS", r"(\Deleted)"),
+    ]
+    assert imap.expunge_called is True
+
+
+def test_bulk_helpers_resolve_flags_targets_and_move_order():
+    assert _bulk_flag_command("read") == ("+FLAGS", r"(\Seen)")
+    assert _bulk_flag_command("unread") == ("-FLAGS", r"(\Seen)")
+    assert _bulk_flag_command("unstar") == ("-FLAGS", r"(\Flagged)")
+    assert _bulk_target_folder("archive", None) == "Archive"
+    assert _bulk_target_folder("spam", None) == "Junk Mail"
+    assert _bulk_target_folder("delete", None) == "Deleted Items"
+    assert _bulk_target_folder("move", "Clients") == "Clients"
+    assert _message_ids_for_move(["10", "2", "1"]) == ["10", "2", "1"]
+    assert _message_ids_for_move(["abc", "2", "1"]) == ["1", "2", "abc"]
 
 
 def test_ensure_folder_creates_missing_archive_folder():

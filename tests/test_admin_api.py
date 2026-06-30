@@ -1636,6 +1636,59 @@ def test_mailbox_star_state_returns_imap_state_payload(tmp_path, monkeypatch):
     assert response.json() == {"folder": "INBOX", "messageId": "1", "starred": True}
 
 
+def test_mailbox_bulk_action_requires_mailbox_credentials(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.post(
+            "/api/v1/mailbox/message/bulk",
+            json={"folder": "INBOX", "messageIds": ["1", "2"], "action": "archive"},
+        )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Mailbox credentials required"
+
+
+def test_mailbox_bulk_action_returns_imap_bulk_payload(tmp_path, monkeypatch):
+    class Bulk:
+        def as_dict(self):
+            return {
+                "folder": "INBOX",
+                "action": "archive",
+                "message_ids": ["1", "2"],
+                "target_folder": "Archive",
+                "succeeded": 2,
+            }
+
+    def fake_bulk_action(**kwargs):
+        assert kwargs["email"] == "admin@example.com"
+        assert kwargs["password"] == "secret"
+        assert kwargs["folder"] == "INBOX"
+        assert kwargs["message_ids"] == ["1", "2"]
+        assert kwargs["action"] == "archive"
+        assert kwargs["target_folder"] == "Archive"
+        return Bulk()
+
+    monkeypatch.setattr("freemail_api.main.bulk_mailbox_message_action", fake_bulk_action)
+
+    with make_client(tmp_path) as client:
+        response = client.post(
+            "/api/v1/mailbox/message/bulk",
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+            json={"folder": "INBOX", "messageIds": ["1", "2"], "action": "archive", "targetFolder": "Archive"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "folder": "INBOX",
+        "action": "archive",
+        "messageIds": ["1", "2"],
+        "targetFolder": "Archive",
+        "succeeded": 2,
+    }
+
+
 def test_mailbox_message_requires_mailbox_credentials(tmp_path):
     with make_client(tmp_path) as client:
         response = client.get("/api/v1/mailbox/message?folder=INBOX&message_id=1")

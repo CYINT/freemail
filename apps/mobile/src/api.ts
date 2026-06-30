@@ -115,6 +115,14 @@ export type DraftMessage = {
   draftFolder: string;
 };
 
+export type BulkMessageAction = {
+  folder: string;
+  action: string;
+  messageIds: string[];
+  targetFolder?: string | null;
+  succeeded: number;
+};
+
 export async function createMailboxSession(apiBaseUrl: string, email: string, password: string): Promise<MailboxSession> {
   const response = await request(apiBaseUrl, "/api/v1/mailbox/session", {
     method: "POST",
@@ -239,6 +247,24 @@ export async function setMailboxMessageStarState(
     },
     body: JSON.stringify({ folder, messageId, starred }),
   });
+}
+
+export async function bulkMailboxMessageAction(
+  session: MailboxSession,
+  folder: string,
+  messageIds: string[],
+  action: "read" | "unread" | "star" | "unstar" | "archive" | "spam" | "delete" | "move",
+  targetFolder?: string,
+): Promise<BulkMessageAction> {
+  const response = await request(session.apiBaseUrl, "/api/v1/mailbox/message/bulk", {
+    method: "POST",
+    headers: {
+      ...mailboxHeaders(session),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ folder, messageIds, action, targetFolder }),
+  });
+  return response.json();
 }
 
 export async function registerMailboxPushDevice(

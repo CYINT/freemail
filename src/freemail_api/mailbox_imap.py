@@ -153,6 +153,18 @@ class StarStateMailboxMessage:
 
 
 @dataclass(frozen=True)
+class BulkActionMailboxMessages:
+    folder: str
+    action: str
+    message_ids: list[str]
+    succeeded: int
+    target_folder: str | None = None
+
+    def as_dict(self) -> dict[str, object]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class MutatedMailboxFolder:
     folder: str
     action: str
@@ -261,6 +273,46 @@ def set_mailbox_message_star_state(
         imap.login(email, password)
         _set_message_flagged(imap, folder=folder, message_id=message_id, starred=starred)
     return StarStateMailboxMessage(folder=folder, message_id=message_id, starred=starred)
+
+
+def bulk_mailbox_message_action(
+    *,
+    email: str,
+    password: str,
+    host: str,
+    port: int,
+    folder: str,
+    message_ids: list[str],
+    action: str,
+    target_folder: str | None = None,
+    timeout_seconds: float = 10.0,
+    verify_tls: bool = False,
+) -> BulkActionMailboxMessages:
+    normalized_action = action.strip().lower()
+    if normalized_action not in {"read", "unread", "star", "unstar", "archive", "spam", "delete", "move"}:
+        raise imaplib.IMAP4.error(f"Unsupported mailbox bulk action: {action}")
+
+    tls_context = _tls_context(verify_tls=verify_tls)
+    with imaplib.IMAP4_SSL(host, port, ssl_context=tls_context, timeout=timeout_seconds) as imap:
+        imap.login(email, password)
+        if normalized_action in {"read", "unread", "star", "unstar"}:
+            succeeded = _bulk_store_flags(imap, folder=folder, message_ids=message_ids, action=normalized_action)
+            resolved_target = None
+        else:
+            resolved_target = _bulk_target_folder(normalized_action, target_folder)
+            succeeded = _bulk_move_messages(
+                imap,
+                folder=folder,
+                message_ids=message_ids,
+                target_folder=resolved_target,
+            )
+    return BulkActionMailboxMessages(
+        folder=folder,
+        action=normalized_action,
+        target_folder=resolved_target,
+        message_ids=message_ids,
+        succeeded=succeeded,
+    )
 
 
 def search_mailbox_messages(
@@ -428,6 +480,81 @@ def _set_message_flagged(imap: imaplib.IMAP4_SSL, *, folder: str, message_id: st
     store_status, _store_data = imap.store(message_id.encode("ascii"), command, r"(\Flagged)")
     if store_status != "OK":
         raise imaplib.IMAP4.error("Mailbox message star state could not be updated")
+
+
+def _bulk_store_flags(imap: imaplib.IMAP4_SSL, *, folder: str, message_ids: list[str], action: str) -> int:
+    status, _data = imap.select(f'"{folder}"', readonly=False)
+    if status != "OK":
+        raise imaplib.IMAP4.error(f"Mailbox folder not found: {folder}")
+    command, flags = _bulk_flag_command(action)
+    succeeded = 0
+    for message_id in message_ids:
+        store_status, _store_data = imap.store(message_id.encode("ascii"), command, flags)
+        if store_status != "OK":
+            raise imaplib.IMAP4.error("Mailbox bulk flag update failed")
+        succeeded += 1
+    return succeeded
+
+
+def _bulk_move_messages(
+    imap: imaplib.IMAP4_SSL,
+    *,
+    folder: str,
+    message_ids: list[str],
+    target_folder: str,
+) -> int:
+    status, _data = imap.select(f'"{folder}"', readonly=False)
+    if status != "OK":
+        raise imaplib.IMAP4.error(f"Mailbox folder not found: {folder}")
+    _ensure_folder(imap, target_folder)
+    status, _data = imap.select(f'"{folder}"', readonly=False)
+    if status != "OK":
+        raise imaplib.IMAP4.error(f"Mailbox folder not found: {folder}")
+    succeeded = 0
+    for message_id in _message_ids_for_move(message_ids):
+        encoded_id = message_id.encode("ascii")
+        copy_status, _copy_data = imap.copy(encoded_id, f'"{target_folder}"')
+        if copy_status != "OK":
+            raise imaplib.IMAP4.error("Mailbox bulk message copy failed")
+        store_status, _store_data = imap.store(encoded_id, "+FLAGS", r"(\Deleted)")
+        if store_status != "OK":
+            raise imaplib.IMAP4.error("Mailbox bulk source flag update failed")
+        succeeded += 1
+    expunge_status, _expunge_data = imap.expunge()
+    if expunge_status != "OK":
+        raise imaplib.IMAP4.error("Mailbox bulk source folder expunge failed")
+    return succeeded
+
+
+def _bulk_flag_command(action: str) -> tuple[str, str]:
+    if action == "read":
+        return "+FLAGS", r"(\Seen)"
+    if action == "unread":
+        return "-FLAGS", r"(\Seen)"
+    if action == "star":
+        return "+FLAGS", r"(\Flagged)"
+    if action == "unstar":
+        return "-FLAGS", r"(\Flagged)"
+    raise imaplib.IMAP4.error(f"Unsupported mailbox bulk flag action: {action}")
+
+
+def _bulk_target_folder(action: str, target_folder: str | None) -> str:
+    if action == "archive":
+        return target_folder or "Archive"
+    if action == "spam":
+        return "Junk Mail"
+    if action == "delete":
+        return "Deleted Items"
+    if action == "move" and target_folder:
+        return target_folder
+    raise imaplib.IMAP4.error(f"Unsupported mailbox bulk move action: {action}")
+
+
+def _message_ids_for_move(message_ids: list[str]) -> list[str]:
+    try:
+        return [message_id for _numeric, message_id in sorted((int(value), value) for value in message_ids)[::-1]]
+    except ValueError:
+        return list(reversed(message_ids))
 
 
 def _ensure_folder(imap: imaplib.IMAP4_SSL, folder: str) -> None:

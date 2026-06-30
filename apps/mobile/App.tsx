@@ -19,6 +19,7 @@ import {
 
 import {
   archiveMailboxMessage,
+  bulkMailboxMessageAction,
   ComposeAttachment,
   createMailboxPushNotification,
   createMailboxFolder,
@@ -71,6 +72,7 @@ export default function App() {
   const [folder, setFolder] = useState("INBOX");
   const [folders, setFolders] = useState<MailFolder[]>([]);
   const [messages, setMessages] = useState<MailMessage[]>([]);
+  const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([]);
   const [contacts, setContacts] = useState<MailContact[]>([]);
   const [pushDevices, setPushDevices] = useState<MailboxPushDevice[]>([]);
   const [pushNotifications, setPushNotifications] = useState<MailboxPushNotification[]>([]);
@@ -160,6 +162,7 @@ export default function App() {
       setFolder(targetFolder);
       setFolders(snapshot.folders || []);
       setMessages(snapshot.messages || []);
+      setSelectedMessageIds([]);
       setContacts(contactList.contacts || []);
       setPushDevices(devices || []);
       setPushNotifications(notifications || []);
@@ -241,6 +244,7 @@ export default function App() {
     try {
       const result = await searchMailbox(session, folder, query);
       setMessages(result.messages || []);
+      setSelectedMessageIds([]);
       setSelectedMessage(null);
       setStatus(`Found ${result.messages?.length || 0} messages in ${folder}.`);
     } catch (error) {
@@ -501,6 +505,29 @@ export default function App() {
     }
   }
 
+  async function bulkAction(
+    action: "read" | "unread" | "star" | "unstar" | "archive" | "spam" | "delete",
+    successMessage: string,
+  ) {
+    if (!session || !selectedMessageIds.length) {
+      setStatus("Select messages before using bulk actions.");
+      return;
+    }
+    setLoading(true);
+    setStatus(`Applying ${action} to ${selectedMessageIds.length} messages...`);
+    try {
+      const result = await bulkMailboxMessageAction(session, folder, selectedMessageIds, action);
+      setSelectedMessageIds([]);
+      setSelectedMessage(null);
+      await refreshMailbox(session, folder);
+      setStatus(`${successMessage} ${result.succeeded}/${result.messageIds.length} updated.`);
+    } catch (error) {
+      setStatus(readableError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function setSelectedMessageReadState(read: boolean) {
     if (!session || !selectedMessage) {
       return;
@@ -545,6 +572,12 @@ export default function App() {
     if (!existing.includes(contact.email)) {
       setComposeTo([...existing, contact.email].join(", "));
     }
+  }
+
+  function toggleMessageSelection(messageId: string) {
+    setSelectedMessageIds((current) =>
+      current.includes(messageId) ? current.filter((value) => value !== messageId) : [...current, messageId],
+    );
   }
 
   return (
@@ -627,12 +660,47 @@ export default function App() {
             </View>
 
             <View style={styles.listPanel}>
+              <View style={styles.rowHeader}>
+                <Text style={styles.sectionTitle}>Messages</Text>
+                <Text style={styles.meta}>{selectedMessageIds.length} selected</Text>
+              </View>
+              <View style={styles.inlineControls}>
+                <Pressable style={styles.secondaryButton} onPress={() => bulkAction("read", "Messages marked read.")}>
+                  <Text>Read</Text>
+                </Pressable>
+                <Pressable style={styles.secondaryButton} onPress={() => bulkAction("unread", "Messages marked unread.")}>
+                  <Text>Unread</Text>
+                </Pressable>
+                <Pressable style={styles.secondaryButton} onPress={() => bulkAction("star", "Messages starred.")}>
+                  <Text>Star</Text>
+                </Pressable>
+                <Pressable style={styles.secondaryButton} onPress={() => bulkAction("unstar", "Messages unstarred.")}>
+                  <Text>Unstar</Text>
+                </Pressable>
+                <Pressable style={styles.secondaryButton} onPress={() => bulkAction("archive", "Messages archived.")}>
+                  <Text>Archive</Text>
+                </Pressable>
+                <Pressable style={styles.secondaryButton} onPress={() => bulkAction("spam", "Messages moved to spam.")}>
+                  <Text>Spam</Text>
+                </Pressable>
+                <Pressable style={styles.dangerButton} onPress={() => bulkAction("delete", "Messages deleted.")}>
+                  <Text style={styles.dangerButtonText}>Delete</Text>
+                </Pressable>
+              </View>
               <FlatList
                 data={messages}
                 scrollEnabled={false}
                 keyExtractor={(item) => `${item.folder}:${item.messageId}`}
                 renderItem={({ item }) => (
                   <Pressable style={styles.messageRow} onPress={() => openMessage(item)}>
+                    <Pressable
+                      style={[styles.selectionPill, selectedMessageIds.includes(item.messageId) ? styles.selectedPill : null]}
+                      onPress={() => toggleMessageSelection(item.messageId)}
+                    >
+                      <Text style={selectedMessageIds.includes(item.messageId) ? styles.selectedPillText : styles.selectionPillText}>
+                        {selectedMessageIds.includes(item.messageId) ? "Selected" : "Select"}
+                      </Text>
+                    </Pressable>
                     <Text style={styles.sender}>{item.sender || "Unknown sender"}</Text>
                     <Text style={styles.subject}>{item.starred ? `* ${item.subject || "(no subject)"}` : item.subject || "(no subject)"}</Text>
                     <Text style={styles.meta}>{item.recipients}</Text>
@@ -917,6 +985,19 @@ const styles = StyleSheet.create({
   activeFolderText: { color: "#ffffff", fontWeight: "700" },
   folderCount: { color: "#697386", fontSize: 12, marginTop: 2 },
   messageRow: { borderBottomColor: "#d8dee9", borderBottomWidth: 1, paddingVertical: 10, gap: 3 },
+  selectionPill: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    borderColor: "#cbd5e1",
+    borderRadius: 6,
+    borderWidth: 1,
+    minHeight: 30,
+    justifyContent: "center",
+    paddingHorizontal: 8,
+  },
+  selectedPill: { backgroundColor: "#176b5f", borderColor: "#176b5f" },
+  selectionPillText: { color: "#1f2937", fontSize: 12, fontWeight: "700" },
+  selectedPillText: { color: "#ffffff", fontSize: 12, fontWeight: "700" },
   contactRow: { borderBottomColor: "#eef2f7", borderBottomWidth: 1, paddingVertical: 8, gap: 2 },
   attachmentRow: {
     alignItems: "center",

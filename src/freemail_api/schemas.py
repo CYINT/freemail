@@ -273,6 +273,21 @@ class MailboxStarStateRecord(ApiModel):
     starred: bool
 
 
+class MailboxBulkActionCreate(ApiModel):
+    folder: str = Field(min_length=1, max_length=160)
+    message_ids: list[str] = Field(min_length=1, max_length=100)
+    action: str = Field(pattern=r"^(read|unread|star|unstar|archive|spam|delete|move)$")
+    target_folder: str | None = Field(default=None, min_length=1, max_length=160)
+
+
+class MailboxBulkActionRecord(ApiModel):
+    folder: str
+    action: str
+    message_ids: list[str]
+    succeeded: int
+    target_folder: str | None = None
+
+
 class MailboxFolderCreate(ApiModel):
     folder: str = Field(min_length=1, max_length=160, pattern=r'^[^"/\\\r\n]+$')
 

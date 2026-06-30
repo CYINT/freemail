@@ -338,14 +338,41 @@ h2 {
   background: #ffffff;
 }
 
+.bulk-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  border-bottom: 1px solid #d8e0e8;
+  background: #f8fafc;
+  padding: 0.5rem;
+}
+
+.bulk-toolbar button {
+  min-height: 34px;
+  border-radius: 6px;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.82rem;
+}
+
 .message-row {
   position: relative;
   display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 0.2rem;
   min-height: 112px;
   border-bottom: 1px solid #e0e7ee;
   padding: 0.9rem 4.5rem 0.9rem 1rem;
   cursor: pointer;
+}
+
+.message-row input[type="checkbox"] {
+  grid-row: 1 / 4;
+  width: 18px;
+  height: 18px;
+  margin: 0.15rem 0.4rem 0 0;
 }
 
 .message-row.selected {

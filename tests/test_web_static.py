@@ -51,7 +51,11 @@ def test_static_web_validation_flags_credential_storage():
         '<button id="mark-read-action">Mark read</button><button id="mark-unread-action">Mark unread</button>'
         '<button id="archive-action">Archive</button>'
         '<button id="spam-action">Spam</button><button id="delete-action">Delete</button>'
-        '<section class="message-list"><article class="message-row reader compose-panel">'
+        '<button id="bulk-read-action">Read</button><button id="bulk-unread-action">Unread</button>'
+        '<button id="bulk-star-action">Star</button><button id="bulk-unstar-action">Unstar</button>'
+        '<button id="bulk-archive-action">Archive</button><button id="bulk-spam-action">Spam</button>'
+        '<button id="bulk-delete-action">Delete</button>'
+        '<section class="message-list"><div class="bulk-toolbar"></div><article class="message-row reader compose-panel">'
         "Inbox Compose Reply Forward Mark read Mark unread Attach Send Junk Mail Spam Delete</article></section></main>"
     )
 
@@ -66,10 +70,12 @@ def test_static_web_validation_flags_credential_storage():
         "fetch('/api/v1/mailbox/message/move'); "
         "fetch('/api/v1/mailbox/message/read-state'); "
         "fetch('/api/v1/mailbox/message/star-state'); "
+        "fetch('/api/v1/mailbox/message/bulk'); "
         "renderMessageBody('body'); renderMessageAttachments({}); downloadMailboxAttachment({}, {}); "
         "filesToAttachments([]); fileToBase64({}); archiveMailboxMessage({}); moveMailboxMessage({}, 'Trash', 'Done'); "
         "setMailboxMessageReadState({}, true); Message marked read; Message marked unread; "
         "setMailboxMessageStarState({}, true); Message starred; Message unstarred; "
+        "bulkMailboxMessages('archive', 'Bulk messages archived'); selectedMessageIds.add('1'); "
         "fetch('/api/v1/mailbox/draft'); saveMailboxDraft({}); Draft saved; composePayload(); "
         "searchMailboxMessages('term'); loadMailboxContacts(); renderContacts([]); "
         "createMailboxFolder('x'); renameMailboxFolder('y'); deleteMailboxFolder('z'); mutateMailboxFolder('POST', {}); "

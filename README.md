@@ -25,8 +25,8 @@ The FreeMail program includes:
 This repository is at the implementation baseline. It contains:
 
 - A FastAPI admin/runtime API with persistent SQLite-backed domain, user, mailbox, alias, and audit-log surfaces.
-- A static webmail preview shell with inbox, search, message reader, read/unread and star controls, compose, draft saving and editing, folder navigation, token-gated admin setup, and responsive layout QA.
-- An Expo/React Native mobile client scaffold with secure session storage, mailbox workflows, draft saving and editing, read/unread and star controls, archive/spam/delete actions, and static QA.
+- A static webmail preview shell with inbox, search, message reader, read/unread and star controls, bulk message actions, compose, draft saving and editing, folder navigation, token-gated admin setup, and responsive layout QA.
+- An Expo/React Native mobile client scaffold with secure session storage, mailbox workflows, draft saving and editing, read/unread and star controls, bulk archive/spam/delete/read/star actions, and static QA.
 - A Docker Compose stack with VPN-only loopback bindings by default.
 - A Stalwart mail-core candidate profile for the first architecture spike.
 - CI for linting, tests, repository secret scanning, dependency audit, Compose validation, and image build.
@@ -150,7 +150,7 @@ npm audit --audit-level=moderate
 Pop-Location
 ```
 
-The mobile scaffold lives in `apps\mobile`, uses Expo/React Native, defaults to `https://freemail.kuzuryu.ai`, and persists bearer sessions through `expo-secure-store` rather than browser-style storage. It currently covers sign-in, inbox/folder snapshots, message reading, read/unread and star state, compose/send, draft saving and draft reopen into compose with bounded document-picker attachments, reply/forward drafts, folder-scoped search, contacts, non-core folder management, attachment metadata plus authenticated download/share handling, secure offline metadata caching for the last loaded mailbox views, bearer-authenticated push-device registration, and provider-neutral push notification delivery status.
+The mobile scaffold lives in `apps\mobile`, uses Expo/React Native, defaults to `https://freemail.kuzuryu.ai`, and persists bearer sessions through `expo-secure-store` rather than browser-style storage. It currently covers sign-in, inbox/folder snapshots, message reading, read/unread and star state, bulk read/unread/star/unstar/archive/spam/delete actions, compose/send, draft saving and draft reopen into compose with bounded document-picker attachments, reply/forward drafts, folder-scoped search, contacts, non-core folder management, attachment metadata plus authenticated download/share handling, secure offline metadata caching for the last loaded mailbox views, bearer-authenticated push-device registration, and provider-neutral push notification delivery status.
 
 Mobile native release posture is documented in `docs\mobile-release.md`. The open-source repo keeps signing credentials, provisioning profiles, keystores, store API keys, and generated native projects out of source control; CI validates the Expo config, Android native prebuild drill, static release checklist, and macOS iOS native prebuild drill.
 Signed mobile builds, app-store submission evidence, and real-device private-beta validation are validated with `scripts\mobile_release_gate.py` from credential-free evidence stored outside Git.
@@ -205,6 +205,7 @@ The first read-only mailbox API uses per-request IMAP credentials and does not s
 .\.venv\Scripts\python.exe scripts\qa_mailbox_contacts_api.py --email admin@example.com --secrets-json secrets\mail-core-users.json
 .\.venv\Scripts\python.exe scripts\qa_mailbox_folder_api.py --email admin@example.com --secrets-json secrets\mail-core-users.json
 .\.venv\Scripts\python.exe scripts\qa_mailbox_star_api.py --email admin@example.com --secrets-json secrets\mail-core-users.json
+.\.venv\Scripts\python.exe scripts\qa_mailbox_bulk_api.py --email admin@example.com --secrets-json secrets\mail-core-users.json
 ```
 
 `FREEMAIL_SESSION_SECRET` must be set for browser mailbox sessions. Use a long random value and keep it out of source control. Existing per-request mailbox credential QA scripts remain available for API smoke coverage.
@@ -251,7 +252,7 @@ POST /api/v1/mailbox/draft
 .\.venv\Scripts\python.exe scripts\qa_mailbox_draft_api.py --email admin@example.com --recipient admin@example.com --secrets-json secrets\mail-core-users.json
 ```
 
-The current webmail preview supports reply and forward as live compose-prefill workflows from the selected message body. Messages selected from `Drafts` can be reopened into compose through Edit draft; attachment metadata is shown in the reader, and files should be reattached before saving or sending the reopened draft. Star and Unstar update the IMAP `\Flagged` flag through the mailbox API and display starred messages with a leading marker in message lists. Sending compose drafts uses the same mailbox send API and server-side Sent Items persistence, while Save draft uses the draft API. The Archive action uses IMAP copy/delete semantics, creates the `Archive` folder if it is missing, and refreshes the current folder after success:
+The current webmail preview supports reply and forward as live compose-prefill workflows from the selected message body. Messages selected from `Drafts` can be reopened into compose through Edit draft; attachment metadata is shown in the reader, and files should be reattached before saving or sending the reopened draft. Star and Unstar update the IMAP `\Flagged` flag through the mailbox API and display starred messages with a leading marker in message lists. The bulk action API and clients can mark selected messages read/unread, star/unstar them, archive them, or move them to spam/trash in one request. Sending compose drafts uses the same mailbox send API and server-side Sent Items persistence, while Save draft uses the draft API. The Archive action uses IMAP copy/delete semantics, creates the `Archive` folder if it is missing, and refreshes the current folder after success:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\qa_mailbox_archive_api.py --email admin@example.com --secrets-json secrets\mail-core-users.json
