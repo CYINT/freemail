@@ -10,8 +10,15 @@ from freemail_api.release_gate import assert_release_gate, ReleaseGateError, Rel
 def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monkeypatch):
     metadata = tmp_path / "metadata.json"
     mail_store = tmp_path / "mail-store.tar.gz"
+    release_notes = tmp_path / "release-notes.md"
     metadata.write_text("{}", encoding="utf-8")
     mail_store.write_bytes(b"archive")
+    release_notes.write_text(
+        "# FreeMail v0.1.0-private-beta\n\n"
+        "Verification: CI, release gates, and backup evidence passed.\n\n"
+        "Known limitations: VPN-only private beta.\n",
+        encoding="utf-8",
+    )
 
     def fake_command(command):
         if command == ["git", "rev-parse", "HEAD"]:
@@ -43,12 +50,22 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
     monkeypatch.setattr(release_gate, "_command", fake_command)
     monkeypatch.setattr(release_gate, "_fetch_json", fake_fetch)
 
-    result = run_release_gate(ReleaseGateOptions(metadata_backup=metadata, mail_store_backup=mail_store))
+    result = run_release_gate(
+        ReleaseGateOptions(
+            metadata_backup=metadata,
+            mail_store_backup=mail_store,
+            release_notes=release_notes,
+            release_version="v0.1.0-private-beta",
+        )
+    )
 
     assert result["passed"] is True
     checks_by_name = {check["name"]: check for check in result["checks"]}
     assert checks_by_name["metadata-backup"]["details"]["sha256"] == hashlib.sha256(b"{}").hexdigest()
     assert checks_by_name["mail-store-backup"]["details"]["sha256"] == hashlib.sha256(b"archive").hexdigest()
+    assert checks_by_name["release-notes"]["details"]["sha256"] == hashlib.sha256(
+        release_notes.read_bytes()
+    ).hexdigest()
     assert {check["name"] for check in result["checks"]} == {
         "git-clean",
         "remote-sha",
@@ -56,6 +73,7 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
         "github-ci",
         "metadata-backup",
         "mail-store-backup",
+        "release-notes",
         "runtime-health",
         "deployment-boundary",
         "metadata-readiness",
@@ -71,6 +89,7 @@ def test_release_gate_fails_without_backup_evidence(tmp_path, monkeypatch):
             metadata_backup=None,
             mail_store_backup=None,
             skip_github_ci=True,
+            skip_release_notes=True,
             skip_runtime=True,
         )
     )
@@ -87,6 +106,7 @@ def test_assert_release_gate_raises_for_failed_checks(tmp_path, monkeypatch):
             ReleaseGateOptions(
                 skip_github_ci=True,
                 skip_backup_evidence=True,
+                skip_release_notes=True,
                 skip_runtime=True,
             )
         )
@@ -156,3 +176,49 @@ def test_backup_file_check_records_sha256_for_non_empty_file(tmp_path):
     assert check["status"] == "pass"
     assert check["details"]["bytes"] == 6
     assert check["details"]["sha256"] == hashlib.sha256(b"backup").hexdigest()
+
+
+def test_release_notes_check_requires_version_and_required_sections(tmp_path):
+    release_notes = tmp_path / "release-notes.md"
+    release_notes.write_text(
+        "# FreeMail v0.1.0-private-beta\n\n"
+        "Verification: CI passed.\n\n"
+        "Known limitations: VPN-only private beta.\n",
+        encoding="utf-8",
+    )
+
+    check = release_gate._check_release_notes(release_notes, "v0.1.0-private-beta")
+
+    assert check["status"] == "pass"
+    assert check["details"]["versionPresent"] is True
+    assert check["details"]["missingRequiredTerms"] == []
+
+
+def test_release_notes_check_rejects_placeholder_text(tmp_path):
+    release_notes = tmp_path / "release-notes.md"
+    release_notes.write_text(
+        "# FreeMail v0.1.0-private-beta\n\n"
+        "Verification: TODO.\n\n"
+        "Known limitations: VPN-only private beta.\n",
+        encoding="utf-8",
+    )
+
+    check = release_gate._check_release_notes(release_notes, "v0.1.0-private-beta")
+
+    assert check["status"] == "fail"
+    assert check["details"]["placeholderTerms"] == ["todo"]
+
+
+def test_release_notes_check_rejects_missing_version(tmp_path):
+    release_notes = tmp_path / "release-notes.md"
+    release_notes.write_text(
+        "# FreeMail private beta\n\n"
+        "Verification: CI passed.\n\n"
+        "Known limitations: VPN-only private beta.\n",
+        encoding="utf-8",
+    )
+
+    check = release_gate._check_release_notes(release_notes, "v0.1.0-private-beta")
+
+    assert check["status"] == "fail"
+    assert check["details"]["versionPresent"] is False

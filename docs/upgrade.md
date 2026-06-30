@@ -50,7 +50,9 @@ Invoke-RestMethod https://freemail.kuzuryu.ai/health
 Invoke-RestMethod https://freemail.kuzuryu.ai/api/v1/mail-core/readiness
 .\.venv\Scripts\python.exe scripts\release_gate.py `
   --metadata-backup .freemail-qa\backups\metadata.json `
-  --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz
+  --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
+  --release-notes docs\release-notes\v0.1.0-private-beta.md `
+  --release-version v0.1.0-private-beta
 ```
 
 ## Rollback

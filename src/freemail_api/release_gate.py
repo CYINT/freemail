@@ -24,8 +24,11 @@ class ReleaseGateOptions:
     readiness_url: str | None = "https://freemail.kuzuryu.ai/api/v1/mail-core/readiness"
     metadata_backup: Path | None = None
     mail_store_backup: Path | None = None
+    release_notes: Path | None = None
+    release_version: str | None = None
     skip_github_ci: bool = False
     skip_backup_evidence: bool = False
+    skip_release_notes: bool = False
     skip_runtime: bool = False
 
 
@@ -40,6 +43,8 @@ def run_release_gate(options: ReleaseGateOptions) -> dict[str, Any]:
         checks.append(_check_github_ci(options.repo, commit))
     if not options.skip_backup_evidence:
         checks.extend(_check_backup_evidence(options.metadata_backup, options.mail_store_backup))
+    if not options.skip_release_notes:
+        checks.append(_check_release_notes(options.release_notes, options.release_version))
     if not options.skip_runtime:
         checks.extend(
             _check_runtime(
@@ -128,6 +133,35 @@ def _check_backup_file(name: str, path: Path) -> dict[str, Any]:
     exists = path.is_file()
     size = path.stat().st_size if exists else 0
     return _check(name, exists and size > 0, _file_evidence_details(path, exists, size))
+
+
+def _check_release_notes(path: Path | None, release_version: str | None) -> dict[str, Any]:
+    if path is None:
+        return _check("release-notes", False, {"error": "release notes path is required"})
+    exists = path.is_file()
+    size = path.stat().st_size if exists else 0
+    details = _file_evidence_details(path, exists, size)
+    if not exists or size == 0:
+        details["error"] = "release notes file must exist and be non-empty"
+        return _check("release-notes", False, details)
+
+    content = path.read_text(encoding="utf-8").strip()
+    lowered = content.lower()
+    required_terms = ["freemail", "verification", "known limitations", "vpn"]
+    missing_terms = [term for term in required_terms if term not in lowered]
+    placeholder_terms = ["todo", "tbd", "fixme", "changeme", "placeholder"]
+    placeholders = [term for term in placeholder_terms if term in lowered]
+    normalized_version = (release_version or "").strip()
+    version_present = not normalized_version or normalized_version.lower() in lowered
+    details.update(
+        {
+            "version": normalized_version or None,
+            "versionPresent": version_present,
+            "missingRequiredTerms": missing_terms,
+            "placeholderTerms": placeholders,
+        }
+    )
+    return _check("release-notes", version_present and not missing_terms and not placeholders, details)
 
 
 def _file_evidence_details(path: Path, exists: bool | None = None, size: int | None = None) -> dict[str, Any]:
