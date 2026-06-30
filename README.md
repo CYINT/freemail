@@ -252,12 +252,13 @@ PUT /api/v1/mailbox/saved-contacts
 DELETE /api/v1/mailbox/saved-contacts/{contactId}
 ```
 
-Mailbox sender rules are durable mailbox metadata for allow/block abuse triage and are included in metadata backups. Webmail and mobile can save allow/block rules from the selected message; the block-sender action also moves the selected message to `Junk Mail`.
+Mailbox sender rules are durable mailbox metadata for allow/block abuse triage and are included in metadata backups. Webmail and mobile can save allow/block rules from the selected message; the block-sender action also moves the selected message to `Junk Mail`. Both clients can apply saved block rules to the current folder, with allow rules taking precedence, to move matching messages into `Junk Mail`.
 
 ```text
 GET /api/v1/mailbox/sender-rules
 PUT /api/v1/mailbox/sender-rules
 DELETE /api/v1/mailbox/sender-rules/{ruleId}
+POST /api/v1/mailbox/sender-rules/apply
 ```
 
 Folder management uses the browser bearer session or per-request mailbox credentials:

@@ -52,6 +52,7 @@ const preferencesForm = document.querySelector("#mailbox-preferences");
 const preferenceDisplayName = document.querySelector("#preference-display-name");
 const preferenceSignature = document.querySelector("#preference-signature");
 const senderRulesRefresh = document.querySelector("#sender-rules-refresh");
+const senderRulesApply = document.querySelector("#sender-rules-apply");
 const senderRuleForm = document.querySelector("#sender-rule-form");
 const senderRuleEmail = document.querySelector("#sender-rule-email");
 const senderRuleNotes = document.querySelector("#sender-rule-notes");
@@ -343,6 +344,10 @@ savedContactForm?.addEventListener("submit", async (event) => {
 
 senderRulesRefresh?.addEventListener("click", async () => {
   await loadMailboxSenderRules();
+});
+
+senderRulesApply?.addEventListener("click", async () => {
+  await applyMailboxSenderRules();
 });
 
 senderRuleForm?.addEventListener("submit", async (event) => {
@@ -1229,6 +1234,33 @@ async function deleteMailboxSenderRule(ruleId) {
     setStatus("Sender rule deleted.", "ready");
   } catch (error) {
     setStatus(`Delete sender rule failed: ${readableError(error)}`, "error");
+  }
+}
+
+async function applyMailboxSenderRules() {
+  if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
+    setStatus("Sign in before applying sender rules.", "error");
+    return;
+  }
+  setStatus("Applying sender rules...", "loading");
+  try {
+    const response = await fetch(new URL("/api/v1/mailbox/sender-rules/apply", mailboxSession.apiBaseUrl), {
+      method: "POST",
+      headers: {
+        ...mailboxHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ folder: currentFolder, targetFolder: "Junk Mail" }),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const result = await response.json();
+    selectedMessageDetail = null;
+    await loadMailboxSnapshot(currentFolder);
+    setStatus(`Applied sender rules. Moved ${result.moved || 0} messages to spam.`, "ready");
+  } catch (error) {
+    setStatus(`Apply sender rules failed: ${readableError(error)}`, "error");
   }
 }
 

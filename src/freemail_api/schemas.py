@@ -485,6 +485,20 @@ class MailboxSenderRuleDeleteRecord(ApiModel):
     rule_id: int
 
 
+class MailboxSenderRulesApplyCreate(ApiModel):
+    folder: str = Field(min_length=1, max_length=160)
+    target_folder: str = Field(default="Junk Mail", min_length=1, max_length=160)
+
+
+class MailboxSenderRulesApplyRecord(ApiModel):
+    folder: str
+    target_folder: str
+    blocked_senders: list[EmailStr]
+    allowed_senders: list[EmailStr]
+    message_ids: list[str]
+    moved: int
+
+
 class MailboxSessionCreate(ApiModel):
     email: EmailStr
     password: str = Field(min_length=1, max_length=512)

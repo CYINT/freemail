@@ -20,6 +20,7 @@ from freemail_api.mailbox_imap import (
     MutatedMailboxFolder,
     ReadStateMailboxMessage,
     StarStateMailboxMessage,
+    _message_ids_from_senders,
     _archive_message,
     _attachment_contents_from_message,
     _attachments_from_message,
@@ -726,6 +727,24 @@ def test_bulk_helpers_resolve_flags_targets_and_move_order():
     assert _bulk_target_folder("move", "Clients") == "Clients"
     assert _message_ids_for_move(["10", "2", "1"]) == ["10", "2", "1"]
     assert _message_ids_for_move(["abc", "2", "1"]) == ["1", "2", "abc"]
+
+
+def test_message_ids_from_senders_matches_normalized_from_addresses():
+    class SenderImap(FakeImap):
+        def fetch(self, message_id, query):
+            senders = {
+                b"1": b"From: Friendly <friend@example.net>\r\n\r\n",
+                b"2": b"From: Blocked <blocked@example.net>\r\n\r\n",
+                b"3": b"From: Other <other@example.net>\r\n\r\n",
+            }
+            return "OK", [(b"1 (BODY[HEADER.FIELDS (FROM)] {32}", senders[message_id])]
+
+    imap = SenderImap()
+
+    matches = _message_ids_from_senders(imap, folder="INBOX", sender_emails=["BLOCKED@example.net"])
+
+    assert matches == ["2"]
+    assert imap.selected_folders == [('"INBOX"', True)]
 
 
 def test_ensure_folder_creates_missing_archive_folder():

@@ -140,6 +140,15 @@ export type MailboxSenderRules = {
   rules: MailboxSenderRule[];
 };
 
+export type AppliedSenderRules = {
+  folder: string;
+  targetFolder: string;
+  blockedSenders: string[];
+  allowedSenders: string[];
+  messageIds: string[];
+  moved: number;
+};
+
 export type MailboxPushDevice = {
   id: number;
   mailboxEmail: string;
@@ -365,6 +374,22 @@ export async function deleteMailboxSenderRule(session: MailboxSession, ruleId: n
     method: "DELETE",
     headers: mailboxHeaders(session),
   });
+}
+
+export async function applyMailboxSenderRules(
+  session: MailboxSession,
+  folder: string,
+  targetFolder = "Junk Mail",
+): Promise<AppliedSenderRules> {
+  const response = await request(session.apiBaseUrl, "/api/v1/mailbox/sender-rules/apply", {
+    method: "POST",
+    headers: {
+      ...mailboxHeaders(session),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ folder, targetFolder }),
+  });
+  return response.json();
 }
 
 export async function loadMailboxMessage(

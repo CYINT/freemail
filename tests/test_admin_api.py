@@ -2546,6 +2546,68 @@ def test_mailbox_sender_rule_delete_is_scoped_to_mailbox(tmp_path):
     assert user_rules.json()["rules"][0]["senderEmail"] == "blocked@example.net"
 
 
+def test_mailbox_sender_rules_apply_requires_mailbox_credentials(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.post("/api/v1/mailbox/sender-rules/apply", json={"folder": "INBOX"})
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Mailbox credentials required"
+
+
+def test_mailbox_sender_rules_apply_uses_effective_block_rules(tmp_path, monkeypatch):
+    headers = {
+        "X-FreeMail-Mailbox-Email": "admin@example.com",
+        "X-FreeMail-Mailbox-Password": "secret",
+    }
+
+    class Applied:
+        def as_dict(self):
+            return {
+                "folder": "INBOX",
+                "target_folder": "Junk Mail",
+                "blocked_senders": ["blocked@example.net"],
+                "allowed_senders": ["friend@example.net"],
+                "message_ids": ["2", "5"],
+                "moved": 2,
+            }
+
+    def fake_apply_rules(**kwargs):
+        assert kwargs["email"] == "admin@example.com"
+        assert kwargs["password"] == "secret"
+        assert kwargs["folder"] == "INBOX"
+        assert kwargs["target_folder"] == "Junk Mail"
+        assert sorted(kwargs["blocked_senders"]) == ["blocked@example.net"]
+        assert sorted(kwargs["allowed_senders"]) == ["friend@example.net"]
+        return Applied()
+
+    monkeypatch.setattr("freemail_api.main.apply_blocked_sender_rules", fake_apply_rules)
+
+    with make_client(tmp_path) as client:
+        blocked_response = client.put(
+            "/api/v1/mailbox/sender-rules",
+            headers=headers,
+            json={"senderEmail": "blocked@example.net", "action": "block"},
+        )
+        allowed_response = client.put(
+            "/api/v1/mailbox/sender-rules",
+            headers=headers,
+            json={"senderEmail": "friend@example.net", "action": "allow"},
+        )
+        response = client.post("/api/v1/mailbox/sender-rules/apply", headers=headers, json={"folder": "INBOX"})
+
+    assert blocked_response.status_code == 200
+    assert allowed_response.status_code == 200
+    assert response.status_code == 200
+    assert response.json() == {
+        "folder": "INBOX",
+        "targetFolder": "Junk Mail",
+        "blockedSenders": ["blocked@example.net"],
+        "allowedSenders": ["friend@example.net"],
+        "messageIds": ["2", "5"],
+        "moved": 2,
+    }
+
+
 def test_mailbox_message_requires_mailbox_credentials(tmp_path):
     with make_client(tmp_path) as client:
         response = client.get("/api/v1/mailbox/message?folder=INBOX&message_id=1")

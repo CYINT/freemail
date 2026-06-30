@@ -19,6 +19,7 @@ import {
 } from "react-native";
 
 import {
+  applyMailboxSenderRules,
   archiveMailboxMessage,
   bulkMailboxMessageAction,
   ComposeAttachment,
@@ -450,6 +451,25 @@ export default function App() {
       await deleteMailboxSenderRule(session, ruleId);
       await refreshSenderRules(session);
       setStatus("Sender rule deleted.");
+    } catch (error) {
+      setStatus(readableError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function applySenderRules() {
+    if (!session) {
+      return;
+    }
+    setLoading(true);
+    setStatus("Applying sender rules...");
+    try {
+      const result = await applyMailboxSenderRules(session, folder, "Junk Mail");
+      setSelectedMessage(null);
+      setSelectedMessageIds([]);
+      await refreshMailbox(session, folder);
+      setStatus(`Applied sender rules. Moved ${result.moved || 0} messages to spam.`);
     } catch (error) {
       setStatus(readableError(error));
     } finally {
@@ -1332,9 +1352,14 @@ export default function App() {
             <View style={styles.panel}>
               <View style={styles.rowHeader}>
                 <Text style={styles.sectionTitle}>Sender rules</Text>
-                <Pressable style={styles.secondaryButton} onPress={() => refreshSenderRules()}>
-                  <Text>Refresh</Text>
-                </Pressable>
+                <View style={styles.inlineControls}>
+                  <Pressable style={styles.secondaryButton} onPress={() => refreshSenderRules()}>
+                    <Text>Refresh</Text>
+                  </Pressable>
+                  <Pressable style={styles.secondaryButton} onPress={applySenderRules}>
+                    <Text>Apply blocks</Text>
+                  </Pressable>
+                </View>
               </View>
               <TextInput
                 value={senderRuleEmail}

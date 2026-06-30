@@ -21,6 +21,7 @@ from .attachment_policy import validate_attachments
 from .dns_policy import domain_dns_records
 from .dns_policy import verify_dns_posture
 from .mail_core import probe_mail_core
+from .mailbox_imap import apply_blocked_sender_rules
 from .mailbox_imap import archive_mailbox_message
 from .mailbox_imap import bulk_mailbox_message_action
 from .mailbox_imap import create_mailbox_folder
@@ -111,6 +112,8 @@ from .schemas import (
     MailboxSenderRuleCreate,
     MailboxSenderRuleDeleteRecord,
     MailboxSenderRuleRecord,
+    MailboxSenderRulesApplyCreate,
+    MailboxSenderRulesApplyRecord,
     MailboxSenderRulesRecord,
     MailboxSessionCreate,
     MailboxSessionDeleteRecord,
@@ -200,7 +203,7 @@ COMPONENT_READINESS = {
     "webmail": {
         "status": "beta-ready",
         "evidence": [
-            "mailbox session login, session inspection, targeted and bulk session revocation, paginated and thread-aware folder navigation and search, conversation lookup, contacts, sender allow/block rules, message read, header inspection, EML import/export, read/unread state, star state, compose, attachments, archive, move, delete, and empty-folder controls",
+            "mailbox session login, session inspection, targeted and bulk session revocation, paginated and thread-aware folder navigation and search, conversation lookup, contacts, sender allow/block rules with current-folder block enforcement, message read, header inspection, EML import/export, read/unread state, star state, compose, attachments, archive, move, delete, and empty-folder controls",
             "bulk message actions for read/unread, star/unstar, archive, spam, delete, and move",
             "persistent mailbox preferences with default compose signatures and saved address-book contacts",
             "server-side Drafts persistence and compose reopen support for saved drafts",
@@ -215,7 +218,7 @@ COMPONENT_READINESS = {
     "mobile": {
         "status": "source-ready",
         "evidence": [
-            "Expo/React Native client with VPN API target, mailbox sessions, targeted and bulk session revocation, paginated and thread-aware message workflows, conversation lookup, header inspection, EML import/export/share, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder and empty-folder controls, extracted and saved contacts, sender allow/block rules, attachments, offline metadata cache, and push-device flows",
+            "Expo/React Native client with VPN API target, mailbox sessions, targeted and bulk session revocation, paginated and thread-aware message workflows, conversation lookup, header inspection, EML import/export/share, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder and empty-folder controls, extracted and saved contacts, sender allow/block rules with current-folder block enforcement, attachments, offline metadata cache, and push-device flows",
             "bulk read/star/archive/spam/delete/move client controls over the shared mailbox API",
             "mobile preference controls for default compose signatures",
             "compose/send path uses the shared mailbox API contract with Sent Items persistence status",
@@ -818,6 +821,40 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             ),
             "rule_id": rule_id,
         }
+
+    @app.post("/api/v1/mailbox/sender-rules/apply", response_model=MailboxSenderRulesApplyRecord)
+    def mailbox_sender_rules_apply(
+        payload: MailboxSenderRulesApplyCreate,
+        authorization: str | None = Header(default=None),
+        x_freemail_mailbox_email: str | None = Header(default=None),
+        x_freemail_mailbox_password: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=x_freemail_mailbox_email,
+            x_freemail_mailbox_password=x_freemail_mailbox_password,
+            connection=connection,
+        )
+        rules = database.list_mailbox_sender_rules(connection, email=credentials.email)
+        blocked_senders = [str(rule["sender_email"]) for rule in rules if rule["action"] == "block"]
+        allowed_senders = [str(rule["sender_email"]) for rule in rules if rule["action"] == "allow"]
+        try:
+            result = apply_blocked_sender_rules(
+                email=credentials.email,
+                password=credentials.password,
+                host=active_settings.mail_core_host,
+                port=active_settings.imap_port,
+                folder=payload.folder,
+                target_folder=payload.target_folder,
+                blocked_senders=blocked_senders,
+                allowed_senders=allowed_senders,
+            )
+        except OSError as error:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+        except imaplib.IMAP4.error as error:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+        return result.as_dict()
 
     @app.post("/api/v1/mailbox/push/devices", response_model=MailboxPushDeviceRecord)
     def mailbox_push_device_register(

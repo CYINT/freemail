@@ -260,6 +260,19 @@ class BulkActionMailboxMessages:
 
 
 @dataclass(frozen=True)
+class AppliedSenderRules:
+    folder: str
+    target_folder: str
+    blocked_senders: list[str]
+    allowed_senders: list[str]
+    message_ids: list[str]
+    moved: int
+
+    def as_dict(self) -> dict[str, object]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class ImportedMailboxMessage:
     folder: str
     filename: str
@@ -438,6 +451,52 @@ def bulk_mailbox_message_action(
         target_folder=resolved_target,
         message_ids=message_ids,
         succeeded=succeeded,
+    )
+
+
+def apply_blocked_sender_rules(
+    *,
+    email: str,
+    password: str,
+    host: str,
+    port: int,
+    folder: str,
+    blocked_senders: list[str],
+    allowed_senders: list[str] | None = None,
+    target_folder: str = "Junk Mail",
+    timeout_seconds: float = 10.0,
+    verify_tls: bool = False,
+) -> AppliedSenderRules:
+    normalized_blocked = _normalize_sender_set(blocked_senders)
+    normalized_allowed = _normalize_sender_set(allowed_senders or [])
+    effective_blocked = sorted(normalized_blocked - normalized_allowed)
+    if not effective_blocked or folder == target_folder:
+        return AppliedSenderRules(
+            folder=folder,
+            target_folder=target_folder,
+            blocked_senders=effective_blocked,
+            allowed_senders=sorted(normalized_allowed),
+            message_ids=[],
+            moved=0,
+        )
+
+    tls_context = _tls_context(verify_tls=verify_tls)
+    with imaplib.IMAP4_SSL(host, port, ssl_context=tls_context, timeout=timeout_seconds) as imap:
+        imap.login(email, password)
+        message_ids = _message_ids_from_senders(imap, folder=folder, sender_emails=effective_blocked)
+        moved = _bulk_move_messages(
+            imap,
+            folder=folder,
+            message_ids=message_ids,
+            target_folder=target_folder,
+        ) if message_ids else 0
+    return AppliedSenderRules(
+        folder=folder,
+        target_folder=target_folder,
+        blocked_senders=effective_blocked,
+        allowed_senders=sorted(normalized_allowed),
+        message_ids=message_ids,
+        moved=moved,
     )
 
 
@@ -788,6 +847,45 @@ def _message_ids_for_move(message_ids: list[str]) -> list[str]:
         return [message_id for _numeric, message_id in sorted((int(value), value) for value in message_ids)[::-1]]
     except ValueError:
         return list(reversed(message_ids))
+
+
+def _message_ids_from_senders(
+    imap: imaplib.IMAP4_SSL,
+    *,
+    folder: str,
+    sender_emails: list[str],
+) -> list[str]:
+    normalized_senders = _normalize_sender_set(sender_emails)
+    if not normalized_senders:
+        return []
+    status, _data = imap.select(f'"{folder}"', readonly=True)
+    if status != "OK":
+        raise imaplib.IMAP4.error(f"Mailbox folder not found: {folder}")
+    search_status, search_data = imap.search(None, "ALL")
+    if search_status != "OK" or not search_data:
+        return []
+    matches = []
+    for message_id in search_data[0].split():
+        fetch_status, fetch_data = imap.fetch(message_id, "(BODY.PEEK[HEADER.FIELDS (FROM)])")
+        if fetch_status != "OK" or not fetch_data or not isinstance(fetch_data[0], tuple):
+            continue
+        header = BytesParser(policy=default).parsebytes(fetch_data[0][1])
+        if _sender_email_from_header(header) in normalized_senders:
+            matches.append(message_id.decode("ascii"))
+    return matches
+
+
+def _sender_email_from_header(header) -> str:
+    addresses = getaddresses([str(header.get("from", ""))])
+    for _name, address in addresses:
+        clean_address = address.strip().lower()
+        if "@" in clean_address:
+            return clean_address
+    return ""
+
+
+def _normalize_sender_set(sender_emails: list[str]) -> set[str]:
+    return {sender.strip().lower() for sender in sender_emails if "@" in sender.strip()}
 
 
 def _ensure_folder(imap: imaplib.IMAP4_SSL, folder: str) -> None:
