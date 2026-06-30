@@ -510,6 +510,30 @@ def test_private_beta_gate_requires_beta_evidence_when_enabled():
     ]
 
 
+def test_private_beta_gate_reports_missing_manifest_evidence_files(tmp_path):
+    result = run_private_beta_gate(
+        PrivateBetaGateOptions(
+            domain="example.com",
+            skip_runtime=True,
+            skip_dns=True,
+            mail_flow_evidence=tmp_path / "missing-mail-flow.json",
+            queue_evidence=tmp_path / "missing-queue.json",
+            mail_core_apply_evidence=tmp_path / "missing-mail-core-apply.json",
+            deliverability_evidence=tmp_path / "missing-deliverability.json",
+            acceptance=tmp_path / "missing-acceptance.json",
+        )
+    )
+
+    assert result["passed"] is False
+    checks_by_name = {check["name"]: check for check in result["checks"]}
+    assert checks_by_name["controlled-mail-flow-evidence"]["details"]["bytes"] == 0
+    assert checks_by_name["queue-evidence"]["details"]["bytes"] == 0
+    assert checks_by_name["mail-core-apply-evidence"]["details"]["bytes"] == 0
+    assert checks_by_name["deliverability-abuse-evidence"]["details"]["bytes"] == 0
+    assert checks_by_name["private-beta-acceptance"]["details"]["bytes"] == 0
+    assert "must exist" in checks_by_name["controlled-mail-flow-evidence"]["details"]["error"]
+
+
 def test_private_beta_gate_accepts_complete_beta_evidence(tmp_path):
     mail_flow = tmp_path / "mail-flow.json"
     queue = tmp_path / "queue.json"

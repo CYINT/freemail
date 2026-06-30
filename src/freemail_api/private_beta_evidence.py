@@ -12,6 +12,7 @@ from .private_beta_gate import PrivateBetaGateOptions
 
 
 EVIDENCE_FILENAMES = {
+    "dns_guidance": "dns-guidance.{domain}.json",
     "observed_dns": "observed-dns.{domain}.json",
     "mail_flow": "mail-flow.{domain}.json",
     "queue": "queue.{domain}.json",
@@ -70,6 +71,7 @@ def load_private_beta_gate_options_from_manifest(path: Path) -> PrivateBetaGateO
         raise ValueError("private-beta evidence manifest must contain privateBetaGateInputs")
     return PrivateBetaGateOptions(
         domain=str(payload.get("domain") or "").strip() or None,
+        dns_guidance=_manifest_input_path(path, inputs, "--dns-guidance"),
         observed_dns=_manifest_input_path(path, inputs, "--observed-dns"),
         mail_flow_evidence=_manifest_input_path(path, inputs, "--mail-flow-evidence"),
         queue_evidence=_manifest_input_path(path, inputs, "--queue-evidence"),
@@ -221,6 +223,7 @@ def _manifest_template(domain: str, generated_at: str, paths: dict[str, Path]) -
         "generatedAt": generated_at,
         "draftOnly": True,
         "privateBetaGateInputs": {
+            "--dns-guidance": paths["dns_guidance"].name,
             "--observed-dns": paths["observed_dns"].name,
             "--mail-flow-evidence": paths["mail_flow"].name,
             "--queue-evidence": paths["queue"].name,

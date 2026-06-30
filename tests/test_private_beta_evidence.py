@@ -41,11 +41,14 @@ def test_private_beta_evidence_templates_create_draft_packet(tmp_path):
     assert acceptance["decisionOwner"] == "Dan Fredriksen"
     assert "vpn" in acceptance["accessBoundary"].lower()
     assert manifest["draftOnly"] is True
+    assert result["files"]["dns_guidance"] == str(tmp_path / "dns-guidance.example.com.json")
+    assert manifest["privateBetaGateInputs"]["--dns-guidance"] == "dns-guidance.example.com.json"
     assert "--mail-flow-evidence" in manifest["privateBetaGateInputs"]
     assert "--mail-core-apply-evidence" in manifest["privateBetaGateInputs"]
     assert manifest["privateBetaGateInputs"]["--restore-drill-evidence"] == "restore-drill-evidence.example.com.json"
     options = load_private_beta_gate_options_from_manifest(tmp_path / "private-beta-evidence-manifest.example.com.json")
     assert options.domain == "example.com"
+    assert options.dns_guidance == tmp_path / "dns-guidance.example.com.json"
     assert options.mail_flow_evidence == tmp_path / "mail-flow.example.com.json"
     assert options.queue_evidence == tmp_path / "queue.example.com.json"
     assert options.mail_core_apply_evidence == tmp_path / "mail-core-apply.example.com.json"
@@ -294,6 +297,10 @@ def _write_complete_manifest_packet(tmp_path):
     )
     (tmp_path / "observed-dns.example.com.json").write_text(
         json.dumps({"observedRecords": [{"type": "MX", "name": "example.com", "values": ["10 mail.example.com."]}]}),
+        encoding="utf-8",
+    )
+    (tmp_path / "dns-guidance.example.com.json").write_text(
+        json.dumps({"records": [{"type": "MX", "name": "example.com", "value": "10 mail.example.com."}]}),
         encoding="utf-8",
     )
     (tmp_path / "mail-flow.example.com.json").write_text(

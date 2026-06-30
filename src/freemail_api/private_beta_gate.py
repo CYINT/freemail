@@ -122,6 +122,13 @@ def _check_private_beta_restore_drill_evidence(path: Path | None) -> dict[str, A
 def _check_mail_flow_evidence(options: PrivateBetaGateOptions) -> dict[str, Any]:
     if options.mail_flow_evidence is None:
         return _check("controlled-mail-flow-evidence", False, {"error": "--mail-flow-evidence is required"})
+    missing = _missing_json_evidence_check(
+        "controlled-mail-flow-evidence",
+        options.mail_flow_evidence,
+        "mail flow evidence file must exist and be non-empty",
+    )
+    if missing is not None:
+        return missing
     payload = _load_json(options.mail_flow_evidence)
     required_domain = str(payload.get("requiredDkimDomain", "")).lower()
     expected_domain = (options.domain or "").lower()
@@ -158,6 +165,13 @@ def _check_mail_flow_evidence(options: PrivateBetaGateOptions) -> dict[str, Any]
 def _check_deliverability_evidence(options: PrivateBetaGateOptions) -> dict[str, Any]:
     if options.deliverability_evidence is None:
         return _check("deliverability-abuse-evidence", False, {"error": "--deliverability-evidence is required"})
+    missing = _missing_json_evidence_check(
+        "deliverability-abuse-evidence",
+        options.deliverability_evidence,
+        "deliverability evidence file must exist and be non-empty",
+    )
+    if missing is not None:
+        return missing
     payload = _load_json(options.deliverability_evidence)
     expected_domain = (options.domain or "").lower()
     evidence_domain = str(payload.get("domain", "")).lower()
@@ -199,6 +213,9 @@ def _check_deliverability_evidence(options: PrivateBetaGateOptions) -> dict[str,
 def _check_queue_evidence(path: Path | None) -> dict[str, Any]:
     if path is None:
         return _check("queue-evidence", False, {"error": "--queue-evidence is required"})
+    missing = _missing_json_evidence_check("queue-evidence", path, "queue evidence file must exist and be non-empty")
+    if missing is not None:
+        return missing
     payload = _load_json(path)
     pending = _coerce_int(payload.get("pending", payload.get("pendingCount", payload.get("pendingMessages", 0))))
     due = _coerce_int(payload.get("due", payload.get("dueCount", payload.get("dueMessages", 0))))
@@ -230,6 +247,13 @@ def _check_queue_evidence(path: Path | None) -> dict[str, Any]:
 def _check_mail_core_apply_evidence(options: PrivateBetaGateOptions) -> dict[str, Any]:
     if options.mail_core_apply_evidence is None:
         return _check("mail-core-apply-evidence", False, {"error": "--mail-core-apply-evidence is required"})
+    missing = _missing_json_evidence_check(
+        "mail-core-apply-evidence",
+        options.mail_core_apply_evidence,
+        "mail-core apply evidence file must exist and be non-empty",
+    )
+    if missing is not None:
+        return missing
     payload = _load_json(options.mail_core_apply_evidence)
     expected_domain = (options.domain or "").lower()
     evidence_domain = str(payload.get("domain", "")).lower()
@@ -289,6 +313,13 @@ def _check_mail_core_apply_evidence(options: PrivateBetaGateOptions) -> dict[str
 def _check_acceptance(path: Path | None) -> dict[str, Any]:
     if path is None:
         return _check("private-beta-acceptance", False, {"error": "--acceptance is required"})
+    missing = _missing_json_evidence_check(
+        "private-beta-acceptance",
+        path,
+        "private-beta acceptance evidence file must exist and be non-empty",
+    )
+    if missing is not None:
+        return missing
     payload = _load_json(path)
     boundary = str(payload.get("accessBoundary", ""))
     limitations = payload.get("knownLimitations", [])
@@ -328,6 +359,16 @@ def _json_evidence_details(path: Path, details: dict[str, Any]) -> dict[str, Any
     file_details = _file_evidence_details(path)
     file_details.update(details)
     return file_details
+
+
+def _missing_json_evidence_check(name: str, path: Path, error: str) -> dict[str, Any] | None:
+    exists = path.is_file()
+    size = path.stat().st_size if exists else 0
+    if exists and size > 0:
+        return None
+    details = _file_evidence_details(path, exists, size)
+    details["error"] = error
+    return _check(name, False, details)
 
 
 def resolve_observed_dns(expected_records: list[DnsRecord]) -> list[dict[str, object]]:
