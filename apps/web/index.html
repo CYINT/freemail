@@ -84,16 +84,16 @@
               <p>The local mail-core proof is now repeatable. Inbound mail arrives through SMTP, submitted mail is DKIM-signed, and both paths are visible through IMAP.</p>
               <p>Next production work should validate a controlled domain and finalize deliverability policy before private beta.</p>
             </div>
-            <section class="compose-panel" aria-label="Compose message">
+            <form class="compose-panel" id="compose-form" aria-label="Compose message">
               <h2>Compose</h2>
-              <label>To <input type="email" value="postmaster@example.com"></label>
-              <label>Subject <input type="text" value="Controlled-domain validation"></label>
-              <label>Message <textarea rows="5">Draft the next smoke plan for a controlled FreeMail domain.</textarea></label>
+              <label>To <input id="compose-to" name="to" type="email" value="postmaster@example.com" required></label>
+              <label>Subject <input id="compose-subject" name="subject" type="text" value="Controlled-domain validation" required></label>
+              <label>Message <textarea id="compose-body" name="body" rows="5" required>Draft the next smoke plan for a controlled FreeMail domain.</textarea></label>
               <div class="compose-actions">
                 <button type="button">Attach</button>
-                <button class="send" type="button">Send</button>
+                <button class="send" type="submit">Send</button>
               </div>
-            </section>
+            </form>
           </article>
         </section>
       </main>

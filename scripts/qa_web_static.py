@@ -86,10 +86,18 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         failures.append("missing bounded 8px radius")
     if "./app.js" not in parser.attributes.get("src", []):
         failures.append("missing webmail client script")
-    for marker in ["mailbox-login", "api-base-url", "mailbox-status"]:
+    for marker in ["mailbox-login", "api-base-url", "mailbox-status", "compose-form"]:
         if marker not in " ".join(parser.attributes.get("id", [])):
             failures.append(f"missing live mailbox UI marker: {marker}")
-    for marker in ["fetch(", "/api/v1/mailbox/snapshot", "X-FreeMail-Mailbox-Email", "X-FreeMail-Mailbox-Password"]:
+    for marker in [
+        "fetch(",
+        "/api/v1/mailbox/snapshot",
+        "/api/v1/mailbox/send",
+        'method: "POST"',
+        '"Content-Type": "application/json"',
+        "X-FreeMail-Mailbox-Email",
+        "X-FreeMail-Mailbox-Password",
+    ]:
         if marker not in js_text:
             failures.append(f"missing live mailbox client marker: {marker}")
     for forbidden in ["localStorage", "sessionStorage", "document.cookie"]:

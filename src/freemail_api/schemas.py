@@ -146,3 +146,17 @@ class MailboxSnapshotRecord(ApiModel):
     email: EmailStr
     folders: list[MailboxFolderSummary]
     messages: list[MailboxMessageSummary]
+
+
+class MailboxSendCreate(ApiModel):
+    recipients: list[EmailStr] = Field(min_length=1, max_length=50)
+    subject: str = Field(min_length=1, max_length=255)
+    body: str = Field(min_length=1, max_length=20000)
+
+
+class MailboxSendRecord(ApiModel):
+    accepted: bool
+    message_id: str
+    sender: EmailStr
+    recipients: list[EmailStr]
+    subject: str

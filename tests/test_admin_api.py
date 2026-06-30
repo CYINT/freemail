@@ -234,6 +234,23 @@ def test_mailbox_snapshot_allows_loopback_web_preview_cors(tmp_path):
     assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:18091"
 
 
+def test_mailbox_send_allows_loopback_web_preview_cors(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.options(
+            "/api/v1/mailbox/send",
+            headers={
+                "Origin": "http://127.0.0.1:18091",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": (
+                    "Content-Type, X-FreeMail-Mailbox-Email, X-FreeMail-Mailbox-Password"
+                ),
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:18091"
+
+
 def test_mailbox_snapshot_returns_imap_adapter_payload(tmp_path, monkeypatch):
     class Snapshot:
         def as_dict(self):
@@ -274,3 +291,49 @@ def test_mailbox_snapshot_returns_imap_adapter_payload(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert response.json()["folders"][0]["name"] == "INBOX"
     assert response.json()["messages"][0]["subject"] == "Hello"
+
+
+def test_mailbox_send_requires_mailbox_credentials(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.post(
+            "/api/v1/mailbox/send",
+            json={"recipients": ["admin@example.com"], "subject": "Hello", "body": "Test"},
+        )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Mailbox credentials required"
+
+
+def test_mailbox_send_returns_submission_payload(tmp_path, monkeypatch):
+    class Sent:
+        def as_dict(self):
+            return {
+                "message_id": "<message@example.com>",
+                "sender": "admin@example.com",
+                "recipients": ["hello@example.com"],
+                "subject": "Hello",
+            }
+
+    def fake_send(**kwargs):
+        assert kwargs["email"] == "admin@example.com"
+        assert kwargs["password"] == "secret"
+        assert kwargs["recipients"] == ["hello@example.com"]
+        assert kwargs["subject"] == "Hello"
+        assert kwargs["body"] == "Body"
+        return Sent()
+
+    monkeypatch.setattr("freemail_api.main.send_mailbox_message", fake_send)
+
+    with make_client(tmp_path) as client:
+        response = client.post(
+            "/api/v1/mailbox/send",
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+            json={"recipients": ["hello@example.com"], "subject": "Hello", "body": "Body"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["accepted"] is True
+    assert response.json()["messageId"] == "<message@example.com>"

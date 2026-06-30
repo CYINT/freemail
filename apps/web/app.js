@@ -4,6 +4,7 @@ const messageList = document.querySelector("#message-list");
 const statusNode = document.querySelector("#mailbox-status");
 const readerSubject = document.querySelector("#reader-subject");
 const readerMeta = document.querySelector("#reader-meta");
+const composeForm = document.querySelector("#compose-form");
 
 let mailboxSession = {
   email: "",
@@ -22,6 +23,19 @@ loginForm?.addEventListener("submit", async (event) => {
     folder: mailboxSession.folder || "INBOX",
   };
   await loadMailboxSnapshot(mailboxSession.folder);
+});
+
+composeForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = new FormData(composeForm);
+  await sendMailboxMessage({
+    recipients: String(form.get("to") || "")
+      .split(",")
+      .map((recipient) => recipient.trim())
+      .filter(Boolean),
+    subject: String(form.get("subject") || "").trim(),
+    body: String(form.get("body") || ""),
+  });
 });
 
 async function loadMailboxSnapshot(folder) {
@@ -50,6 +64,34 @@ async function loadMailboxSnapshot(folder) {
     setStatus(`Loaded ${snapshot.messages?.length || 0} messages from ${folder}.`, "ready");
   } catch (error) {
     setStatus(`Mailbox load failed: ${readableError(error)}`, "error");
+  }
+}
+
+async function sendMailboxMessage(message) {
+  if (!mailboxSession.email || !mailboxSession.password || !mailboxSession.apiBaseUrl) {
+    setStatus("Load a mailbox before sending.", "error");
+    return;
+  }
+  setStatus("Sending message...", "loading");
+  try {
+    const url = new URL("/api/v1/mailbox/send", mailboxSession.apiBaseUrl);
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-FreeMail-Mailbox-Email": mailboxSession.email,
+        "X-FreeMail-Mailbox-Password": mailboxSession.password,
+      },
+      body: JSON.stringify(message),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const result = await response.json();
+    setStatus(`Sent ${result.messageId || "message"}.`, "ready");
+    await loadMailboxSnapshot(mailboxSession.folder);
+  } catch (error) {
+    setStatus(`Send failed: ${readableError(error)}`, "error");
   }
 }
 

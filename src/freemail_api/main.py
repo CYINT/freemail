@@ -1,6 +1,7 @@
 from collections.abc import Iterator
 from contextlib import asynccontextmanager
 import imaplib
+import smtplib
 import sqlite3
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status
@@ -10,6 +11,7 @@ from . import database
 from . import dkim
 from .mail_core import probe_mail_core
 from .mailbox_imap import list_mailbox_snapshot
+from .mailbox_smtp import send_mailbox_message
 from .schemas import (
     AliasCreate,
     AliasRecord,
@@ -25,6 +27,8 @@ from .schemas import (
     DomainRecord,
     MailboxCreate,
     MailboxRecord,
+    MailboxSendCreate,
+    MailboxSendRecord,
     MailboxSnapshotRecord,
     UserCreate,
     UserRecord,
@@ -52,7 +56,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.add_middleware(
             CORSMiddleware,
             allow_origins=cors_origins,
-            allow_methods=["GET"],
+            allow_methods=["GET", "POST"],
             allow_headers=["X-FreeMail-Mailbox-Email", "X-FreeMail-Mailbox-Password"],
         )
 
@@ -158,6 +162,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except imaplib.IMAP4.error as error:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Mailbox authentication failed") from error
         return snapshot.as_dict()
+
+    @app.post("/api/v1/mailbox/send", response_model=MailboxSendRecord)
+    def mailbox_send(
+        payload: MailboxSendCreate,
+        x_freemail_mailbox_email: str | None = Header(default=None),
+        x_freemail_mailbox_password: str | None = Header(default=None),
+    ) -> dict[str, object]:
+        if not x_freemail_mailbox_email or not x_freemail_mailbox_password:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Mailbox credentials required")
+        try:
+            sent = send_mailbox_message(
+                email=x_freemail_mailbox_email,
+                password=x_freemail_mailbox_password,
+                host=active_settings.mail_core_host,
+                port=active_settings.submission_port,
+                recipients=[str(recipient) for recipient in payload.recipients],
+                subject=payload.subject,
+                body=payload.body,
+            )
+        except smtplib.SMTPAuthenticationError as error:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Mailbox authentication failed") from error
+        except smtplib.SMTPRecipientsRefused as error:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Recipient refused") from error
+        except (OSError, smtplib.SMTPException) as error:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+        return {"accepted": True, **sent.as_dict()}
 
     @app.post("/api/v1/bootstrap/admin", response_model=BootstrapAdminRecord, status_code=status.HTTP_201_CREATED)
     def bootstrap_admin(
