@@ -39,6 +39,8 @@ def validate_mobile(root: Path) -> list[str]:
     scripts = package.get("scripts", {})
     if scripts.get("config:check") != "expo config --type public":
         failures.append("mobile package must expose config:check for Expo config validation")
+    if scripts.get("native:prebuild:check") != "python ../../scripts/qa_mobile_native_prebuild.py":
+        failures.append("mobile package must expose native:prebuild:check for native prebuild validation")
     dependencies = package.get("dependencies", {})
     for dependency in ["expo", "react-native", "expo-secure-store", "expo-document-picker", "expo-file-system", "expo-sharing"]:
         if dependency not in dependencies:
@@ -110,9 +112,10 @@ def validate_mobile(root: Path) -> list[str]:
         "Native Build Drill",
         "Signing Material",
         "npm run config:check",
+        "native:prebuild:check",
         "expo config --type public",
         "technology.cyint.freemail",
-        "npx expo prebuild --clean --no-install",
+        "npx expo prebuild --clean --no-install --platform all",
     ]:
         if marker not in combined:
             failures.append(f"missing mobile marker: {marker}")

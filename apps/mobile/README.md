@@ -23,6 +23,7 @@ The current mobile implementation is a source-level foundation, not a production
 cd apps\mobile
 npm install
 npm run config:check
+npm run native:prebuild:check
 npm run typecheck
 npm audit --audit-level=moderate
 npm run start
@@ -51,3 +52,5 @@ Push-provider delivery is provider-neutral at this stage. The mobile client can 
 ## Native Release Readiness
 
 Native releases must follow `docs/mobile-release.md`. The repository intentionally does not contain Apple certificates, provisioning profiles, Android keystores, store API keys, or generated `ios/` and `android/` native projects. Generate native projects only for a release branch or local build drill, then keep signing material outside Git.
+
+`npm run native:prebuild:check` runs the Android native prebuild drill in a temporary copy and verifies generated identifiers without leaving generated native project files in the repository. Run `python ../../scripts/qa_mobile_native_prebuild.py --platform ios` from a macOS release runner for the iOS native drill.

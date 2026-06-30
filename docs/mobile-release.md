@@ -22,12 +22,14 @@ Run these checks before any mobile build drill:
 Push-Location apps\mobile
 npm ci
 npm run config:check
+npm run native:prebuild:check
 npm run typecheck
 npm audit --audit-level=moderate
 Pop-Location
 ```
 
 `npm run config:check` runs `expo config --type public` and validates the app metadata that native builds consume. It does not require app-store credentials.
+`npm run native:prebuild:check` copies the mobile app into a temporary directory, runs an Android Expo native prebuild, verifies generated identifiers, and removes the temporary native projects when the drill passes.
 
 ## Native Build Drill
 
@@ -36,12 +38,19 @@ Use a clean release branch or temporary worktree for native project generation:
 ```powershell
 Push-Location apps\mobile
 npm ci
-npx expo prebuild --clean --no-install
+npm run native:prebuild:check
+npx expo prebuild --clean --no-install --platform all
 npm run config:check
 Pop-Location
 ```
 
 After the drill, remove generated `ios/` and `android/` directories unless the project intentionally moves to checked-in native projects. Do not commit generated native files as incidental build output.
+
+Run the full iOS native drill on a macOS release runner:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\qa_mobile_native_prebuild.py --platform ios
+```
 
 ## Signing Material
 

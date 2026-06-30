@@ -35,6 +35,8 @@ jobs:
         run: npm ci --prefix apps/mobile
       - name: Mobile config validation
         run: npm run --prefix apps/mobile config:check
+      - name: Mobile native prebuild drill
+        run: python scripts/qa_mobile_native_prebuild.py --link-node-modules --platform android
       - name: Mobile typecheck
         run: npm run --prefix apps/mobile typecheck
       - name: Mobile dependency audit

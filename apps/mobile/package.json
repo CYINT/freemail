@@ -8,6 +8,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "config:check": "expo config --type public",
+    "native:prebuild:check": "python ../../scripts/qa_mobile_native_prebuild.py",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
