@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .release_gate import _file_evidence_details
+
 
 EXPECTED_IOS_BUNDLE_ID = "technology.cyint.freemail"
 EXPECTED_ANDROID_PACKAGE = "technology.cyint.freemail"
@@ -56,6 +58,7 @@ def run_mobile_release_gate(options: MobileReleaseGateOptions) -> dict[str, Any]
     return {
         "passed": passed,
         "evidence": str(options.evidence),
+        "evidenceDetails": _file_evidence_details(options.evidence),
         "checks": checks,
     }
 
@@ -121,7 +124,7 @@ def _check_platform_build(evidence: dict[str, Any], *, platform: str) -> dict[st
         and build.get("identifier") == expected_identifier
         and build.get("distribution") in {"internal", "private-beta", "store-review", "production"}
         and artifact.get("type") in expected_artifact_types
-        and bool(str(artifact.get("sha256", "")).strip())
+        and _is_sha256(artifact.get("sha256"))
         and int(artifact.get("bytes", 0) or 0) > 0
         and bool(str(build.get("buildUrl", "")).strip())
     )
@@ -195,6 +198,11 @@ def _load_json(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError(f"{path} must contain a JSON object")
     return payload
+
+
+def _is_sha256(value: object) -> bool:
+    text = str(value or "").strip().lower()
+    return len(text) == 64 and all(character in "0123456789abcdef" for character in text)
 
 
 def _check(name: str, passed: bool, details: dict[str, Any]) -> dict[str, Any]:

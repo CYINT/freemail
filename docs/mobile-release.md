@@ -65,7 +65,7 @@ Keep signing material outside Git:
 
 ## Signed Build Evidence
 
-This is the mobile signed-build release evidence gate for private beta and store-candidate builds.
+This is the mobile signed-build release evidence gate for private beta and store-candidate builds. The gate output records the mobile evidence JSON path, byte count, and SHA-256 checksum.
 
 After signed iOS and Android builds complete in the private signing environment, capture a credential-free JSON evidence file outside Git and validate it with:
 
@@ -79,7 +79,7 @@ After TestFlight and Play internal-testing submission, require store submission 
 .\.venv\Scripts\python.exe scripts\mobile_release_gate.py --evidence .freemail-qa\mobile-release-evidence.json --require-store-submission
 ```
 
-The evidence must not include API keys, Apple certificates, provisioning profiles, keystores, passwords, private keys, service-account JSON, or raw tokens. It must include both signed build records and the VPN-only private-beta boundary:
+The evidence must not include API keys, Apple certificates, provisioning profiles, keystores, passwords, private keys, service-account JSON, or raw tokens. It must include both signed build records and the VPN-only private-beta boundary. Artifact `sha256` values must be full 64-character SHA-256 hex strings:
 
 ```json
 {
@@ -97,7 +97,7 @@ The evidence must not include API keys, Apple certificates, provisioning profile
       "artifact": {
         "type": "ipa",
         "bytes": 123,
-        "sha256": "replace-with-artifact-sha256"
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       }
     },
     "android": {
@@ -108,7 +108,7 @@ The evidence must not include API keys, Apple certificates, provisioning profile
       "artifact": {
         "type": "aab",
         "bytes": 456,
-        "sha256": "replace-with-artifact-sha256"
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
       }
     }
   },
