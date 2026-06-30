@@ -82,6 +82,14 @@ Create a draft evidence file before the signing run so the required fields are e
 
 The generated file is a credential-free draft. It intentionally keeps `signed` and `submitted` false, artifact hashes empty, artifact byte counts zero, and evidence URLs empty until real signed-build and store-submission evidence is recorded.
 
+Inspect the evidence packet before using it in a release candidate:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\mobile_release_status.py --evidence .freemail-qa\mobile-release-evidence.json --require-store-submission
+```
+
+The status command is read-only. It reports the evidence file path, checksum, failed mobile-release checks, and whether the packet is ready for the hard release gate. It does not run native builds, access app-store APIs, or sign artifacts.
+
 After TestFlight and Play internal-testing submission, require store submission evidence too:
 
 ```powershell

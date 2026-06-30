@@ -41,6 +41,16 @@ Explicit artifact flags override manifest values when an artifact has been reloc
 
 The packet status command is read-only. It reports missing, empty, and invalid artifacts, runs the local mobile, private-beta, and release-notes evidence checks, and records SHA-256 checksums for present artifacts. Passing packet status does not replace the full release gate because it intentionally excludes Git, GitHub Actions, Docker Compose, runtime health, deployment-boundary, metadata-readiness, and mail-core-readiness checks.
 
+Mobile release evidence can also be inspected directly before adding it to the release packet:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\mobile_release_status.py `
+  --evidence .freemail-qa\mobile-release-evidence.json `
+  --require-store-submission
+```
+
+This mobile status command is read-only and reports missing or failing signed-build and store-submission checks without running native build tools or contacting store APIs.
+
 Run the gate from a clean checkout after pushing the candidate commit to `CYINT/freemail` and after GitHub Actions CI has passed for that exact commit:
 
 ```powershell
