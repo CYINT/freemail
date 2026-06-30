@@ -109,4 +109,4 @@ Before private beta, record evidence that:
 - `scripts\collect_restore_drill_evidence.py` proves metadata restore into a new database, Stalwart apply-plan export from restored metadata, and mail-store archive restore into a drill Docker volume.
 - Active-volume restore is tested only when all writers are stopped and a fresh rollback archive exists.
 - DKIM records generated from restored key material match the active DNS guidance.
-- Release and private-beta gate outputs record SHA-256 checksums for the metadata and mail-store backup files. Private-beta gate output also records checksums for mail-flow, queue, deliverability/abuse, and acceptance evidence files.
+- Release and private-beta gate outputs record SHA-256 checksums for the metadata backup, mail-store backup, and restore-drill evidence files. Private-beta gate output also records checksums for mail-flow, queue, deliverability/abuse, and acceptance evidence files.

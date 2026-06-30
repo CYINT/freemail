@@ -21,6 +21,7 @@ def main() -> int:
     parser.add_argument("--deliverability-evidence", type=Path)
     parser.add_argument("--metadata-backup", type=Path)
     parser.add_argument("--mail-store-backup", type=Path)
+    parser.add_argument("--restore-drill-evidence", type=Path)
     parser.add_argument("--acceptance", type=Path)
     parser.add_argument("--skip-dns", action="store_true")
     parser.add_argument("--skip-evidence", action="store_true")
@@ -50,6 +51,7 @@ def _options_from_args(args: argparse.Namespace, manifest: PrivateBetaGateOption
         deliverability_evidence=args.deliverability_evidence or _manifest_value(manifest, "deliverability_evidence"),
         metadata_backup=args.metadata_backup or _manifest_value(manifest, "metadata_backup"),
         mail_store_backup=args.mail_store_backup or _manifest_value(manifest, "mail_store_backup"),
+        restore_drill_evidence=args.restore_drill_evidence or _manifest_value(manifest, "restore_drill_evidence"),
         acceptance=args.acceptance or _manifest_value(manifest, "acceptance"),
         skip_dns=args.skip_dns,
         skip_evidence=args.skip_evidence,

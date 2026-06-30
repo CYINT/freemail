@@ -292,6 +292,7 @@ def _check_private_beta_evidence(path: Path | None) -> dict[str, Any]:
         "deliverability-abuse-evidence",
         "metadata-backup-evidence",
         "mail-store-backup-evidence",
+        "restore-drill-evidence",
         "private-beta-acceptance",
     }
     details = _file_evidence_details(path)

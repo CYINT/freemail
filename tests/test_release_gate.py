@@ -552,6 +552,7 @@ def valid_private_beta_evidence():
             {"name": "deliverability-abuse-evidence", "status": "pass", "details": {}},
             {"name": "metadata-backup-evidence", "status": "pass", "details": {}},
             {"name": "mail-store-backup-evidence", "status": "pass", "details": {}},
+            {"name": "restore-drill-evidence", "status": "pass", "details": {}},
             {"name": "private-beta-acceptance", "status": "pass", "details": {}},
         ],
     }

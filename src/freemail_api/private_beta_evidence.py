@@ -19,6 +19,7 @@ EVIDENCE_FILENAMES = {
     "deliverability": "deliverability.{domain}.json",
     "metadata_backup": "metadata-backup.{domain}.json",
     "mail_store_backup": "stalwart-mail-store.{domain}.tar.gz",
+    "restore_drill_evidence": "restore-drill-evidence.{domain}.json",
     "acceptance": "private-beta-acceptance.{domain}.json",
     "manifest": "private-beta-evidence-manifest.{domain}.json",
 }
@@ -76,6 +77,7 @@ def load_private_beta_gate_options_from_manifest(path: Path) -> PrivateBetaGateO
         deliverability_evidence=_manifest_input_path(path, inputs, "--deliverability-evidence"),
         metadata_backup=_manifest_input_path(path, inputs, "--metadata-backup"),
         mail_store_backup=_manifest_input_path(path, inputs, "--mail-store-backup"),
+        restore_drill_evidence=_manifest_input_path(path, inputs, "--restore-drill-evidence"),
         acceptance=_manifest_input_path(path, inputs, "--acceptance"),
     )
 
@@ -226,6 +228,7 @@ def _manifest_template(domain: str, generated_at: str, paths: dict[str, Path]) -
             "--deliverability-evidence": paths["deliverability"].name,
             "--metadata-backup": paths["metadata_backup"].name,
             "--mail-store-backup": paths["mail_store_backup"].name,
+            "--restore-drill-evidence": paths["restore_drill_evidence"].name,
             "--acceptance": paths["acceptance"].name,
         },
         "releaseBoundary": "VPN-only private beta on freemail.kuzuryu.ai until public release gates are explicitly satisfied.",

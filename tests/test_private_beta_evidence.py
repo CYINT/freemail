@@ -43,6 +43,7 @@ def test_private_beta_evidence_templates_create_draft_packet(tmp_path):
     assert manifest["draftOnly"] is True
     assert "--mail-flow-evidence" in manifest["privateBetaGateInputs"]
     assert "--mail-core-apply-evidence" in manifest["privateBetaGateInputs"]
+    assert manifest["privateBetaGateInputs"]["--restore-drill-evidence"] == "restore-drill-evidence.example.com.json"
     options = load_private_beta_gate_options_from_manifest(tmp_path / "private-beta-evidence-manifest.example.com.json")
     assert options.domain == "example.com"
     assert options.mail_flow_evidence == tmp_path / "mail-flow.example.com.json"
@@ -50,6 +51,7 @@ def test_private_beta_evidence_templates_create_draft_packet(tmp_path):
     assert options.mail_core_apply_evidence == tmp_path / "mail-core-apply.example.com.json"
     assert options.metadata_backup == tmp_path / "metadata-backup.example.com.json"
     assert options.mail_store_backup == tmp_path / "stalwart-mail-store.example.com.tar.gz"
+    assert options.restore_drill_evidence == tmp_path / "restore-drill-evidence.example.com.json"
     status = summarize_private_beta_evidence_manifest(tmp_path / "private-beta-evidence-manifest.example.com.json")
     assert status["ready"] is False
     assert "--mail-flow-evidence" in status["missingArtifacts"]
@@ -66,10 +68,12 @@ def test_private_beta_evidence_templates_do_not_accidentally_pass_gate(tmp_path)
     )
     metadata = tmp_path / "metadata.json"
     mail_store = tmp_path / "mail-store.tar.gz"
+    restore_drill = tmp_path / "restore-drill-evidence.json"
     mail_flow = tmp_path / "mail-flow.json"
     queue = tmp_path / "queue.json"
     metadata.write_text("{}", encoding="utf-8")
     mail_store.write_bytes(b"backup")
+    write_json(restore_drill, valid_restore_drill_evidence())
     mail_flow.write_text(
         json.dumps(
             {
@@ -100,6 +104,7 @@ def test_private_beta_evidence_templates_do_not_accidentally_pass_gate(tmp_path)
             deliverability_evidence=tmp_path / "deliverability.example.com.json",
             metadata_backup=metadata,
             mail_store_backup=mail_store,
+            restore_drill_evidence=restore_drill,
             acceptance=tmp_path / "private-beta-acceptance.example.com.json",
         )
     )
@@ -219,6 +224,7 @@ def test_private_beta_gate_script_accepts_manifest_packet(tmp_path):
     )
     (tmp_path / "metadata-backup.example.com.json").write_text("{}", encoding="utf-8")
     (tmp_path / "stalwart-mail-store.example.com.tar.gz").write_bytes(b"backup")
+    write_json(tmp_path / "restore-drill-evidence.example.com.json", valid_restore_drill_evidence())
     (tmp_path / "private-beta-acceptance.example.com.json").write_text(
         json.dumps(
             {
@@ -249,7 +255,9 @@ def test_private_beta_gate_script_accepts_manifest_packet(tmp_path):
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
     assert payload["passed"] is True
-    assert "mail-core-apply-evidence" in {check["name"] for check in payload["checks"]}
+    assert {"mail-core-apply-evidence", "restore-drill-evidence"}.issubset(
+        {check["name"] for check in payload["checks"]}
+    )
 
 
 def test_private_beta_packet_status_script_accepts_completed_packet(tmp_path):
@@ -312,7 +320,21 @@ def _write_complete_manifest_packet(tmp_path):
     )
     (tmp_path / "metadata-backup.example.com.json").write_text("{}", encoding="utf-8")
     (tmp_path / "stalwart-mail-store.example.com.tar.gz").write_bytes(b"backup")
+    write_json(tmp_path / "restore-drill-evidence.example.com.json", valid_restore_drill_evidence())
     (tmp_path / "private-beta-acceptance.example.com.json").write_text(
         json.dumps({"accepted": True, "acceptedAt": "2026-06-30T00:00:00Z"}),
         encoding="utf-8",
     )
+
+
+def valid_restore_drill_evidence():
+    return {
+        "credentialFree": True,
+        "metadataRestore": {"restored": True, "tableCounts": {"domains": 1}},
+        "mailStoreRestore": {"restored": True, "drillVolume": "freemail_stalwart_restore_drill"},
+        "stalwartApplyPlan": {"exported": True, "summary": {"operations": 1}},
+    }
+
+
+def write_json(path, payload):
+    path.write_text(json.dumps(payload), encoding="utf-8")

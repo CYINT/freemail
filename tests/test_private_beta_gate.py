@@ -476,6 +476,7 @@ def test_private_beta_gate_requires_beta_evidence_when_enabled():
         "deliverability-abuse-evidence",
         "metadata-backup-evidence",
         "mail-store-backup-evidence",
+        "restore-drill-evidence",
         "private-beta-acceptance",
     ]
 
@@ -487,6 +488,7 @@ def test_private_beta_gate_accepts_complete_beta_evidence(tmp_path):
     deliverability = tmp_path / "deliverability.json"
     metadata = tmp_path / "metadata.json"
     mail_store = tmp_path / "mail-store.tar.gz"
+    restore_drill = tmp_path / "restore-drill-evidence.json"
     acceptance = tmp_path / "acceptance.json"
 
     mail_flow.write_text(
@@ -526,6 +528,7 @@ def test_private_beta_gate_accepts_complete_beta_evidence(tmp_path):
     )
     metadata.write_text("{}", encoding="utf-8")
     mail_store.write_bytes(b"backup")
+    write_json(restore_drill, valid_restore_drill_evidence())
     acceptance.write_text(
         json.dumps(
             {
@@ -550,6 +553,7 @@ def test_private_beta_gate_accepts_complete_beta_evidence(tmp_path):
             deliverability_evidence=deliverability,
             metadata_backup=metadata,
             mail_store_backup=mail_store,
+            restore_drill_evidence=restore_drill,
             acceptance=acceptance,
         )
     )
@@ -568,6 +572,9 @@ def test_private_beta_gate_accepts_complete_beta_evidence(tmp_path):
     ).hexdigest()
     assert checks_by_name["metadata-backup-evidence"]["details"]["sha256"] == hashlib.sha256(b"{}").hexdigest()
     assert checks_by_name["mail-store-backup-evidence"]["details"]["sha256"] == hashlib.sha256(b"backup").hexdigest()
+    assert checks_by_name["restore-drill-evidence"]["details"]["sha256"] == hashlib.sha256(
+        restore_drill.read_bytes()
+    ).hexdigest()
     assert checks_by_name["private-beta-acceptance"]["details"]["sha256"] == hashlib.sha256(
         acceptance.read_bytes()
     ).hexdigest()
@@ -594,3 +601,16 @@ def write_mail_core_apply_evidence(path, **overrides):
     }
     payload.update(overrides)
     path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def write_json(path, payload):
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def valid_restore_drill_evidence():
+    return {
+        "credentialFree": True,
+        "metadataRestore": {"restored": True, "tableCounts": {"domains": 1}},
+        "mailStoreRestore": {"restored": True, "drillVolume": "freemail_stalwart_restore_drill"},
+        "stalwartApplyPlan": {"exported": True, "summary": {"operations": 1}},
+    }

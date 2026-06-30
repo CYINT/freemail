@@ -10,6 +10,7 @@ import dns.resolver
 
 from .dns_policy import verify_dns_posture
 from .release_gate import _check
+from .release_gate import _check_restore_drill_evidence
 from .release_gate import _file_evidence_details
 from .release_gate import _check_runtime
 from .schemas import DnsRecord
@@ -26,6 +27,7 @@ class PrivateBetaGateOptions:
     deliverability_evidence: Path | None = None
     metadata_backup: Path | None = None
     mail_store_backup: Path | None = None
+    restore_drill_evidence: Path | None = None
     acceptance: Path | None = None
     skip_dns: bool = False
     skip_evidence: bool = False
@@ -94,8 +96,15 @@ def _check_beta_evidence(options: PrivateBetaGateOptions) -> list[dict[str, Any]
         _check_deliverability_evidence(options),
         _check_file("metadata-backup-evidence", options.metadata_backup, "--metadata-backup"),
         _check_file("mail-store-backup-evidence", options.mail_store_backup, "--mail-store-backup"),
+        _check_private_beta_restore_drill_evidence(options.restore_drill_evidence),
         _check_acceptance(options.acceptance),
     ]
+
+
+def _check_private_beta_restore_drill_evidence(path: Path | None) -> dict[str, Any]:
+    if path is None:
+        return _check("restore-drill-evidence", False, {"error": "--restore-drill-evidence is required"})
+    return _check_restore_drill_evidence(path)
 
 
 def _check_mail_flow_evidence(options: PrivateBetaGateOptions) -> dict[str, Any]:

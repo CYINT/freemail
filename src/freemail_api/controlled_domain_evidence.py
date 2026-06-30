@@ -112,6 +112,7 @@ def collect_controlled_domain_evidence(
             "--mail-core-apply-evidence",
             "--metadata-backup",
             "--mail-store-backup",
+            "--restore-drill-evidence",
             "--acceptance",
         ],
     }

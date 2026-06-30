@@ -469,14 +469,15 @@ Run the private-beta runtime gate during development:
 .\.venv\Scripts\python.exe scripts\private_beta_gate.py --skip-dns --skip-evidence
 ```
 
-For a real beta domain, pass admin DNS guidance plus observed DNS evidence, mail-flow evidence, queue evidence, credential-free mail-core apply evidence, backups, and decision-owner acceptance. Omit `--observed-dns` only when the gate should resolve live MX/TXT records:
+For a real beta domain, pass admin DNS guidance plus observed DNS evidence, mail-flow evidence, queue evidence, credential-free mail-core apply evidence, backups, restore-drill evidence, and decision-owner acceptance. Omit `--observed-dns` only when the gate should resolve live MX/TXT records:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\private_beta_gate.py `
   --manifest .freemail-qa\private-beta\private-beta-evidence-manifest.example.com.json `
   --dns-guidance .freemail-qa\dns-guidance-example.com.json `
   --metadata-backup .freemail-qa\backups\metadata.json `
-  --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz
+  --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
+  --restore-drill-evidence .freemail-qa\backups\restore-drill-evidence.json
 ```
 
 To avoid hand-authoring the JSON packet, create draft evidence templates first:
@@ -488,7 +489,7 @@ To avoid hand-authoring the JSON packet, create draft evidence templates first:
   --decision-owner "Decision Owner"
 ```
 
-The generated files are credential-free drafts. They intentionally keep `passed`, `applied`, and `accepted` false until controlled-domain DNS, mail flow, mail-core apply, queue, deliverability, backup, and owner-review evidence are actually recorded.
+The generated files are credential-free drafts. They intentionally keep `passed`, `applied`, and `accepted` false until controlled-domain DNS, mail flow, mail-core apply, queue, deliverability, backup, restore-drill, and owner-review evidence are actually recorded.
 
 After the controlled mailbox and DNS guidance exist, collect live DNS, mail-flow, queue, and deliverability evidence into the same packet:
 
@@ -506,7 +507,7 @@ After the controlled mailbox and DNS guidance exist, collect live DNS, mail-flow
   --force
 ```
 
-The collector writes credential-free observed DNS, mail-flow, queue, and deliverability JSON. It does not replace mail-core apply evidence, backup artifacts, or decision-owner acceptance.
+The collector writes credential-free observed DNS, mail-flow, queue, and deliverability JSON. It does not replace mail-core apply evidence, backup artifacts, restore-drill evidence, or decision-owner acceptance.
 
 Check packet inventory before running the full private-beta gate:
 
@@ -515,7 +516,7 @@ Check packet inventory before running the full private-beta gate:
   --manifest .freemail-qa\private-beta\private-beta-evidence-manifest.example.com.json
 ```
 
-`scripts\private_beta_gate.py --manifest` loads the generated packet paths and lets explicit flags override any manifest entry, which is useful when metadata or mail-store backups are stored in a shared backup directory.
+`scripts\private_beta_gate.py --manifest` loads the generated packet paths and lets explicit flags override any manifest entry, which is useful when metadata, mail-store, or restore-drill evidence is stored in a shared backup directory.
 
 Generate queue evidence with `scripts\qa_stalwart_queue.py` after controlled mail-flow tests; the private-beta gate requires a clear queue with zero pending and due messages.
 

@@ -115,7 +115,7 @@ The gate verifies:
 - metadata and mail-store backup evidence files exist, are non-empty, and have SHA-256 checksums recorded in the gate output
 - restore-drill evidence exists and proves metadata restore, Stalwart apply-plan export, and mail-store restore into a drill volume
 - mobile signed-build and store-submission evidence passes `scripts/mobile_release_gate.py` with credential-free proof for both iOS and Android
-- private-beta gate output passes for at least one controlled domain and includes DNS, mail-flow, queue, mail-core apply, deliverability/abuse, backup, and decision-owner acceptance checks
+- private-beta gate output passes for at least one controlled domain and includes DNS, mail-flow, queue, mail-core apply, deliverability/abuse, backup, restore-drill, and decision-owner acceptance checks
 - release notes exist, are non-empty, include the candidate version, include verification, known-limitations, and VPN-boundary language, contain no placeholder markers, and have a SHA-256 checksum recorded in the gate output
 - `https://freemail.kuzuryu.ai/health` reports VPN-only health and release metadata
 - `https://freemail.kuzuryu.ai/api/v1/deployment` reports `vpn-only` exposure and `publicInternet: false`
@@ -138,14 +138,15 @@ Before private-beta use, run the private-beta gate. Runtime-only development mod
 .\.venv\Scripts\python.exe scripts\private_beta_gate.py --skip-dns --skip-evidence
 ```
 
-For a controlled domain, first export DNS guidance from the admin API, capture observed DNS values, run controlled mail-flow and queue checks, apply the Stalwart mail-core plan, collect credential-free apply evidence, collect deliverability/abuse evidence, collect backup evidence, record decision-owner acceptance, then run:
+For a controlled domain, first export DNS guidance from the admin API, capture observed DNS values, run controlled mail-flow and queue checks, apply the Stalwart mail-core plan, collect credential-free apply evidence, collect deliverability/abuse evidence, collect backup evidence, collect restore-drill evidence, record decision-owner acceptance, then run:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\private_beta_gate.py `
   --manifest .freemail-qa\private-beta\private-beta-evidence-manifest.example.com.json `
   --dns-guidance .freemail-qa\dns-guidance-example.com.json `
   --metadata-backup .freemail-qa\backups\metadata.json `
-  --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz
+  --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
+  --restore-drill-evidence .freemail-qa\backups\restore-drill-evidence.json
 ```
 
 Operators can generate a credential-free draft packet with:
@@ -159,7 +160,7 @@ Operators can generate a credential-free draft packet with:
 
 The generated mail-core apply, deliverability, and acceptance templates are intentionally failing drafts until real controlled-domain evidence is filled in.
 
-The generated manifest provides the expected paths for observed DNS, mail-flow, queue, mail-core apply, deliverability, backup, and acceptance evidence. `scripts\private_beta_gate.py --manifest` loads those paths, and any explicit CLI path flag overrides the corresponding manifest entry.
+The generated manifest provides the expected paths for observed DNS, mail-flow, queue, mail-core apply, deliverability, backup, restore-drill, and acceptance evidence. `scripts\private_beta_gate.py --manifest` loads those paths, and any explicit CLI path flag overrides the corresponding manifest entry.
 
 After the controlled mailbox, mailbox-secret JSON, and admin DNS guidance exist, operators can collect the live DNS, mail-flow, queue, and deliverability evidence into the generated packet:
 
@@ -177,7 +178,7 @@ After the controlled mailbox, mailbox-secret JSON, and admin DNS guidance exist,
   --force
 ```
 
-The collector runs controlled mail-flow checks, queries the Stalwart queue helper, resolves live DNS from the guidance record names, and writes credential-free JSON only. It intentionally leaves mail-core apply evidence, metadata backup, mail-store backup, and decision-owner acceptance as separate evidence artifacts.
+The collector runs controlled mail-flow checks, queries the Stalwart queue helper, resolves live DNS from the guidance record names, and writes credential-free JSON only. It intentionally leaves mail-core apply evidence, metadata backup, mail-store backup, restore-drill evidence, and decision-owner acceptance as separate evidence artifacts.
 
 Before running the full private-beta gate, check the packet inventory:
 
@@ -188,7 +189,7 @@ Before running the full private-beta gate, check the packet inventory:
 
 The packet status command is read-only. It reports missing, empty, and draft-blocking artifacts plus SHA-256 checksums for present files; it does not replace the full private-beta gate.
 
-If observed DNS evidence is omitted from both CLI flags and the manifest, the gate resolves live MX/TXT DNS for the expected record names. The output JSON is release evidence and should be stored outside Git with the other private-beta artifacts. Evidence checks include the path, byte count, and SHA-256 checksum for mail-flow, queue, mail-core apply, deliverability/abuse, backup, and acceptance files.
+If observed DNS evidence is omitted from both CLI flags and the manifest, the gate resolves live MX/TXT DNS for the expected record names. The output JSON is release evidence and should be stored outside Git with the other private-beta artifacts. Evidence checks include the path, byte count, and SHA-256 checksum for mail-flow, queue, mail-core apply, deliverability/abuse, backup, restore-drill, and acceptance files.
 
 Mail-flow evidence generated by `scripts\qa_mail_flow.py` must include a timezone-aware ISO-8601 `checkedAt` timestamp.
 
@@ -293,6 +294,7 @@ Release provenance for a candidate consists of:
 - metadata readiness evidence for the active API database
 - metadata backup path and checksum, stored outside Git
 - mail-store backup path and checksum, stored outside Git
+- restore-drill evidence path and checksum, stored outside Git
 - deployment hostname and exposure boundary evidence
 
 Record this evidence in the planning lane before private-beta use.
