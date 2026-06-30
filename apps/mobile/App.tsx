@@ -32,6 +32,7 @@ import {
   loadMailboxPushDevices,
   loadMailboxPushNotifications,
   loadMailboxSnapshot,
+  loadMailboxThread,
   MailAttachment,
   MailboxPreferences,
   MailboxSession,
@@ -366,6 +367,27 @@ export default function App() {
       const detail = await loadMailboxMessage(session, message.folder, message.messageId);
       setSelectedMessage(detail);
       setStatus("Message loaded.");
+    } catch (error) {
+      setStatus(readableError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadSelectedThread() {
+    if (!session || !selectedMessage?.threadId) {
+      setStatus("Open a message before loading the conversation.");
+      return;
+    }
+    setLoading(true);
+    setStatus("Loading conversation...");
+    try {
+      const thread = await loadMailboxThread(session, selectedMessage.folder, selectedMessage.threadId);
+      setMessages(thread.messages || []);
+      setSelectedMessage(null);
+      setSelectedMessageIds([]);
+      setMailboxPagination({ mode: "folder", query: "", nextOffset: null, hasMore: false });
+      setStatus(`Loaded ${thread.messages?.length || 0} conversation messages.`);
     } catch (error) {
       setStatus(readableError(error));
     } finally {
@@ -840,6 +862,9 @@ export default function App() {
                   </Pressable>
                   <Pressable style={styles.secondaryButton} onPress={forwardSelectedMessage}>
                     <Text>Forward</Text>
+                  </Pressable>
+                  <Pressable style={styles.secondaryButton} onPress={loadSelectedThread}>
+                    <Text>Conversation</Text>
                   </Pressable>
                   {isDraftMessage(selectedMessage) ? (
                     <Pressable style={styles.secondaryButton} onPress={editSelectedDraft}>

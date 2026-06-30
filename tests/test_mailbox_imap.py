@@ -13,6 +13,7 @@ from freemail_api.mailbox_imap import (
     MailboxSearchResult,
     MovedMailboxMessage,
     MailboxSnapshot,
+    MailboxThreadResult,
     MutatedMailboxFolder,
     ReadStateMailboxMessage,
     StarStateMailboxMessage,
@@ -35,6 +36,7 @@ from freemail_api.mailbox_imap import (
     _list_contacts,
     _list_folders,
     _list_messages,
+    _list_thread_messages,
     _message_ids_for_move,
     _normalized_thread_subject,
     _move_message,
@@ -222,6 +224,34 @@ def test_search_result_serializes_messages():
     assert result.as_dict()["has_more"] is False
 
 
+def test_thread_result_serializes_messages():
+    result = MailboxThreadResult(
+        email="admin@example.com",
+        folder="INBOX",
+        thread_id="thread-1121e6e169058c3a",
+        thread_subject="Hello",
+        messages=[
+            MailboxMessage(
+                folder="INBOX",
+                message_id="1",
+                subject="Re: Hello",
+                sender="sender@example.com",
+                recipients="admin@example.com",
+                date="Mon, 01 Jan 2024 00:00:00 +0000",
+                unread=False,
+                starred=True,
+                thread_id="thread-1121e6e169058c3a",
+                thread_subject="Hello",
+                in_reply_to="<message-1@example.com>",
+            )
+        ],
+    )
+
+    assert result.as_dict()["thread_id"] == "thread-1121e6e169058c3a"
+    assert result.as_dict()["thread_subject"] == "Hello"
+    assert result.as_dict()["messages"][0]["thread_subject"] == "Hello"
+
+
 def test_contacts_serializes_records():
     contacts = MailboxContacts(
         email="admin@example.com",
@@ -366,6 +396,22 @@ def test_search_messages_returns_empty_for_blank_query():
         next_offset=None,
         has_more=False,
     )
+
+
+def test_list_thread_messages_filters_by_thread_id_and_limit():
+    messages = _list_thread_messages(
+        FakeImap(),
+        folder="INBOX",
+        thread_id="thread-1121e6e169058c3a",
+        limit=2,
+    )
+
+    assert [message.message_id for message in messages] == ["3", "2"]
+    assert all(message.thread_id == "thread-1121e6e169058c3a" for message in messages)
+
+
+def test_list_thread_messages_returns_empty_for_blank_thread_id():
+    assert _list_thread_messages(FakeImap(), folder="INBOX", thread_id=" ", limit=10) == []
 
 
 def test_list_contacts_deduplicates_addresses_by_frequency():

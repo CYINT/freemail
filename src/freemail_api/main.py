@@ -27,6 +27,7 @@ from .mailbox_imap import get_mailbox_attachment
 from .mailbox_imap import get_mailbox_message
 from .mailbox_imap import list_mailbox_contacts
 from .mailbox_imap import list_mailbox_snapshot
+from .mailbox_imap import list_mailbox_thread
 from .mailbox_imap import move_mailbox_message
 from .mailbox_imap import rename_mailbox_folder
 from .mailbox_imap import search_mailbox_messages
@@ -97,6 +98,7 @@ from .schemas import (
     MailboxSnapshotRecord,
     MailboxStarStateCreate,
     MailboxStarStateRecord,
+    MailboxThreadRecord,
     StoredUserCreate,
     UserCreate,
     UserRecord,
@@ -166,7 +168,7 @@ COMPONENT_READINESS = {
     "webmail": {
         "status": "beta-ready",
         "evidence": [
-            "mailbox session login, paginated and thread-aware folder navigation and search, contacts, message read, read/unread state, star state, compose, attachments, archive, move, and delete controls",
+            "mailbox session login, paginated and thread-aware folder navigation and search, conversation lookup, contacts, message read, read/unread state, star state, compose, attachments, archive, move, and delete controls",
             "bulk message actions for read/unread, star/unstar, archive, spam, delete, and move",
             "persistent mailbox preferences with default compose signatures",
             "server-side Drafts persistence and compose reopen support for saved drafts",
@@ -181,7 +183,7 @@ COMPONENT_READINESS = {
     "mobile": {
         "status": "source-ready",
         "evidence": [
-            "Expo/React Native client with VPN API target, mailbox sessions, paginated and thread-aware message workflows, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder controls, contacts, attachments, offline metadata cache, and push-device flows",
+            "Expo/React Native client with VPN API target, mailbox sessions, paginated and thread-aware message workflows, conversation lookup, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder controls, contacts, attachments, offline metadata cache, and push-device flows",
             "bulk read/star/archive/spam/delete/move client controls over the shared mailbox API",
             "mobile preference controls for default compose signatures",
             "compose/send path uses the shared mailbox API contract with Sent Items persistence status",
@@ -691,6 +693,43 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 query=clean_query,
                 limit=limit,
                 offset=offset,
+            )
+        except OSError as error:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+        except imaplib.IMAP4.error as error:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Mailbox authentication failed") from error
+        return result.as_dict()
+
+    @app.get("/api/v1/mailbox/thread", response_model=MailboxThreadRecord)
+    def mailbox_thread(
+        thread_id: str,
+        folder: str = "INBOX",
+        limit: int = 100,
+        authorization: str | None = Header(default=None),
+        x_freemail_mailbox_email: str | None = Header(default=None),
+        x_freemail_mailbox_password: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=x_freemail_mailbox_email,
+            x_freemail_mailbox_password=x_freemail_mailbox_password,
+            connection=connection,
+        )
+        clean_thread_id = thread_id.strip()
+        if not clean_thread_id:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="thread_id is required")
+        if limit < 1 or limit > 500:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="limit must be between 1 and 500")
+        try:
+            result = list_mailbox_thread(
+                email=credentials.email,
+                password=credentials.password,
+                host=active_settings.mail_core_host,
+                port=active_settings.imap_port,
+                folder=folder,
+                thread_id=clean_thread_id,
+                limit=limit,
             )
         except OSError as error:
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error

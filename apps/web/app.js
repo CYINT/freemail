@@ -19,6 +19,7 @@ const searchQuery = document.querySelector("#search-query");
 const logoutAction = document.querySelector("#mailbox-logout");
 const replyAction = document.querySelector("#reply-action");
 const forwardAction = document.querySelector("#forward-action");
+const loadThreadAction = document.querySelector("#load-thread-action");
 const editDraftAction = document.querySelector("#edit-draft-action");
 const starAction = document.querySelector("#star-action");
 const unstarAction = document.querySelector("#unstar-action");
@@ -158,6 +159,14 @@ forwardAction?.addEventListener("click", () => {
     return;
   }
   prefillForward(selectedMessageDetail);
+});
+
+loadThreadAction?.addEventListener("click", async () => {
+  if (!selectedMessageDetail?.threadId) {
+    setStatus("Select a message before loading the conversation.", "error");
+    return;
+  }
+  await loadMailboxThread(selectedMessageDetail);
 });
 
 editDraftAction?.addEventListener("click", () => {
@@ -538,6 +547,36 @@ async function searchMailboxMessages(query, { offset = 0, append = false } = {})
     setStatus(`Showing ${visibleMessages.length} matches for "${query}".`, "ready");
   } catch (error) {
     setStatus(`Search failed: ${readableError(error)}`, "error");
+  }
+}
+
+async function loadMailboxThread(message) {
+  if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
+    setStatus("Sign in to load a conversation.", "error");
+    return;
+  }
+  setStatus(`Loading conversation "${message.threadSubject || message.subject || "(no subject)"}"...`, "loading");
+  try {
+    const url = new URL("/api/v1/mailbox/thread", mailboxSession.apiBaseUrl);
+    url.searchParams.set("folder", message.folder || mailboxSession.folder);
+    url.searchParams.set("thread_id", message.threadId);
+    url.searchParams.set("limit", "100");
+    const response = await fetch(url, { headers: mailboxHeaders() });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const thread = await response.json();
+    selectedMessageIds = new Set();
+    mailboxPagination = {
+      mode: "folder",
+      query: "",
+      nextOffset: null,
+      hasMore: false,
+    };
+    renderMessages(thread.messages || []);
+    setStatus(`Loaded ${thread.messages?.length || 0} conversation message${thread.messages?.length === 1 ? "" : "s"}.`, "ready");
+  } catch (error) {
+    setStatus(`Conversation load failed: ${readableError(error)}`, "error");
   }
 }
 

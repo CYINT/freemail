@@ -1369,6 +1369,78 @@ def test_mailbox_search_validates_offset(tmp_path):
     assert response.json()["detail"] == "offset must be zero or greater"
 
 
+def test_mailbox_thread_requires_mailbox_credentials(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.get("/api/v1/mailbox/thread?thread_id=thread-1121e6e169058c3a")
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Mailbox credentials required"
+
+
+def test_mailbox_thread_validates_thread_id(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.get(
+            "/api/v1/mailbox/thread?thread_id=+",
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+        )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "thread_id is required"
+
+
+def test_mailbox_thread_returns_imap_thread(tmp_path, monkeypatch):
+    class Result:
+        def as_dict(self):
+            return {
+                "email": "admin@example.com",
+                "folder": "INBOX",
+                "thread_id": "thread-1121e6e169058c3a",
+                "thread_subject": "Hello",
+                "messages": [
+                    {
+                        "folder": "INBOX",
+                        "message_id": "2",
+                        "subject": "Re: Hello",
+                        "sender": "sender@example.net",
+                        "recipients": "admin@example.com",
+                        "date": "",
+                        "unread": False,
+                        "starred": False,
+                        "thread_id": "thread-1121e6e169058c3a",
+                        "thread_subject": "Hello",
+                        "in_reply_to": "<message-1@example.com>",
+                    }
+                ],
+            }
+
+    def fake_thread(**kwargs):
+        assert kwargs["email"] == "admin@example.com"
+        assert kwargs["password"] == "secret"
+        assert kwargs["folder"] == "INBOX"
+        assert kwargs["thread_id"] == "thread-1121e6e169058c3a"
+        assert kwargs["limit"] == 50
+        return Result()
+
+    monkeypatch.setattr("freemail_api.main.list_mailbox_thread", fake_thread)
+
+    with make_client(tmp_path) as client:
+        response = client.get(
+            "/api/v1/mailbox/thread?folder=INBOX&thread_id=thread-1121e6e169058c3a&limit=50",
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["threadId"] == "thread-1121e6e169058c3a"
+    assert response.json()["threadSubject"] == "Hello"
+    assert response.json()["messages"][0]["subject"] == "Re: Hello"
+
+
 def test_mailbox_contacts_requires_mailbox_credentials(tmp_path):
     with make_client(tmp_path) as client:
         response = client.get("/api/v1/mailbox/contacts")

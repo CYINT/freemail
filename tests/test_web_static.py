@@ -48,6 +48,7 @@ def test_static_web_validation_flags_credential_storage():
         '<form id="mailbox-preferences"><input id="preference-display-name">'
         '<textarea id="preference-signature"></textarea></form>'
         '<button id="reply-action">Reply</button><button id="forward-action">Forward</button>'
+        '<button id="load-thread-action">Conversation</button>'
         '<button id="edit-draft-action">Edit draft</button>'
         '<button id="star-action">Star</button><button id="unstar-action">Unstar</button>'
         '<button id="mark-read-action">Mark read</button><button id="mark-unread-action">Mark unread</button>'
@@ -66,6 +67,7 @@ def test_static_web_validation_flags_credential_storage():
         "@media (max-width: 640px) {} button { min-height: 38px; outline: 1px solid; border-radius: 8px; }",
         "fetch('/api/v1/mailbox/session', {headers: {Authorization: 'Bearer token'}}); "
         "fetch('/api/v1/mailbox/snapshot'); fetch('/api/v1/mailbox/search'); fetch('/api/v1/mailbox/message'); "
+        "fetch('/api/v1/mailbox/thread'); loadMailboxThread({}); load-thread-action; Conversation; "
         "fetch('/api/v1/mailbox/contacts'); "
         "fetch('/api/v1/mailbox/folder'); "
         "fetch('/api/v1/mailbox/message/attachment'); fetch('/api/v1/mailbox/message/archive'); "

@@ -57,6 +57,14 @@ export type MailboxSearch = {
   hasMore: boolean;
 };
 
+export type MailboxThread = {
+  email: string;
+  folder: string;
+  threadId: string;
+  threadSubject: string;
+  messages: MailMessage[];
+};
+
 export type MailContact = {
   name: string;
   email: string;
@@ -181,6 +189,17 @@ export async function searchMailbox(
   limit = 25,
 ): Promise<MailboxSearch> {
   const path = `/api/v1/mailbox/search?folder=${encodeURIComponent(folder)}&query=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}`;
+  const response = await request(session.apiBaseUrl, path, { headers: mailboxHeaders(session) });
+  return response.json();
+}
+
+export async function loadMailboxThread(
+  session: MailboxSession,
+  folder: string,
+  threadId: string,
+  limit = 100,
+): Promise<MailboxThread> {
+  const path = `/api/v1/mailbox/thread?folder=${encodeURIComponent(folder)}&thread_id=${encodeURIComponent(threadId)}&limit=${limit}`;
   const response = await request(session.apiBaseUrl, path, { headers: mailboxHeaders(session) });
   return response.json();
 }

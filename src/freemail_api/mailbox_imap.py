@@ -114,6 +114,24 @@ class MailboxSearchResult:
 
 
 @dataclass(frozen=True)
+class MailboxThreadResult:
+    email: str
+    folder: str
+    thread_id: str
+    thread_subject: str
+    messages: list[MailboxMessage]
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "email": self.email,
+            "folder": self.folder,
+            "thread_id": self.thread_id,
+            "thread_subject": self.thread_subject,
+            "messages": [message.as_dict() for message in self.messages],
+        }
+
+
+@dataclass(frozen=True)
 class MailboxContact:
     name: str
     email: str
@@ -378,6 +396,32 @@ def search_mailbox_messages(
         offset=offset,
         next_offset=page.next_offset,
         has_more=page.has_more,
+    )
+
+
+def list_mailbox_thread(
+    *,
+    email: str,
+    password: str,
+    host: str,
+    port: int,
+    folder: str,
+    thread_id: str,
+    limit: int = 100,
+    timeout_seconds: float = 10.0,
+    verify_tls: bool = False,
+) -> MailboxThreadResult:
+    tls_context = _tls_context(verify_tls=verify_tls)
+    with imaplib.IMAP4_SSL(host, port, ssl_context=tls_context, timeout=timeout_seconds) as imap:
+        imap.login(email, password)
+        messages = _list_thread_messages(imap, folder=folder, thread_id=thread_id, limit=limit)
+    thread_subject = messages[0].thread_subject if messages else "(unknown thread)"
+    return MailboxThreadResult(
+        email=email,
+        folder=folder,
+        thread_id=thread_id,
+        thread_subject=thread_subject,
+        messages=messages,
     )
 
 
@@ -728,6 +772,32 @@ def _list_contacts(imap: imaplib.IMAP4_SSL, *, folder: str, limit: int) -> list[
             else:
                 contact_rows[key] = MailboxContact(name=name, email=address, message_count=1)
     return sorted(contact_rows.values(), key=lambda contact: (-contact.message_count, contact.email))
+
+
+def _list_thread_messages(
+    imap: imaplib.IMAP4_SSL,
+    *,
+    folder: str,
+    thread_id: str,
+    limit: int,
+) -> list[MailboxMessage]:
+    clean_thread_id = thread_id.strip()
+    if not clean_thread_id:
+        return []
+    status, _data = imap.select(f'"{folder}"', readonly=True)
+    if status != "OK":
+        return []
+    search_status, search_data = imap.search(None, "ALL")
+    if search_status != "OK" or not search_data:
+        return []
+    matches = []
+    for message_id in reversed(search_data[0].split()):
+        message = _message_header(imap, folder=folder, message_id=message_id)
+        if message and message.thread_id == clean_thread_id:
+            matches.append(message)
+            if len(matches) >= limit:
+                break
+    return matches
 
 
 def _contacts_from_header(header) -> list[tuple[str, str]]:

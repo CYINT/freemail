@@ -332,6 +332,14 @@ class MailboxSearchRecord(ApiModel):
     has_more: bool = False
 
 
+class MailboxThreadRecord(ApiModel):
+    email: EmailStr
+    folder: str
+    thread_id: str
+    thread_subject: str
+    messages: list[MailboxMessageSummary]
+
+
 class MailboxContactRecord(ApiModel):
     name: str
     email: EmailStr
