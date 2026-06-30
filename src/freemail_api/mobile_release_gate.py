@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from .release_gate import _file_evidence_details
 
@@ -126,7 +127,7 @@ def _check_platform_build(evidence: dict[str, Any], *, platform: str) -> dict[st
         and artifact.get("type") in expected_artifact_types
         and _is_sha256(artifact.get("sha256"))
         and int(artifact.get("bytes", 0) or 0) > 0
-        and bool(str(build.get("buildUrl", "")).strip())
+        and _is_https_url(build.get("buildUrl"))
     )
     return _check(
         f"{platform}-signed-build",
@@ -173,7 +174,7 @@ def _check_store_submission(evidence: dict[str, Any], *, platform: str) -> dict[
         and submission.get("identifier") == expected_identifier
         and submission.get("track") in allowed_tracks
         and submission.get("submitted") is True
-        and bool(str(submission.get("submissionUrl", "")).strip())
+        and _is_https_url(submission.get("submissionUrl"))
         and bool(str(submission.get("submittedAt", "")).strip())
         and bool(str(submission.get("reviewState", "")).strip())
     )
@@ -203,6 +204,11 @@ def _load_json(path: Path) -> dict[str, Any]:
 def _is_sha256(value: object) -> bool:
     text = str(value or "").strip().lower()
     return len(text) == 64 and all(character in "0123456789abcdef" for character in text)
+
+
+def _is_https_url(value: object) -> bool:
+    parsed = urlparse(str(value or "").strip())
+    return parsed.scheme == "https" and bool(parsed.netloc)
 
 
 def _check(name: str, passed: bool, details: dict[str, Any]) -> dict[str, Any]:

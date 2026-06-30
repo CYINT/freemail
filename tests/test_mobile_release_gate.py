@@ -161,6 +161,61 @@ def test_mobile_release_gate_rejects_malformed_artifact_hash(tmp_path):
     assert ios_check["status"] == "fail"
 
 
+def test_mobile_release_gate_rejects_insecure_build_url(tmp_path):
+    app_config = tmp_path / "app.json"
+    evidence = tmp_path / "mobile-release.json"
+    write_json(
+        app_config,
+        {
+            "expo": {
+                "name": "FreeMail",
+                "version": "0.1.0-dev",
+                "ios": {"bundleIdentifier": "technology.cyint.freemail"},
+                "android": {"package": "technology.cyint.freemail"},
+                "extra": {"apiBaseUrl": "https://freemail.kuzuryu.ai"},
+            }
+        },
+    )
+    payload = valid_evidence()
+    payload["builds"]["android"]["buildUrl"] = "http://example.invalid/android-build"
+    write_json(evidence, payload)
+
+    result = run_mobile_release_gate(MobileReleaseGateOptions(evidence=evidence, app_config=app_config))
+
+    assert result["passed"] is False
+    android_check = next(check for check in result["checks"] if check["name"] == "android-signed-build")
+    assert android_check["status"] == "fail"
+
+
+def test_mobile_release_gate_rejects_insecure_store_submission_url(tmp_path):
+    app_config = tmp_path / "app.json"
+    evidence = tmp_path / "mobile-release.json"
+    write_json(
+        app_config,
+        {
+            "expo": {
+                "name": "FreeMail",
+                "version": "0.1.0-dev",
+                "ios": {"bundleIdentifier": "technology.cyint.freemail"},
+                "android": {"package": "technology.cyint.freemail"},
+                "extra": {"apiBaseUrl": "https://freemail.kuzuryu.ai"},
+            }
+        },
+    )
+    payload = valid_evidence()
+    payload["storeSubmissions"] = valid_store_submissions()
+    payload["storeSubmissions"]["ios"]["submissionUrl"] = "http://example.invalid/testflight"
+    write_json(evidence, payload)
+
+    result = run_mobile_release_gate(
+        MobileReleaseGateOptions(evidence=evidence, app_config=app_config, require_store_submission=True)
+    )
+
+    assert result["passed"] is False
+    ios_check = next(check for check in result["checks"] if check["name"] == "ios-store-submission")
+    assert ios_check["status"] == "fail"
+
+
 def valid_evidence():
     return {
         "app": {
