@@ -90,6 +90,8 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
     for marker in [
         "mailbox-login",
         "mailbox-logout",
+        "mailbox-search",
+        "search-query",
         "api-base-url",
         "mailbox-status",
         "message-body",
@@ -106,11 +108,13 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         "fetch(",
         "/api/v1/mailbox/session",
         "/api/v1/mailbox/snapshot",
+        "/api/v1/mailbox/search",
         "/api/v1/mailbox/message",
         "/api/v1/mailbox/message/attachment",
         "/api/v1/mailbox/message/archive",
         "/api/v1/mailbox/send",
         "archiveMailboxMessage",
+        "searchMailboxMessages",
         "downloadMailboxAttachment",
         "filesToAttachments",
         "fileToBase64",
@@ -126,6 +130,7 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         "restoreMailboxSession",
         "persistMailboxSession",
         "forgetMailboxSession",
+        "clearSearch",
     ]:
         if marker not in js_text:
             failures.append(f"missing live mailbox client marker: {marker}")

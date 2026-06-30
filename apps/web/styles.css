@@ -197,6 +197,11 @@ h2 {
   font-size: 0.8rem;
 }
 
+.search div {
+  display: flex;
+  gap: 0.5rem;
+}
+
 .search input,
 .compose-panel input,
 .compose-panel textarea {
@@ -207,6 +212,10 @@ h2 {
   background: #ffffff;
   color: #18212b;
   padding: 0.55rem 0.65rem;
+}
+
+.search button {
+  flex: 0 0 auto;
 }
 
 .mail-layout {
@@ -402,6 +411,11 @@ h2 {
 
   .topbar,
   .reader-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .search div {
     align-items: stretch;
     flex-direction: column;
   }

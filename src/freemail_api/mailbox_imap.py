@@ -68,6 +68,22 @@ class MailboxSnapshot:
 
 
 @dataclass(frozen=True)
+class MailboxSearchResult:
+    email: str
+    folder: str
+    query: str
+    messages: list[MailboxMessage]
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "email": self.email,
+            "folder": self.folder,
+            "query": self.query,
+            "messages": [message.as_dict() for message in self.messages],
+        }
+
+
+@dataclass(frozen=True)
 class ArchivedMailboxMessage:
     folder: str
     message_id: str
@@ -119,6 +135,25 @@ def archive_mailbox_message(
         archive_folder=archive_folder,
         archived=True,
     )
+
+
+def search_mailbox_messages(
+    *,
+    email: str,
+    password: str,
+    host: str,
+    port: int,
+    folder: str,
+    query: str,
+    limit: int = 25,
+    timeout_seconds: float = 10.0,
+    verify_tls: bool = False,
+) -> MailboxSearchResult:
+    tls_context = _tls_context(verify_tls=verify_tls)
+    with imaplib.IMAP4_SSL(host, port, ssl_context=tls_context, timeout=timeout_seconds) as imap:
+        imap.login(email, password)
+        messages = _search_messages(imap, folder=folder, query=query, limit=limit)
+    return MailboxSearchResult(email=email, folder=folder, query=query, messages=messages)
 
 
 def get_mailbox_message(
@@ -231,6 +266,64 @@ def _list_messages(imap: imaplib.IMAP4_SSL, *, folder: str, limit: int) -> list[
             )
         )
     return messages
+
+
+def _search_messages(imap: imaplib.IMAP4_SSL, *, folder: str, query: str, limit: int) -> list[MailboxMessage]:
+    clean_query = query.strip()
+    if not clean_query:
+        return []
+    status, _data = imap.select(f'"{folder}"', readonly=True)
+    if status != "OK":
+        return []
+    search_status, search_data = imap.search(None, *_search_criteria(clean_query))
+    if search_status != "OK" or not search_data:
+        return []
+    message_ids = search_data[0].split()[-limit:]
+    messages = []
+    for message_id in reversed(message_ids):
+        message = _message_header(imap, folder=folder, message_id=message_id)
+        if message:
+            messages.append(message)
+    return messages
+
+
+def _message_header(imap: imaplib.IMAP4_SSL, *, folder: str, message_id: bytes) -> MailboxMessage | None:
+    fetch_status, fetch_data = imap.fetch(message_id, "(FLAGS BODY.PEEK[HEADER])")
+    if fetch_status != "OK" or not fetch_data or not isinstance(fetch_data[0], tuple):
+        return None
+    header = BytesParser(policy=default).parsebytes(fetch_data[0][1])
+    flags = _flags_from_fetch(fetch_data[0][0])
+    return MailboxMessage(
+        folder=folder,
+        message_id=message_id.decode("ascii"),
+        subject=str(header.get("subject", "")),
+        sender=str(header.get("from", "")),
+        recipients=str(header.get("to", "")),
+        date=str(header.get("date", "")),
+        unread="\\Seen" not in flags,
+    )
+
+
+def _search_criteria(query: str) -> tuple[str, ...]:
+    quoted_query = _quote_search_value(query)
+    return (
+        "OR",
+        "OR",
+        "OR",
+        "FROM",
+        quoted_query,
+        "TO",
+        quoted_query,
+        "SUBJECT",
+        quoted_query,
+        "BODY",
+        quoted_query,
+    )
+
+
+def _quote_search_value(value: str) -> str:
+    escaped = value.replace("\\", "\\\\").replace('"', r"\"")
+    return f'"{escaped}"'
 
 
 def _get_message(imap: imaplib.IMAP4_SSL, *, folder: str, message_id: str) -> MailboxMessageDetail:

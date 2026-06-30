@@ -25,7 +25,7 @@ The FreeMail program includes:
 This repository is at the implementation baseline. It contains:
 
 - A FastAPI admin/runtime API with persistent SQLite-backed domain, user, mailbox, alias, and audit-log surfaces.
-- A static webmail preview shell with inbox, message reader, compose, folder navigation, and responsive layout QA.
+- A static webmail preview shell with inbox, search, message reader, compose, folder navigation, and responsive layout QA.
 - A mobile client lane placeholder.
 - A Docker Compose stack with VPN-only loopback bindings by default.
 - A Stalwart mail-core candidate profile for the first architecture spike.
@@ -111,9 +111,18 @@ The first read-only mailbox API uses per-request IMAP credentials and does not s
 .\.venv\Scripts\python.exe scripts\qa_mailbox_snapshot_api.py --email admin@example.com --secrets-json secrets\mail-core-users.json
 .\.venv\Scripts\python.exe scripts\qa_mailbox_message_api.py --email admin@example.com --secrets-json secrets\mail-core-users.json
 .\.venv\Scripts\python.exe scripts\qa_mailbox_session_api.py --email admin@example.com --secrets-json secrets\mail-core-users.json
+.\.venv\Scripts\python.exe scripts\qa_mailbox_search_api.py --email admin@example.com --secrets-json secrets\mail-core-users.json
 ```
 
 `FREEMAIL_SESSION_SECRET` must be set for browser mailbox sessions. Use a long random value and keep it out of source control. Existing per-request mailbox credential QA scripts remain available for API smoke coverage.
+
+The mailbox search API searches the selected folder by sender, recipient, subject, and body text:
+
+```text
+GET /api/v1/mailbox/search?folder=INBOX&query=needle&limit=25
+```
+
+The webmail search form uses the current folder and the browser's bearer session.
 
 The first mailbox send API uses the same per-request credential posture and submits through authenticated implicit-TLS SMTP:
 

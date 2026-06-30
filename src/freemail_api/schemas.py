@@ -173,6 +173,13 @@ class MailboxSnapshotRecord(ApiModel):
     messages: list[MailboxMessageSummary]
 
 
+class MailboxSearchRecord(ApiModel):
+    email: EmailStr
+    folder: str
+    query: str
+    messages: list[MailboxMessageSummary]
+
+
 class MailboxSessionCreate(ApiModel):
     email: EmailStr
     password: str = Field(min_length=1, max_length=512)

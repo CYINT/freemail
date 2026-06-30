@@ -5,6 +5,7 @@ from freemail_api.mailbox_imap import (
     MailboxAttachment,
     MailboxFolder,
     MailboxMessage,
+    MailboxSearchResult,
     MailboxMessageDetail,
     MailboxSnapshot,
     _archive_message,
@@ -19,6 +20,9 @@ from freemail_api.mailbox_imap import (
     _list_folders,
     _list_messages,
     _parse_folder,
+    _quote_search_value,
+    _search_criteria,
+    _search_messages,
     _tls_context,
 )
 
@@ -30,6 +34,7 @@ class FakeImap:
         self.copied_messages = []
         self.stored_flags = []
         self.expunge_called = False
+        self.search_calls = []
 
     def list(self):
         return "OK", [b'(\\HasNoChildren) "/" "INBOX"', b'(\\HasNoChildren) "/" "Sent Items"']
@@ -39,8 +44,9 @@ class FakeImap:
         self.selected_folders.append((folder, readonly))
         return "OK", [b"3"]
 
-    def search(self, charset, criteria):
-        if criteria == "UNSEEN":
+    def search(self, charset, *criteria):
+        self.search_calls.append((charset, criteria))
+        if criteria == ("UNSEEN",):
             return "OK", [b"1 3"]
         return "OK", [b"1 2 3"]
 
@@ -129,6 +135,28 @@ def test_message_detail_serializes_body():
     assert detail.as_dict()["attachments"][0]["filename"] == "report.txt"
 
 
+def test_search_result_serializes_messages():
+    result = MailboxSearchResult(
+        email="admin@example.com",
+        folder="INBOX",
+        query="hello",
+        messages=[
+            MailboxMessage(
+                folder="INBOX",
+                message_id="1",
+                subject="Hello",
+                sender="sender@example.com",
+                recipients="admin@example.com",
+                date="Mon, 01 Jan 2024 00:00:00 +0000",
+                unread=False,
+            )
+        ],
+    )
+
+    assert result.as_dict()["query"] == "hello"
+    assert result.as_dict()["messages"][0]["subject"] == "Hello"
+
+
 def test_archived_message_serializes_archive_result():
     archived = ArchivedMailboxMessage(folder="INBOX", message_id="7", archive_folder="Archive", archived=True)
 
@@ -156,6 +184,34 @@ def test_list_messages_parses_headers_and_seen_flag():
     assert messages[0].sender == "sender@example.com"
     assert messages[0].recipients == "admin@example.com"
     assert messages[0].unread is False
+
+
+def test_search_messages_uses_sender_recipient_subject_and_body_criteria():
+    imap = FakeImap()
+
+    messages = _search_messages(imap, folder="INBOX", query="hello", limit=2)
+
+    assert len(messages) == 2
+    assert messages[0].subject == "Hello"
+    assert imap.search_calls[-1] == (None, _search_criteria("hello"))
+
+
+def test_search_messages_returns_empty_for_blank_query():
+    assert _search_messages(FakeImap(), folder="INBOX", query=" ", limit=10) == []
+
+
+def test_search_criteria_covers_expected_fields():
+    criteria = _search_criteria("needle")
+
+    assert criteria.count("OR") == 3
+    assert ("FROM", '"needle"') == criteria[3:5]
+    assert ("TO", '"needle"') == criteria[5:7]
+    assert ("SUBJECT", '"needle"') == criteria[7:9]
+    assert ("BODY", '"needle"') == criteria[9:11]
+
+
+def test_quote_search_value_escapes_special_characters():
+    assert _quote_search_value('hello "quoted" \\ path') == r'"hello \"quoted\" \\ path"'
 
 
 def test_get_message_parses_body_and_headers():

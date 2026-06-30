@@ -7,6 +7,8 @@ const readerMeta = document.querySelector("#reader-meta");
 const messageBody = document.querySelector("#message-body");
 const messageAttachments = document.querySelector("#message-attachments");
 const composeForm = document.querySelector("#compose-form");
+const searchForm = document.querySelector("#mailbox-search");
+const searchQuery = document.querySelector("#search-query");
 const logoutAction = document.querySelector("#mailbox-logout");
 const replyAction = document.querySelector("#reply-action");
 const forwardAction = document.querySelector("#forward-action");
@@ -50,6 +52,12 @@ composeForm?.addEventListener("submit", async (event) => {
     body: String(form.get("body") || ""),
     attachments: await filesToAttachments(composeAttachments?.files || []),
   });
+});
+
+searchForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = new FormData(searchForm);
+  await searchMailboxMessages(String(form.get("query") || "").trim());
 });
 
 replyAction?.addEventListener("click", () => {
@@ -149,11 +157,41 @@ async function loadMailboxSnapshot(folder) {
     const snapshot = await response.json();
     mailboxSession.folder = folder;
     persistMailboxSession(mailboxSession);
+    clearSearch();
     renderFolders(snapshot.folders || [], folder);
     renderMessages(snapshot.messages || []);
     setStatus(`Loaded ${snapshot.messages?.length || 0} messages from ${folder}.`, "ready");
   } catch (error) {
     setStatus(`Mailbox load failed: ${readableError(error)}`, "error");
+  }
+}
+
+async function searchMailboxMessages(query) {
+  if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
+    setStatus("Sign in to search mail.", "error");
+    return;
+  }
+  if (!query) {
+    await loadMailboxSnapshot(mailboxSession.folder);
+    return;
+  }
+  setStatus(`Searching ${mailboxSession.folder}...`, "loading");
+  try {
+    const url = new URL("/api/v1/mailbox/search", mailboxSession.apiBaseUrl);
+    url.searchParams.set("folder", mailboxSession.folder);
+    url.searchParams.set("query", query);
+    url.searchParams.set("limit", "25");
+    const response = await fetch(url, {
+      headers: mailboxHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const result = await response.json();
+    renderMessages(result.messages || []);
+    setStatus(`Found ${result.messages?.length || 0} messages for "${query}".`, "ready");
+  } catch (error) {
+    setStatus(`Search failed: ${readableError(error)}`, "error");
   }
 }
 
@@ -483,6 +521,13 @@ function forgetMailboxSession() {
   window.localStorage.removeItem(mailboxSessionStorageKey);
   mailboxSession = { email: "", token: "", apiBaseUrl: "", folder: "INBOX" };
   selectedMessageDetail = null;
+  clearSearch();
+}
+
+function clearSearch() {
+  if (searchQuery) {
+    searchQuery.value = "";
+  }
 }
 
 async function filesToAttachments(files) {

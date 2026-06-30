@@ -16,6 +16,7 @@ from .mailbox_imap import archive_mailbox_message
 from .mailbox_imap import get_mailbox_attachment
 from .mailbox_imap import get_mailbox_message
 from .mailbox_imap import list_mailbox_snapshot
+from .mailbox_imap import search_mailbox_messages
 from .mailbox_smtp import OutboundAttachment
 from .mailbox_smtp import send_mailbox_message
 from .schemas import (
@@ -36,6 +37,7 @@ from .schemas import (
     MailboxCreate,
     MailboxMessageDetailRecord,
     MailboxRecord,
+    MailboxSearchRecord,
     MailboxSendCreate,
     MailboxSendRecord,
     MailboxSessionCreate,
@@ -245,7 +247,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             connection=connection,
         )
         if limit < 1 or limit > 100:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="limit must be between 1 and 100")
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="limit must be between 1 and 100")
         try:
             snapshot = list_mailbox_snapshot(
                 email=credentials.email,
@@ -260,6 +262,43 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except imaplib.IMAP4.error as error:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Mailbox authentication failed") from error
         return snapshot.as_dict()
+
+    @app.get("/api/v1/mailbox/search", response_model=MailboxSearchRecord)
+    def mailbox_search(
+        query: str,
+        folder: str = "INBOX",
+        limit: int = 25,
+        authorization: str | None = Header(default=None),
+        x_freemail_mailbox_email: str | None = Header(default=None),
+        x_freemail_mailbox_password: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=x_freemail_mailbox_email,
+            x_freemail_mailbox_password=x_freemail_mailbox_password,
+            connection=connection,
+        )
+        clean_query = query.strip()
+        if not clean_query:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="query is required")
+        if limit < 1 or limit > 100:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="limit must be between 1 and 100")
+        try:
+            result = search_mailbox_messages(
+                email=credentials.email,
+                password=credentials.password,
+                host=active_settings.mail_core_host,
+                port=active_settings.imap_port,
+                folder=folder,
+                query=clean_query,
+                limit=limit,
+            )
+        except OSError as error:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+        except imaplib.IMAP4.error as error:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Mailbox authentication failed") from error
+        return result.as_dict()
 
     @app.get("/api/v1/mailbox/message", response_model=MailboxMessageDetailRecord)
     def mailbox_message(
@@ -395,11 +434,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 ],
             )
         except (ValueError, binascii.Error) as error:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid attachment payload") from error
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Invalid attachment payload") from error
         except smtplib.SMTPAuthenticationError as error:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Mailbox authentication failed") from error
         except smtplib.SMTPRecipientsRefused as error:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Recipient refused") from error
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Recipient refused") from error
         except (OSError, smtplib.SMTPException) as error:
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
         return {"accepted": True, **sent.as_dict()}

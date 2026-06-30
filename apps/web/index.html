@@ -40,10 +40,13 @@
             <p class="eyebrow">VPN-only webmail preview</p>
             <h1>Inbox</h1>
           </div>
-          <label class="search">
+          <form class="search" id="mailbox-search" role="search">
             <span>Search mail</span>
-            <input type="search" placeholder="sender, subject, or text">
-          </label>
+            <div>
+              <input id="search-query" name="query" type="search" placeholder="sender, subject, or text">
+              <button type="submit">Search</button>
+            </div>
+          </form>
         </header>
 
         <section class="mail-layout" aria-label="Mailbox">

@@ -387,6 +387,72 @@ def test_mailbox_session_delete_revokes_token(tmp_path, monkeypatch):
     assert snapshot_response.status_code == 401
 
 
+def test_mailbox_search_requires_mailbox_credentials(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.get("/api/v1/mailbox/search?folder=INBOX&query=hello")
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Mailbox credentials required"
+
+
+def test_mailbox_search_requires_query(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.get(
+            "/api/v1/mailbox/search?folder=INBOX&query=%20",
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+        )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "query is required"
+
+
+def test_mailbox_search_returns_imap_results(tmp_path, monkeypatch):
+    class Result:
+        def as_dict(self):
+            return {
+                "email": "admin@example.com",
+                "folder": "INBOX",
+                "query": "hello",
+                "messages": [
+                    {
+                        "folder": "INBOX",
+                        "message_id": "1",
+                        "subject": "Hello",
+                        "sender": "sender@example.net",
+                        "recipients": "admin@example.com",
+                        "date": "",
+                        "unread": False,
+                    }
+                ],
+            }
+
+    def fake_search(**kwargs):
+        assert kwargs["email"] == "admin@example.com"
+        assert kwargs["password"] == "secret"
+        assert kwargs["folder"] == "INBOX"
+        assert kwargs["query"] == "hello"
+        assert kwargs["limit"] == 10
+        return Result()
+
+    monkeypatch.setattr("freemail_api.main.search_mailbox_messages", fake_search)
+
+    with make_client(tmp_path) as client:
+        response = client.get(
+            "/api/v1/mailbox/search?folder=INBOX&query=hello&limit=10",
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["query"] == "hello"
+    assert response.json()["messages"][0]["subject"] == "Hello"
+
+
 def test_mailbox_message_requires_mailbox_credentials(tmp_path):
     with make_client(tmp_path) as client:
         response = client.get("/api/v1/mailbox/message?folder=INBOX&message_id=1")
