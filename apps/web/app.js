@@ -6,6 +6,11 @@ const readerSubject = document.querySelector("#reader-subject");
 const readerMeta = document.querySelector("#reader-meta");
 const messageBody = document.querySelector("#message-body");
 const composeForm = document.querySelector("#compose-form");
+const replyAction = document.querySelector("#reply-action");
+const forwardAction = document.querySelector("#forward-action");
+const composeTo = document.querySelector("#compose-to");
+const composeSubject = document.querySelector("#compose-subject");
+const composeBody = document.querySelector("#compose-body");
 
 let mailboxSession = {
   email: "",
@@ -13,6 +18,7 @@ let mailboxSession = {
   apiBaseUrl: "",
   folder: "INBOX",
 };
+let selectedMessageDetail = null;
 
 loginForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -37,6 +43,22 @@ composeForm?.addEventListener("submit", async (event) => {
     subject: String(form.get("subject") || "").trim(),
     body: String(form.get("body") || ""),
   });
+});
+
+replyAction?.addEventListener("click", () => {
+  if (!selectedMessageDetail) {
+    setStatus("Select a message before replying.", "error");
+    return;
+  }
+  prefillReply(selectedMessageDetail);
+});
+
+forwardAction?.addEventListener("click", () => {
+  if (!selectedMessageDetail) {
+    setStatus("Select a message before forwarding.", "error");
+    return;
+  }
+  prefillForward(selectedMessageDetail);
 });
 
 async function loadMailboxSnapshot(folder) {
@@ -121,6 +143,7 @@ function renderMessages(messages) {
     return;
   }
   if (!messages.length) {
+    selectedMessageDetail = null;
     messageList.replaceChildren(emptyMessage());
     readerSubject.textContent = "No messages";
     readerMeta.textContent = "Select another folder or refresh the mailbox.";
@@ -162,12 +185,70 @@ async function selectMessage(message, row) {
   renderMessageBody("Loading message...");
   try {
     const detail = await loadMailboxMessage(message.folder, message.messageId);
+    selectedMessageDetail = detail;
     readerSubject.textContent = detail.subject || "(no subject)";
     readerMeta.textContent = `From ${detail.sender || "Unknown sender"} to ${detail.recipients || mailboxSession.email}`;
     renderMessageBody(detail.body || "(No plain text body)");
   } catch (error) {
+    selectedMessageDetail = null;
     renderMessageBody(`Message load failed: ${readableError(error)}`);
   }
+}
+
+function prefillReply(message) {
+  fillCompose({
+    to: addressOnly(message.sender),
+    subject: prefixedSubject("Re:", message.subject),
+    body: quoteMessage(message, "reply"),
+  });
+  setStatus("Reply draft ready.", "ready");
+}
+
+function prefillForward(message) {
+  fillCompose({
+    to: "",
+    subject: prefixedSubject("Fwd:", message.subject),
+    body: quoteMessage(message, "forward"),
+  });
+  setStatus("Forward draft ready.", "ready");
+}
+
+function fillCompose({ to, subject, body }) {
+  if (composeTo) {
+    composeTo.value = to;
+  }
+  if (composeSubject) {
+    composeSubject.value = subject;
+  }
+  if (composeBody) {
+    composeBody.value = body;
+    composeBody.focus();
+  }
+}
+
+function prefixedSubject(prefix, subject) {
+  const cleanSubject = subject || "(no subject)";
+  return cleanSubject.toLowerCase().startsWith(prefix.toLowerCase()) ? cleanSubject : `${prefix} ${cleanSubject}`;
+}
+
+function quoteMessage(message, mode) {
+  const label = mode === "forward" ? "Forwarded message" : "Original message";
+  const lines = [
+    "",
+    "",
+    `---- ${label} ----`,
+    `From: ${message.sender || "Unknown sender"}`,
+    `To: ${message.recipients || mailboxSession.email}`,
+    `Subject: ${message.subject || "(no subject)"}`,
+    "",
+    message.body || "",
+  ];
+  return lines.join("\n");
+}
+
+function addressOnly(value) {
+  const match = String(value || "").match(/<([^>]+)>/);
+  return match ? match[1] : String(value || "").trim();
 }
 
 async function loadMailboxMessage(folder, messageId) {

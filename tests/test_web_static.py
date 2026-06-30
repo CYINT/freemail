@@ -36,6 +36,7 @@ def test_static_web_validation_flags_credential_storage():
         '<input id="api-base-url"><p id="mailbox-status">Ready</p></form>'
         '<div id="message-body"></div>'
         '<form class="compose-panel" id="compose-form"></form>'
+        '<button id="reply-action">Reply</button><button id="forward-action">Forward</button>'
         '<section class="message-list"><article class="message-row reader compose-panel">'
         "Inbox Compose Reply Forward Attach Send Junk Mail</article></section></main>"
     )
@@ -45,7 +46,8 @@ def test_static_web_validation_flags_credential_storage():
         "@media (max-width: 640px) {} button { min-height: 38px; outline: 1px solid; border-radius: 8px; }",
         "fetch('/api/v1/mailbox/snapshot', {headers: {'X-FreeMail-Mailbox-Email': '', "
         "'X-FreeMail-Mailbox-Password': ''}}); fetch('/api/v1/mailbox/message'); "
-        "renderMessageBody('body'); fetch('/api/v1/mailbox/send', {method: \"POST\", "
+        "renderMessageBody('body'); prefillReply({}); prefillForward({}); quoteMessage({}, 'reply'); "
+        "fetch('/api/v1/mailbox/send', {method: \"POST\", "
         'headers: {"Content-Type": "application/json"}}); localStorage.setItem(\'mailbox\', \'secret\');',
     )
 
