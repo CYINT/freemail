@@ -2,6 +2,21 @@
 
 FreeMail release gates are intended for private-beta and later release candidates. They do not make the stack public; the current deployment posture remains VPN-only.
 
+Before the hard gate, inspect the local release packet without touching Docker, GitHub, or live runtime URLs:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\release_packet_status.py `
+  --metadata-backup .freemail-qa\backups\metadata.json `
+  --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
+  --mobile-release-evidence .freemail-qa\mobile-release-evidence.json `
+  --require-mobile-store-submission `
+  --private-beta-evidence .freemail-qa\private-beta-gate-example.com.json `
+  --release-notes docs\release-notes\v0.1.0-private-beta.md `
+  --release-version v0.1.0-private-beta
+```
+
+The packet status command is read-only. It reports missing, empty, and invalid artifacts, runs the local mobile, private-beta, and release-notes evidence checks, and records SHA-256 checksums for present artifacts. Passing packet status does not replace the full release gate because it intentionally excludes Git, GitHub Actions, Docker Compose, runtime health, deployment-boundary, metadata-readiness, and mail-core-readiness checks.
+
 Run the gate from a clean checkout after pushing the candidate commit to `CYINT/freemail` and after GitHub Actions CI has passed for that exact commit:
 
 ```powershell

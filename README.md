@@ -369,6 +369,21 @@ Restore drills should target a separate volume before replacing the active Stalw
 
 Read `docs/upgrade.md` and `docs/release-gates.md` before private-beta upgrades or release-candidate work.
 
+Before running the hard release gate, inspect the local release packet inventory:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\release_packet_status.py `
+  --metadata-backup .freemail-qa\backups\metadata.json `
+  --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
+  --mobile-release-evidence .freemail-qa\mobile-release-evidence.json `
+  --require-mobile-store-submission `
+  --private-beta-evidence .freemail-qa\private-beta-gate-example.com.json `
+  --release-notes docs\release-notes\v0.1.0-private-beta.md `
+  --release-version v0.1.0-private-beta
+```
+
+The packet status command is read-only. It reports missing, empty, and failing packet artifacts without invoking Docker, GitHub, or live runtime URLs.
+
 Run the local release gate only after the candidate commit has been pushed and GitHub Actions CI has passed for that exact commit:
 
 ```powershell
