@@ -185,7 +185,11 @@ def test_release_packet_status_script_uses_default_release_notes():
     artifacts = {artifact["flag"]: artifact for artifact in payload["artifacts"]}
     release_notes_check = next(check for check in payload["checks"] if check["name"] == "release-notes")
     assert "--release-notes" not in payload["missingArtifacts"]
-    assert artifacts["--release-notes"]["path"] == "docs\\release-notes\\v0.1.0-private-beta.md"
+    assert Path(artifacts["--release-notes"]["path"]).parts == (
+        "docs",
+        "release-notes",
+        "v0.1.0-private-beta.md",
+    )
     assert release_notes_check["status"] == "pass"
 
 
