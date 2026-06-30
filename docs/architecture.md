@@ -48,20 +48,22 @@ Current spike evidence:
 
 - `docker compose --profile mail-core up -d mail-core` starts the Stalwart candidate.
 - Mail-core ports remain host-loopback-bound by Compose.
+- Compose mounts Stalwart's config at `/etc/stalwart/config.json` and persists Stalwart data at `/var/lib/stalwart`.
 - Stalwart reports healthy after first boot.
-- The first boot enters Stalwart bootstrap/setup mode; this is acceptable for the spike but is not a production-ready mail-domain configuration.
-- `scripts/qa_mail_core.py` distinguishes TCP reachability from protocol readiness so bootstrap mode cannot be mistaken for completed SMTP/submission/IMAP proof.
+- The configured Stalwart profile starts protocol listeners for SMTP, implicit-TLS submission, implicit-TLS IMAP, and JMAP/admin.
+- `scripts/qa_mail_core.py --strict` distinguishes TCP reachability from protocol readiness and passes only when all expected protocol surfaces respond.
 
 Remaining spike work:
 
-- complete Stalwart initial setup through configuration or API
-- configure one controlled domain and mailbox
+- configure one controlled production domain and mailbox
 - prove SMTP receive on the loopback-bound SMTP port
 - prove authenticated submission on the loopback-bound submission port
 - prove IMAP or JMAP mailbox access
 
 ## Stalwart Provisioning Plan
 
-FreeMail exports Stalwart `apply` NDJSON through `scripts/export_stalwart_apply_plan.py`. The exporter emits idempotent domain, DKIM signature, account, and alias/list operations from the FreeMail metadata store.
+FreeMail exports Stalwart `apply` NDJSON through `scripts/export_stalwart_apply_plan.py`. The exporter emits idempotent domain, DKIM signature, and account operations from the FreeMail metadata store. FreeMail one-to-one aliases are provisioned as account aliases.
 
 The exporter intentionally requires a separate ignored secrets JSON file for account secrets. FreeMail stores password hashes only, so it cannot derive plaintext mail-core credentials from the admin database.
+
+The exported plan uses Stalwart CLI upsert operations grouped by object type. It is intended to run after Stalwart's initial `Bootstrap` singleton has been completed; while the server remains in bootstrap mode, Stalwart rejects all object access except `Bootstrap`.

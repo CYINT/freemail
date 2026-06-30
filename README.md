@@ -96,6 +96,8 @@ docker compose --profile mail-core up --build -d
 
 Do not publish FreeMail directly to the public internet during the current phase. Local deployment target is `freemail.kuzuryu.ai` over the private Dragonscale/VPN path only.
 
+The Stalwart profile mounts `ops\stalwart\config.json` at `/etc/stalwart/config.json` and persists mail-core data in the `freemail_stalwart` Docker volume at `/var/lib/stalwart`. The default Stalwart listener set is exposed on loopback as SMTP `2525`, implicit-TLS submission `2465`, implicit-TLS IMAP `2993`, JMAP/admin `18092`, and HTTPS `18443`.
+
 `scripts\qa_mail_core.py` exits successfully when the configured mail-core ports are reachable and reports whether each protocol is actually ready. Add `--strict` when the Stalwart setup is expected to pass SMTP, submission, IMAP, and JMAP checks.
 
 FreeMail can export a Stalwart `apply` plan from admin metadata:
@@ -105,6 +107,12 @@ FreeMail can export a Stalwart `apply` plan from admin metadata:
 ```
 
 Keep `secrets\mail-core-users.json` ignored and local. It maps mailbox email addresses to Stalwart account secrets because FreeMail stores password hashes only and cannot recover user passwords for mail-core provisioning.
+
+The plan is newline-delimited JSON for `stalwart-cli apply`. Stalwart must be taken out of first-boot bootstrap mode before domain, account, or DKIM objects can be applied:
+
+```powershell
+docker run --rm -i -e STALWART_URL -e STALWART_USER -e STALWART_PASSWORD ghcr.io/stalwartlabs/cli apply --stdin < .freemail-qa\stalwart-plan.ndjson
+```
 
 ## VPN-Only Deployment
 

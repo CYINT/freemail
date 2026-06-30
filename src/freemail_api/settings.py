@@ -15,8 +15,8 @@ class Settings(BaseSettings):
     bootstrap_token: str | None = Field(default=None, validation_alias="FREEMAIL_BOOTSTRAP_TOKEN")
     mail_core_host: str = Field(default="127.0.0.1", validation_alias="FREEMAIL_MAIL_CORE_HOST")
     smtp_port: int = Field(default=2525, validation_alias="FREEMAIL_SMTP_PORT")
-    submission_port: int = Field(default=2587, validation_alias="FREEMAIL_SUBMISSION_PORT")
-    imap_port: int = Field(default=2143, validation_alias="FREEMAIL_IMAP_PORT")
+    submission_port: int = Field(default=2465, validation_alias="FREEMAIL_SUBMISSION_PORT")
+    imap_port: int = Field(default=2993, validation_alias="FREEMAIL_IMAP_PORT")
     jmap_port: int = Field(default=18092, validation_alias="FREEMAIL_JMAP_PORT")
     vpn_only: bool = True
 

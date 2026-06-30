@@ -50,13 +50,29 @@ def test_build_apply_plan_exports_domains_dkim_accounts_and_aliases(tmp_path):
 
         plan = build_apply_plan(connection, PlanOptions(user_secrets={"admin@example.com": "mail-secret"}))
 
-    assert [operation["object"] for operation in plan] == ["Domain", "DkimSignature", "Account", "EmailList"]
-    assert plan[0]["id"] == "example.com"
-    assert plan[1]["params"]["selector"] == "mail"
-    assert plan[2]["params"]["emails"] == ["admin@example.com"]
-    assert plan[2]["params"]["secrets"] == ["mail-secret"]
-    assert plan[2]["params"]["roles"] == ["admin"]
-    assert plan[3]["params"]["members"] == ["admin@example.com"]
+    assert [operation["@type"] for operation in plan] == ["upsert", "upsert", "upsert"]
+    assert [operation["object"] for operation in plan] == ["Domain", "DkimSignature", "Account"]
+    assert plan[0]["matchOn"] == ["name"]
+    assert plan[0]["value"]["domain-example-com"]["name"] == "example.com"
+    assert plan[1]["matchOn"] == ["selector", "domainId"]
+    assert plan[1]["value"]["dkim-mail-example-com"]["@type"] == "Dkim1RsaSha256"
+    assert plan[1]["value"]["dkim-mail-example-com"]["selector"] == "mail"
+    assert plan[1]["value"]["dkim-mail-example-com"]["privateKey"] == {
+        "@type": "Text",
+        "secret": "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----\n",
+    }
+    assert plan[2]["matchOn"] == ["emailAddress"]
+    assert plan[2]["value"]["account-admin-example-com"]["name"] == "admin"
+    assert plan[2]["value"]["account-admin-example-com"]["emailAddress"] == "admin@example.com"
+    assert plan[2]["value"]["account-admin-example-com"]["domainId"] == "#domain-example-com"
+    assert plan[2]["value"]["account-admin-example-com"]["credentials"]["0"] == {
+        "@type": "Password",
+        "secret": "mail-secret",
+    }
+    assert plan[2]["value"]["account-admin-example-com"]["aliases"] == {
+        "0": {"name": "hello", "domainId": "#domain-example-com"}
+    }
+    assert plan[2]["value"]["account-admin-example-com"]["roles"] == {"@type": "User"}
 
 
 def test_build_apply_plan_requires_user_secret_by_default(tmp_path):
