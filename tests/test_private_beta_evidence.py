@@ -8,6 +8,7 @@ import pytest
 from freemail_api.private_beta_evidence import (
     PrivateBetaEvidenceTemplateOptions,
     create_private_beta_evidence_templates,
+    load_private_beta_gate_options_from_manifest,
 )
 from freemail_api.private_beta_gate import PrivateBetaGateOptions, run_private_beta_gate
 
@@ -41,6 +42,13 @@ def test_private_beta_evidence_templates_create_draft_packet(tmp_path):
     assert manifest["draftOnly"] is True
     assert "--mail-flow-evidence" in manifest["privateBetaGateInputs"]
     assert "--mail-core-apply-evidence" in manifest["privateBetaGateInputs"]
+    options = load_private_beta_gate_options_from_manifest(tmp_path / "private-beta-evidence-manifest.example.com.json")
+    assert options.domain == "example.com"
+    assert options.mail_flow_evidence == tmp_path / "mail-flow.example.com.json"
+    assert options.queue_evidence == tmp_path / "queue.example.com.json"
+    assert options.mail_core_apply_evidence == tmp_path / "mail-core-apply.example.com.json"
+    assert options.metadata_backup == tmp_path / "metadata-backup.example.com.json"
+    assert options.mail_store_backup == tmp_path / "stalwart-mail-store.example.com.tar.gz"
 
 
 def test_private_beta_evidence_templates_do_not_accidentally_pass_gate(tmp_path):
@@ -138,3 +146,102 @@ def test_private_beta_evidence_templates_script(tmp_path):
     payload = json.loads(result.stdout)
     assert payload["domain"] == "example.com"
     assert (tmp_path / "private-beta-evidence-manifest.example.com.json").is_file()
+
+
+def test_private_beta_gate_script_accepts_manifest_packet(tmp_path):
+    create_private_beta_evidence_templates(
+        PrivateBetaEvidenceTemplateOptions(
+            domain="example.com",
+            output_dir=tmp_path,
+            checked_at=datetime(2026, 6, 30, tzinfo=timezone.utc),
+        )
+    )
+    (tmp_path / "mail-flow.example.com.json").write_text(
+        json.dumps(
+            {
+                "passed": True,
+                "checkedAt": "2026-06-30T00:00:00Z",
+                "inboundAccepted": True,
+                "inboundFound": {"folder": "INBOX", "message_ids": ["1"]},
+                "submissionAccepted": True,
+                "submissionFound": {"folder": "Sent", "message_ids": ["2"]},
+                "requiredDkimDomain": "example.com",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "queue.example.com.json").write_text(
+        json.dumps({"passed": True, "pending": 0, "due": 0, "reviewedAt": "2026-06-30T00:00:00Z"}),
+        encoding="utf-8",
+    )
+    (tmp_path / "mail-core-apply.example.com.json").write_text(
+        json.dumps(
+            {
+                "applied": True,
+                "appliedAt": "2026-06-30T00:00:00Z",
+                "appliedBy": "operator",
+                "domain": "example.com",
+                "planStatus": {
+                    "ready": True,
+                    "operationTypes": ["Domain", "DkimSignature", "Account"],
+                    "domains": 1,
+                    "dkimKeys": 1,
+                    "accounts": 1,
+                    "aliases": 0,
+                    "missingProvisioningSecrets": [],
+                },
+                "result": {"exitCode": 0, "stdoutSha256": "a" * 64, "stderrSha256": "b" * 64},
+                "postApplyReadiness": {"mailCoreReady": True, "queueClear": True},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "deliverability.example.com.json").write_text(
+        json.dumps(
+            {
+                "passed": True,
+                "domain": "example.com",
+                "checkedAt": "2026-06-30T00:00:00Z",
+                "spfAligned": True,
+                "dmarcAligned": True,
+                "dkimAligned": True,
+                "queueReviewed": True,
+                "bounceOrRetryReviewed": True,
+                "abuseComplaints": 0,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "metadata-backup.example.com.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "stalwart-mail-store.example.com.tar.gz").write_bytes(b"backup")
+    (tmp_path / "private-beta-acceptance.example.com.json").write_text(
+        json.dumps(
+            {
+                "accepted": True,
+                "acceptedAt": "2026-06-30T00:00:00Z",
+                "decisionOwner": "CEO",
+                "accessBoundary": "Dragonscale/VPN clients only",
+                "knownLimitations": ["private beta only"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/private_beta_gate.py",
+            "--manifest",
+            str(tmp_path / "private-beta-evidence-manifest.example.com.json"),
+            "--skip-runtime",
+            "--skip-dns",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["passed"] is True
+    assert "mail-core-apply-evidence" in {check["name"] for check in payload["checks"]}

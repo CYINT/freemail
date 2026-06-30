@@ -7,11 +7,17 @@ from pathlib import Path
 import re
 from typing import Any
 
+from .private_beta_gate import PrivateBetaGateOptions
+
 
 EVIDENCE_FILENAMES = {
     "observed_dns": "observed-dns.{domain}.json",
+    "mail_flow": "mail-flow.{domain}.json",
+    "queue": "queue.{domain}.json",
     "mail_core_apply": "mail-core-apply.{domain}.json",
     "deliverability": "deliverability.{domain}.json",
+    "metadata_backup": "metadata-backup.{domain}.json",
+    "mail_store_backup": "stalwart-mail-store.{domain}.tar.gz",
     "acceptance": "private-beta-acceptance.{domain}.json",
     "manifest": "private-beta-evidence-manifest.{domain}.json",
 }
@@ -53,6 +59,24 @@ def create_private_beta_evidence_templates(options: PrivateBetaEvidenceTemplateO
         "generatedAt": checked_at,
         "files": {**{name: str(path) for name, path in paths.items()}, "manifest": str(manifest_path)},
     }
+
+
+def load_private_beta_gate_options_from_manifest(path: Path) -> PrivateBetaGateOptions:
+    payload = _load_json(path)
+    inputs = payload.get("privateBetaGateInputs")
+    if not isinstance(inputs, dict):
+        raise ValueError("private-beta evidence manifest must contain privateBetaGateInputs")
+    return PrivateBetaGateOptions(
+        domain=str(payload.get("domain") or "").strip() or None,
+        observed_dns=_manifest_input_path(path, inputs, "--observed-dns"),
+        mail_flow_evidence=_manifest_input_path(path, inputs, "--mail-flow-evidence"),
+        queue_evidence=_manifest_input_path(path, inputs, "--queue-evidence"),
+        mail_core_apply_evidence=_manifest_input_path(path, inputs, "--mail-core-apply-evidence"),
+        deliverability_evidence=_manifest_input_path(path, inputs, "--deliverability-evidence"),
+        metadata_backup=_manifest_input_path(path, inputs, "--metadata-backup"),
+        mail_store_backup=_manifest_input_path(path, inputs, "--mail-store-backup"),
+        acceptance=_manifest_input_path(path, inputs, "--acceptance"),
+    )
 
 
 def _normalize_domain(domain: str) -> str:
@@ -174,17 +198,33 @@ def _manifest_template(domain: str, generated_at: str, paths: dict[str, Path]) -
         "generatedAt": generated_at,
         "draftOnly": True,
         "privateBetaGateInputs": {
-            "--observed-dns": str(paths["observed_dns"]),
-            "--deliverability-evidence": str(paths["deliverability"]),
-            "--acceptance": str(paths["acceptance"]),
-            "--mail-flow-evidence": "Generate with scripts/qa_mail_flow.py after controlled-domain mail flow.",
-            "--queue-evidence": "Generate with scripts/qa_stalwart_queue.py after controlled-domain mail flow.",
-            "--mail-core-apply-evidence": str(paths["mail_core_apply"]),
-            "--metadata-backup": "Generate with scripts/backup_metadata.py before beta access.",
-            "--mail-store-backup": "Generate with scripts/backup_mail_store.py before beta access.",
+            "--observed-dns": paths["observed_dns"].name,
+            "--mail-flow-evidence": paths["mail_flow"].name,
+            "--queue-evidence": paths["queue"].name,
+            "--mail-core-apply-evidence": paths["mail_core_apply"].name,
+            "--deliverability-evidence": paths["deliverability"].name,
+            "--metadata-backup": paths["metadata_backup"].name,
+            "--mail-store-backup": paths["mail_store_backup"].name,
+            "--acceptance": paths["acceptance"].name,
         },
         "releaseBoundary": "VPN-only private beta on freemail.kuzuryu.ai until public release gates are explicitly satisfied.",
     }
+
+
+def _manifest_input_path(manifest_path: Path, inputs: dict[str, Any], flag: str) -> Path | None:
+    raw_value = inputs.get(flag)
+    if not isinstance(raw_value, str) or not raw_value.strip():
+        return None
+    value = Path(raw_value)
+    return value if value.is_absolute() else manifest_path.parent / value
+
+
+def _load_json(path: Path) -> dict[str, Any]:
+    with path.open("r", encoding="utf-8-sig") as handle:
+        payload = json.load(handle)
+    if not isinstance(payload, dict):
+        raise ValueError(f"{path} must contain a JSON object")
+    return payload
 
 
 def _write_json(path: Path, payload: dict[str, Any], *, force: bool) -> None:
