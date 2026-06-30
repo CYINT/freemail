@@ -57,6 +57,7 @@ const adminAuthForm = document.querySelector("#admin-auth");
 const adminApiBaseUrl = document.querySelector("#admin-api-base-url");
 const adminEmailInput = document.querySelector("#admin-email");
 const adminPasswordInput = document.querySelector("#admin-password");
+const adminTotpCodeInput = document.querySelector("#admin-totp-code");
 const adminTokenInput = document.querySelector("#admin-token");
 const bootstrapTokenInput = document.querySelector("#bootstrap-token");
 const adminStatus = document.querySelector("#admin-status");
@@ -66,6 +67,9 @@ const adminRefreshAction = document.querySelector("#admin-refresh-action");
 const bootstrapAdminForm = document.querySelector("#bootstrap-admin-form");
 const adminDomainForm = document.querySelector("#admin-domain-form");
 const adminUserForm = document.querySelector("#admin-user-form");
+const adminMfaForm = document.querySelector("#admin-mfa-form");
+const adminMfaSetupAction = document.querySelector("#admin-mfa-setup-action");
+const adminMfaDisableAction = document.querySelector("#admin-mfa-disable-action");
 const adminUserPasswordForm = document.querySelector("#admin-user-password-form");
 const adminMailboxForm = document.querySelector("#admin-mailbox-form");
 const adminMailboxQuotaForm = document.querySelector("#admin-mailbox-quota-form");
@@ -314,6 +318,7 @@ adminAuthForm?.addEventListener("submit", async (event) => {
     apiBaseUrl: String(form.get("apiBaseUrl") || "").trim().replace(/\/+$/, ""),
     adminEmail: String(form.get("adminEmail") || "").trim(),
     adminPassword: String(form.get("adminPassword") || ""),
+    adminTotpCode: String(form.get("adminTotpCode") || "").trim(),
     adminToken: String(form.get("adminToken") || ""),
     bootstrapToken: String(form.get("bootstrapToken") || ""),
   });
@@ -363,6 +368,20 @@ adminUserForm?.addEventListener("submit", async (event) => {
     },
     "User invited.",
   );
+});
+
+adminMfaSetupAction?.addEventListener("click", async () => {
+  await setupAdminTotp();
+});
+
+adminMfaForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = new FormData(adminMfaForm);
+  await verifyAdminTotp(String(form.get("totpCode") || "").trim());
+});
+
+adminMfaDisableAction?.addEventListener("click", async () => {
+  await disableAdminTotp();
 });
 
 adminUserPasswordForm?.addEventListener("submit", async (event) => {
@@ -1725,7 +1744,7 @@ function forgetMailboxSession() {
   clearSearch();
 }
 
-async function saveAdminSession({ apiBaseUrl, adminEmail, adminPassword, adminToken, bootstrapToken }) {
+async function saveAdminSession({ apiBaseUrl, adminEmail, adminPassword, adminTotpCode, adminToken, bootstrapToken }) {
   if (!apiBaseUrl) {
     setAdminStatus("Enter an API URL before saving admin access.", "error");
     return;
@@ -1747,7 +1766,7 @@ async function saveAdminSession({ apiBaseUrl, adminEmail, adminPassword, adminTo
       const response = await fetch(new URL("/api/v1/admin/session", apiBaseUrl), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: adminEmail, password: adminPassword }),
+        body: JSON.stringify({ email: adminEmail, password: adminPassword, totpCode: adminTotpCode || null }),
       });
       if (!response.ok) {
         throw new Error(await response.text());
@@ -1758,6 +1777,9 @@ async function saveAdminSession({ apiBaseUrl, adminEmail, adminPassword, adminTo
       if (adminPasswordInput) {
         adminPasswordInput.value = "";
       }
+      if (adminTotpCodeInput) {
+        adminTotpCodeInput.value = "";
+      }
     } catch (error) {
       forgetAdminSession();
       setAdminStatus(`Admin sign in failed: ${readableError(error)}`, "error");
@@ -1766,6 +1788,78 @@ async function saveAdminSession({ apiBaseUrl, adminEmail, adminPassword, adminTo
   }
   persistAdminSession(adminSession);
   setAdminStatus(hasAdminCredential() ? "Admin session saved in this browser profile." : "Admin settings saved.", "ready");
+}
+
+async function setupAdminTotp() {
+  if (!adminSession.apiBaseUrl || !hasAdminCredential()) {
+    setAdminStatus("Save an admin login session before setting up MFA.", "error");
+    return;
+  }
+  setAdminStatus("Generating authenticator setup...", "loading");
+  try {
+    const response = await fetch(new URL("/api/v1/admin/mfa/totp/setup", adminSession.apiBaseUrl), {
+      method: "POST",
+      headers: adminHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const result = await response.json();
+    renderAdminResult("Admin MFA setup", {
+      secret: result.secret,
+      otpauthUri: result.otpauthUri,
+      enabled: result.enabled,
+    });
+    setAdminStatus("Authenticator setup generated. Add it to your app, then enter a code to enable MFA.", "ready");
+  } catch (error) {
+    setAdminStatus(`MFA setup failed: ${readableError(error)}`, "error");
+  }
+}
+
+async function verifyAdminTotp(code) {
+  if (!adminSession.apiBaseUrl || !hasAdminCredential()) {
+    setAdminStatus("Save an admin login session before enabling MFA.", "error");
+    return;
+  }
+  setAdminStatus("Verifying authenticator code...", "loading");
+  try {
+    const response = await fetch(new URL("/api/v1/admin/mfa/totp/verify", adminSession.apiBaseUrl), {
+      method: "POST",
+      headers: adminHeaders(),
+      body: JSON.stringify({ code }),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const result = await response.json();
+    renderAdminResult("Admin MFA enabled", result);
+    setAdminStatus("Admin MFA enabled.", "ready");
+    adminMfaForm?.reset();
+  } catch (error) {
+    setAdminStatus(`MFA verification failed: ${readableError(error)}`, "error");
+  }
+}
+
+async function disableAdminTotp() {
+  if (!adminSession.apiBaseUrl || !hasAdminCredential()) {
+    setAdminStatus("Save an admin login session before disabling MFA.", "error");
+    return;
+  }
+  setAdminStatus("Disabling admin MFA...", "loading");
+  try {
+    const response = await fetch(new URL("/api/v1/admin/mfa/totp", adminSession.apiBaseUrl), {
+      method: "DELETE",
+      headers: adminHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const result = await response.json();
+    renderAdminResult("Admin MFA disabled", result);
+    setAdminStatus("Admin MFA disabled.", "ready");
+  } catch (error) {
+    setAdminStatus(`MFA disable failed: ${readableError(error)}`, "error");
+  }
 }
 
 async function revokeAdminSession() {

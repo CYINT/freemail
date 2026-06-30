@@ -92,6 +92,14 @@ CREATE TABLE IF NOT EXISTS admin_sessions (
 
 CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires_at ON admin_sessions(expires_at);
 
+CREATE TABLE IF NOT EXISTS admin_totp_secrets (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    encrypted_secret TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS outbound_send_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     mailbox_email TEXT NOT NULL,
@@ -199,6 +207,7 @@ REQUIRED_TABLE_COLUMNS = {
     },
     "mailbox_sessions": {"id", "token_hash", "email", "encrypted_password", "expires_at", "created_at"},
     "admin_sessions": {"id", "token_hash", "user_id", "email", "expires_at", "created_at"},
+    "admin_totp_secrets": {"user_id", "encrypted_secret", "enabled", "created_at", "updated_at"},
     "outbound_send_events": {"id", "mailbox_email", "recipient_count", "created_at"},
     "mailbox_push_devices": {
         "id",
@@ -288,6 +297,7 @@ def list_rows(connection: sqlite3.Connection, table: str) -> list[sqlite3.Row]:
         "mailboxes",
         "aliases",
         "audit_log",
+        "admin_totp_secrets",
         "dkim_keys",
         "mailbox_preferences",
         "mailbox_contacts",
@@ -384,6 +394,60 @@ def update_user_password(
     _audit(connection, actor, "user.password.update", "user", user_id)
     connection.commit()
     return _get_row(connection, "users", user_id)
+
+
+def get_admin_totp_secret(connection: sqlite3.Connection, user_id: int) -> sqlite3.Row | None:
+    return connection.execute("SELECT * FROM admin_totp_secrets WHERE user_id = ?", [user_id]).fetchone()
+
+
+def upsert_admin_totp_secret(
+    connection: sqlite3.Connection,
+    *,
+    user_id: int,
+    encrypted_secret: str,
+    actor: str,
+) -> sqlite3.Row:
+    _get_row(connection, "users", user_id)
+    connection.execute(
+        """
+        INSERT INTO admin_totp_secrets (user_id, encrypted_secret, enabled, updated_at)
+        VALUES (?, ?, 0, CURRENT_TIMESTAMP)
+        ON CONFLICT(user_id) DO UPDATE SET
+            encrypted_secret = excluded.encrypted_secret,
+            enabled = 0,
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        [user_id, encrypted_secret],
+    )
+    _audit(connection, actor, "admin_mfa.totp.setup", "user", user_id)
+    connection.commit()
+    row = get_admin_totp_secret(connection, user_id)
+    if row is None:
+        raise MissingRecordError("admin TOTP secret was not created")
+    return row
+
+
+def enable_admin_totp(connection: sqlite3.Connection, *, user_id: int, actor: str) -> sqlite3.Row:
+    row = get_admin_totp_secret(connection, user_id)
+    if row is None:
+        raise MissingRecordError("admin TOTP setup does not exist")
+    connection.execute(
+        "UPDATE admin_totp_secrets SET enabled = 1, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?",
+        [user_id],
+    )
+    _audit(connection, actor, "admin_mfa.totp.enable", "user", user_id)
+    connection.commit()
+    enabled = get_admin_totp_secret(connection, user_id)
+    if enabled is None:
+        raise MissingRecordError("admin TOTP setup does not exist")
+    return enabled
+
+
+def delete_admin_totp(connection: sqlite3.Connection, *, user_id: int, actor: str) -> None:
+    _get_row(connection, "users", user_id)
+    connection.execute("DELETE FROM admin_totp_secrets WHERE user_id = ?", [user_id])
+    _audit(connection, actor, "admin_mfa.totp.disable", "user", user_id)
+    connection.commit()
 
 
 def create_mailbox(connection: sqlite3.Connection, payload: MailboxCreate, actor: str) -> sqlite3.Row:
@@ -892,6 +956,8 @@ def _execute_insert(connection: sqlite3.Connection, statement: str, values: Iter
 
 
 def _metadata_order_column(table: str) -> str:
+    if table == "admin_totp_secrets":
+        return "user_id"
     if table == "mailbox_contacts":
         return "mailbox_email, contact_email"
     if table == "mailbox_preferences":
@@ -922,6 +988,18 @@ def _migrate_schema(connection: sqlite3.Connection) -> None:
         """
     )
     connection.execute("CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires_at ON admin_sessions(expires_at)")
+    connection.commit()
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS admin_totp_secrets (
+            user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+            encrypted_secret TEXT NOT NULL,
+            enabled INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
     connection.commit()
     columns = {row["name"] for row in connection.execute("PRAGMA table_info(mailbox_push_devices)")}
     if "encrypted_push_token" not in columns:

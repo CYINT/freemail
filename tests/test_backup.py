@@ -52,6 +52,13 @@ def test_metadata_backup_round_trip_preserves_core_metadata_and_key_material(tmp
             display_name="Admin User",
             signature="Regards,\nAdmin",
         )
+        database.upsert_admin_totp_secret(
+            connection,
+            user_id=1,
+            encrypted_secret="encrypted-totp-secret",
+            actor="test",
+        )
+        database.enable_admin_totp(connection, user_id=1, actor="test")
         database.upsert_saved_mailbox_contact(
             connection,
             email="admin@example.com",
@@ -74,6 +81,8 @@ def test_metadata_backup_round_trip_preserves_core_metadata_and_key_material(tmp
     assert "mailbox_push_devices" not in backup["tables"]
     assert "mailbox_push_notifications" not in backup["tables"]
     assert backup["tables"]["dkim_keys"][0]["private_key_pem"] == "private-key-pem"
+    assert backup["tables"]["admin_totp_secrets"][0]["encrypted_secret"] == "encrypted-totp-secret"
+    assert backup["tables"]["admin_totp_secrets"][0]["enabled"] == 1
     assert backup["tables"]["mailboxes"][0]["quota_bytes"] == 10_737_418_240
     assert backup["tables"]["mailbox_preferences"][0]["signature"] == "Regards,\nAdmin"
     assert backup["tables"]["mailbox_contacts"][0]["contact_email"] == "saved@example.net"
@@ -88,6 +97,9 @@ def test_metadata_backup_round_trip_preserves_core_metadata_and_key_material(tmp
         assert [dict(row) for row in database.list_rows(connection, "aliases")] == backup["tables"]["aliases"]
         assert [dict(row) for row in database.list_rows(connection, "dkim_keys")] == backup["tables"]["dkim_keys"]
         assert [dict(row) for row in database.list_rows(connection, "audit_log")] == backup["tables"]["audit_log"]
+        assert [dict(row) for row in database.list_rows(connection, "admin_totp_secrets")] == backup["tables"][
+            "admin_totp_secrets"
+        ]
         assert [dict(row) for row in database.list_rows(connection, "mailbox_preferences")] == backup["tables"][
             "mailbox_preferences"
         ]

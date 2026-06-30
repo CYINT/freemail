@@ -54,6 +54,9 @@ from .schemas import (
     AdminSessionDeleteRecord,
     AdminSessionRecord,
     AdminStatusUpdate,
+    AdminTotpSetupRecord,
+    AdminTotpStatusRecord,
+    AdminTotpVerifyCreate,
     AliasCreate,
     AliasRecord,
     AuditRecord,
@@ -137,6 +140,9 @@ from .secret_box import SecretBoxDecryptionError
 from .settings import get_settings
 from .settings import Settings
 from .stalwart_plan import build_apply_plan_status
+from .totp import generate_totp_secret
+from .totp import totp_uri
+from .totp import verify_totp_code
 
 
 ROLE_PERMISSIONS = {
@@ -165,7 +171,7 @@ COMPONENT_READINESS = {
     "adminApi": {
         "status": "ready",
         "evidence": [
-            "administrator bootstrap and bearer-session login",
+            "administrator bootstrap, bearer-session login, and authenticator-app MFA",
             "domain, user, user-password rotation, mailbox quota, alias, DKIM, DNS, status, and audit APIs",
             "metadata readiness endpoint and backup/restore coverage",
         ],
@@ -189,7 +195,7 @@ COMPONENT_READINESS = {
             "persistent mailbox preferences with default compose signatures and saved address-book contacts",
             "server-side Drafts persistence and compose reopen support for saved drafts",
             "server-side Sent Items persistence for accepted outbound messages",
-            "token-gated admin console for bootstrap, users, password rotation, domains, mailboxes, aliases, DKIM, DNS guidance, status actions, sync status, and audit logs",
+            "token-gated admin console for bootstrap, MFA setup, users, password rotation, domains, mailboxes, aliases, DKIM, DNS guidance, status actions, sync status, and audit logs",
             "browser and static QA in CI",
         ],
         "remainingReleaseEvidence": [
@@ -435,6 +441,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         user = database.get_active_admin_user_by_email(connection, str(payload.email))
         if user is None or not verify_password_hash(str(user["password_hash"]), payload.password):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Admin authentication failed")
+        _verify_admin_mfa_if_enabled(
+            connection=connection,
+            user_id=int(user["id"]),
+            code=payload.totp_code,
+            secret=active_settings.session_secret,
+        )
         created = create_admin_session(
             connection,
             user_id=int(user["id"]),
@@ -452,6 +464,55 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if token:
             revoke_admin_session(connection, token)
         return {"revoked": True}
+
+    @app.post("/api/v1/admin/mfa/totp/setup", response_model=AdminTotpSetupRecord)
+    def admin_totp_setup(
+        principal: AdminPrincipal = Depends(require_admin),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        secret = generate_totp_secret()
+        try:
+            encrypted_secret = encrypt_text(secret, active_settings.session_secret)
+        except SecretBoxConfigurationError as error:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Admin MFA setup requires FREEMAIL_SESSION_SECRET",
+            ) from error
+        database.upsert_admin_totp_secret(
+            connection,
+            user_id=principal.user_id,
+            encrypted_secret=encrypted_secret,
+            actor=principal.actor,
+        )
+        return {
+            "secret": secret,
+            "otpauth_uri": totp_uri(issuer=active_settings.app_name, account=principal.email, secret=secret),
+            "enabled": False,
+        }
+
+    @app.post("/api/v1/admin/mfa/totp/verify", response_model=AdminTotpStatusRecord)
+    def admin_totp_verify(
+        payload: AdminTotpVerifyCreate,
+        principal: AdminPrincipal = Depends(require_admin),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, bool]:
+        secret = _admin_totp_secret_or_raise(
+            connection=connection,
+            user_id=principal.user_id,
+            secret=active_settings.session_secret,
+        )
+        if not verify_totp_code(secret, payload.code):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin MFA code")
+        database.enable_admin_totp(connection, user_id=principal.user_id, actor=principal.actor)
+        return {"enabled": True}
+
+    @app.delete("/api/v1/admin/mfa/totp", response_model=AdminTotpStatusRecord)
+    def admin_totp_disable(
+        principal: AdminPrincipal = Depends(require_admin),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, bool]:
+        database.delete_admin_totp(connection, user_id=principal.user_id, actor=principal.actor)
+        return {"enabled": False}
 
     @app.post("/api/v1/mailbox/session", response_model=MailboxSessionRecord)
     def mailbox_session_create(
@@ -1718,6 +1779,47 @@ def _normalized_admin_role(is_admin: bool, requested_role: str) -> str:
     if not is_admin:
         return "member"
     return "operator" if requested_role == "member" else requested_role
+
+
+def _verify_admin_mfa_if_enabled(
+    *,
+    connection: sqlite3.Connection,
+    user_id: int,
+    code: str | None,
+    secret: str | None,
+) -> None:
+    row = database.get_admin_totp_secret(connection, user_id)
+    if row is None or not int(row["enabled"]):
+        return
+    if not code:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Admin MFA code required")
+    totp_secret = _decrypt_admin_totp_secret(str(row["encrypted_secret"]), secret)
+    if not verify_totp_code(totp_secret, code):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin MFA code")
+
+
+def _admin_totp_secret_or_raise(
+    *,
+    connection: sqlite3.Connection,
+    user_id: int,
+    secret: str | None,
+) -> str:
+    row = database.get_admin_totp_secret(connection, user_id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admin MFA setup does not exist")
+    return _decrypt_admin_totp_secret(str(row["encrypted_secret"]), secret)
+
+
+def _decrypt_admin_totp_secret(encrypted_secret: str, secret: str | None) -> str:
+    try:
+        return decrypt_text(encrypted_secret, secret)
+    except SecretBoxConfigurationError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Admin MFA requires FREEMAIL_SESSION_SECRET",
+        ) from error
+    except SecretBoxDecryptionError as error:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Admin MFA secret is invalid") from error
 
 
 def _encrypted_push_token(push_token: str, secret: str | None) -> str | None:

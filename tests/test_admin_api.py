@@ -8,6 +8,7 @@ from freemail_api.main import create_app
 from freemail_api.passwords import verify_password_hash
 from freemail_api.push_delivery import PushDeliveryResult
 from freemail_api.settings import Settings
+from freemail_api.totp import totp_code
 
 
 ADMIN_TOKEN = "test-admin-token"
@@ -239,6 +240,151 @@ def test_admin_session_revoke_blocks_bearer_admin_api(tmp_path):
     assert logout.json()["revoked"] is True
     assert response.status_code == 401
     assert response.json()["detail"] == "Invalid admin session"
+
+
+def test_admin_totp_mfa_setup_enforces_login_code_and_can_disable(tmp_path):
+    settings = Settings(
+        database_path=str(tmp_path / "freemail.sqlite"),
+        bootstrap_token=BOOTSTRAP_TOKEN,
+        session_secret="test-session-secret",
+        release_commit="test",
+    )
+    with TestClient(create_app(settings)) as client:
+        client.post(
+            "/api/v1/bootstrap/admin",
+            headers=bootstrap_headers(),
+            json={
+                "domainName": "example.com",
+                "email": "admin@example.com",
+                "displayName": "Admin User",
+                "initialPassword": "correct horse battery",
+                "mailboxLocalPart": "admin",
+            },
+        )
+        login = client.post(
+            "/api/v1/admin/session",
+            json={"email": "admin@example.com", "password": "correct horse battery"},
+        )
+        headers = {"Authorization": f"Bearer {login.json()['token']}"}
+        setup = client.post("/api/v1/admin/mfa/totp/setup", headers=headers)
+        secret = setup.json()["secret"]
+        verify = client.post(
+            "/api/v1/admin/mfa/totp/verify",
+            headers=headers,
+            json={"code": totp_code(secret)},
+        )
+        missing_code = client.post(
+            "/api/v1/admin/session",
+            json={"email": "admin@example.com", "password": "correct horse battery"},
+        )
+        bad_code = client.post(
+            "/api/v1/admin/session",
+            json={"email": "admin@example.com", "password": "correct horse battery", "totpCode": "000000"},
+        )
+        good_code = client.post(
+            "/api/v1/admin/session",
+            json={"email": "admin@example.com", "password": "correct horse battery", "totpCode": totp_code(secret)},
+        )
+        disabled = client.delete(
+            "/api/v1/admin/mfa/totp",
+            headers={"Authorization": f"Bearer {good_code.json()['token']}"},
+        )
+        password_only = client.post(
+            "/api/v1/admin/session",
+            json={"email": "admin@example.com", "password": "correct horse battery"},
+        )
+
+    assert setup.status_code == 200
+    assert setup.json()["enabled"] is False
+    assert setup.json()["otpauthUri"].startswith("otpauth://totp/FreeMail%3Aadmin%40example.com")
+    assert verify.status_code == 200
+    assert verify.json()["enabled"] is True
+    assert missing_code.status_code == 401
+    assert missing_code.json()["detail"] == "Admin MFA code required"
+    assert bad_code.status_code == 401
+    assert bad_code.json()["detail"] == "Invalid admin MFA code"
+    assert good_code.status_code == 200
+    assert disabled.status_code == 200
+    assert disabled.json()["enabled"] is False
+    assert password_only.status_code == 200
+
+
+def test_admin_totp_secret_is_encrypted_and_audited(tmp_path):
+    database_path = tmp_path / "freemail.sqlite"
+    settings = Settings(
+        database_path=str(database_path),
+        bootstrap_token=BOOTSTRAP_TOKEN,
+        session_secret="test-session-secret",
+        release_commit="test",
+    )
+    with TestClient(create_app(settings)) as client:
+        client.post(
+            "/api/v1/bootstrap/admin",
+            headers=bootstrap_headers(),
+            json={
+                "domainName": "example.com",
+                "email": "admin@example.com",
+                "displayName": "Admin User",
+                "initialPassword": "correct horse battery",
+                "mailboxLocalPart": "admin",
+            },
+        )
+        login = client.post(
+            "/api/v1/admin/session",
+            json={"email": "admin@example.com", "password": "correct horse battery"},
+        )
+        setup = client.post(
+            "/api/v1/admin/mfa/totp/setup",
+            headers={"Authorization": f"Bearer {login.json()['token']}"},
+        )
+        secret = setup.json()["secret"]
+
+    with sqlite3.connect(database_path) as connection:
+        encrypted_secret = connection.execute(
+            "SELECT encrypted_secret FROM admin_totp_secrets WHERE user_id = 1"
+        ).fetchone()[0]
+        audit_actions = [
+            row[0]
+            for row in connection.execute(
+                "SELECT action FROM audit_log WHERE target_type = 'user' AND target_id = 1 ORDER BY id"
+            )
+        ]
+
+    assert encrypted_secret != secret
+    assert secret not in encrypted_secret
+    assert audit_actions[-1] == "admin_mfa.totp.setup"
+
+
+def test_admin_totp_setup_requires_session_secret(tmp_path):
+    settings = Settings(
+        database_path=str(tmp_path / "freemail.sqlite"),
+        bootstrap_token=BOOTSTRAP_TOKEN,
+        session_secret=None,
+        release_commit="test",
+    )
+    with TestClient(create_app(settings)) as client:
+        client.post(
+            "/api/v1/bootstrap/admin",
+            headers=bootstrap_headers(),
+            json={
+                "domainName": "example.com",
+                "email": "admin@example.com",
+                "displayName": "Admin User",
+                "initialPassword": "correct horse battery",
+                "mailboxLocalPart": "admin",
+            },
+        )
+        login = client.post(
+            "/api/v1/admin/session",
+            json={"email": "admin@example.com", "password": "correct horse battery"},
+        )
+        response = client.post(
+            "/api/v1/admin/mfa/totp/setup",
+            headers={"Authorization": f"Bearer {login.json()['token']}"},
+        )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Admin MFA setup requires FREEMAIL_SESSION_SECRET"
 
 
 def test_suspended_admin_blocks_existing_bearer_admin_session(tmp_path):

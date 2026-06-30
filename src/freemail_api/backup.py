@@ -14,6 +14,7 @@ BACKUP_TABLES = (
     "aliases",
     "dkim_keys",
     "audit_log",
+    "admin_totp_secrets",
     "mailbox_preferences",
     "mailbox_contacts",
 )
@@ -72,6 +73,8 @@ def _export_table(connection: sqlite3.Connection, table: str) -> list[dict[str, 
 
 
 def _order_column(table: str) -> str:
+    if table == "admin_totp_secrets":
+        return "user_id"
     if table == "mailbox_contacts":
         return "mailbox_email, contact_email"
     if table == "mailbox_preferences":
@@ -89,7 +92,7 @@ def _validated_tables(payload: Mapping[str, Any]) -> dict[str, list[dict[str, An
     tables: dict[str, list[dict[str, Any]]] = {}
     for table in BACKUP_TABLES:
         raw_rows = raw_tables.get(table)
-        if raw_rows is None and table == "mailbox_contacts":
+        if raw_rows is None and table in {"admin_totp_secrets", "mailbox_contacts"}:
             raw_rows = []
         if not isinstance(raw_rows, list):
             raise BackupError(f"backup payload must contain a {table} row list")

@@ -157,6 +157,7 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         "admin-api-base-url",
         "admin-email",
         "admin-password",
+        "admin-totp-code",
         "admin-role",
         "admin-token",
         "bootstrap-token",
@@ -167,6 +168,9 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         "bootstrap-admin-form",
         "admin-domain-form",
         "admin-user-form",
+        "admin-mfa-form",
+        "admin-mfa-setup-action",
+        "admin-mfa-disable-action",
         "admin-user-password-form",
         "admin-mailbox-form",
         "admin-mailbox-quota-form",
@@ -180,6 +184,8 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         failures.append("missing initialPassword admin form field")
     if "adminRole" not in html_text(parser) or "adminRole" not in js_text:
         failures.append("missing adminRole user form field")
+    if "adminTotpCode" not in html_text(parser) or "/api/v1/admin/mfa/totp/setup" not in js_text:
+        failures.append("missing admin MFA setup/login form field")
     if "newPassword" not in html_text(parser) or "/api/v1/admin/users/${userId}/password" not in js_text:
         failures.append("missing user password rotation admin form field")
     if "quotaBytes" not in html_text(parser) or "quotaBytes" not in js_text:
@@ -219,6 +225,9 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         "Sent Items was not updated",
         "composePayload",
         "/api/v1/admin/session",
+        "/api/v1/admin/mfa/totp/setup",
+        "/api/v1/admin/mfa/totp/verify",
+        "/api/v1/admin/mfa/totp",
         "/api/v1/bootstrap/admin",
         "/api/v1/admin/domains",
         "/api/v1/admin/users",

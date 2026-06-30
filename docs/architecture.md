@@ -16,11 +16,11 @@ The implementation should not become one mail-server blob. Keep the mail-core ca
 
 ## Admin API And Metadata Store
 
-The admin API owns FreeMail metadata for domains, users, user-password rotation, mailboxes, aliases, and audit logs. The current implementation uses SQLite through explicit repository functions so the early product can keep a small dependency surface while still proving persistence and API contracts.
+The admin API owns FreeMail metadata for domains, users, user-password rotation, administrator MFA, mailboxes, aliases, and audit logs. The current implementation uses SQLite through explicit repository functions so the early product can keep a small dependency surface while still proving persistence and API contracts.
 
 Admin endpoints accept bearer tokens from `POST /api/v1/admin/session` or the legacy `X-FreeMail-Admin-Token` header. Static admin-token access remains unavailable until `FREEMAIL_ADMIN_API_TOKEN` is configured. The first-admin bootstrap endpoint separately requires `X-FreeMail-Bootstrap-Token` and refuses to run once an administrator exists. This keeps the open-source default from shipping an active hardcoded credential while still supporting day-to-day administrator email/password login after bootstrap.
 
-Admin password login verifies active administrator users against stored Argon2id password hashes, creates a hashed bearer session, and stores no admin password material in runtime session tables. Admin password rotation replaces the stored Argon2id hash, revokes existing admin sessions for the target user, and records an audit event. Suspending an administrator prevents existing bearer sessions from resolving because the session lookup rechecks the user record.
+Admin password login verifies active administrator users against stored Argon2id password hashes, enforces TOTP when authenticator-app MFA is enabled, creates a hashed bearer session, and stores no admin password material in runtime session tables. Admin TOTP setup secrets are returned once for enrollment, stored encrypted with `FREEMAIL_SESSION_SECRET`, and audited when setup, enabled, or disabled. Admin password rotation replaces the stored Argon2id hash, revokes existing admin sessions for the target user, and records an audit event. Suspending an administrator prevents existing bearer sessions from resolving because the session lookup rechecks the user record.
 
 Administrator roles are intentionally coarse for private beta. `owner` can perform every admin action, including granting or suspending administrators. `admin` can read admin metadata and invite normal users but cannot grant administrator access. `operator` can read metadata and operate domains, mailboxes, aliases, DKIM keys, DNS verification, and status changes but cannot invite users. `auditor` is read-only.
 
@@ -28,6 +28,7 @@ The first persistence boundary is:
 
 - `domains`: hosted domain names and lifecycle status
 - `users`: invite-created users with password hashes and coarse administrator role metadata
+- `admin_totp_secrets`: encrypted administrator authenticator-app MFA secrets and enabled flags
 - `mailboxes`: user-owned mailbox addresses under hosted domains plus optional quota-byte metadata
 - `aliases`: forwarding aliases
 - `dkim_keys`: generated DKIM private keys and public DNS TXT values

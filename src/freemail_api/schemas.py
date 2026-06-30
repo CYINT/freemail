@@ -74,6 +74,7 @@ class UserPasswordUpdate(ApiModel):
 class AdminSessionCreate(ApiModel):
     email: EmailStr
     password: str = Field(min_length=1, max_length=512)
+    totp_code: str | None = Field(default=None, min_length=6, max_length=16)
 
 
 class AdminSessionRecord(ApiModel):
@@ -84,6 +85,20 @@ class AdminSessionRecord(ApiModel):
 
 class AdminSessionDeleteRecord(ApiModel):
     revoked: bool
+
+
+class AdminTotpSetupRecord(ApiModel):
+    secret: str
+    otpauth_uri: str
+    enabled: bool
+
+
+class AdminTotpVerifyCreate(ApiModel):
+    code: str = Field(min_length=6, max_length=16)
+
+
+class AdminTotpStatusRecord(ApiModel):
+    enabled: bool
 
 
 class MailboxCreate(ApiModel):

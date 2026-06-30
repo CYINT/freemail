@@ -68,12 +68,15 @@ Run repository hygiene scans before publishing changes:
 
 ## Admin API
 
-Admin endpoints accept either a bearer token from `POST /api/v1/admin/session` or the legacy `X-FreeMail-Admin-Token` operator token. Static admin-token access remains disabled until `FREEMAIL_ADMIN_API_TOKEN` is set; do not commit a real token. The webmail preview includes an operator admin console for bootstrap, admin email/password sign-in, static-token fallback, domain, user, user-password rotation, mailbox, mailbox quota, alias, DKIM, DNS-guidance, suspension/reactivation, and audit-log workflows. Bootstrap and user creation accept one-time `initialPassword` values and hash them server-side with Argon2id before storage.
+Admin endpoints accept either a bearer token from `POST /api/v1/admin/session` or the legacy `X-FreeMail-Admin-Token` operator token. Static admin-token access remains disabled until `FREEMAIL_ADMIN_API_TOKEN` is set; do not commit a real token. The webmail preview includes an operator admin console for bootstrap, admin email/password sign-in, authenticator-app MFA setup, static-token fallback, domain, user, user-password rotation, mailbox, mailbox quota, alias, DKIM, DNS-guidance, suspension/reactivation, and audit-log workflows. Bootstrap and user creation accept one-time `initialPassword` values and hash them server-side with Argon2id before storage.
 
 Initial endpoints:
 
 - `POST /api/v1/admin/session`
 - `DELETE /api/v1/admin/session`
+- `POST /api/v1/admin/mfa/totp/setup`
+- `POST /api/v1/admin/mfa/totp/verify`
+- `DELETE /api/v1/admin/mfa/totp`
 - `POST /api/v1/bootstrap/admin`
 - `POST /api/v1/admin/domains`
 - `GET /api/v1/admin/domains`
@@ -101,7 +104,7 @@ The current metadata store is SQLite at `FREEMAIL_DB_PATH`, defaulting to `data/
 
 The bootstrap endpoint requires `X-FreeMail-Bootstrap-Token`, refuses to run unless `FREEMAIL_BOOTSTRAP_TOKEN` is configured, and refuses to create a second administrator after the first admin exists.
 
-Admin password login verifies active administrator users against the stored Argon2id hash, creates a hashed bearer session, and stores no password material in the session table. Suspending an administrator invalidates existing bearer sessions because session resolution rechecks the user record.
+Admin password login verifies active administrator users against the stored Argon2id hash, creates a hashed bearer session, and stores no password material in the session table. Administrators can set up authenticator-app MFA after sign-in. TOTP setup secrets are returned once for enrollment, stored encrypted with `FREEMAIL_SESSION_SECRET`, and only become required after `POST /api/v1/admin/mfa/totp/verify` accepts a valid code. Once enabled, `POST /api/v1/admin/session` requires `totpCode` in addition to email and password. Suspending an administrator invalidates existing bearer sessions because session resolution rechecks the user record.
 
 `PATCH /api/v1/admin/users/{userId}/password` rotates the FreeMail identity password hash for the selected user, revokes existing admin sessions for that user, and writes an audit-log event without returning password material. It does not rotate the separate Stalwart/mail-core account secret in `secrets\mail-core-users.json`; operators must update that ignored secret and apply the Stalwart plan when changing mailbox protocol credentials.
 
@@ -376,7 +379,7 @@ The exporter matches DKIM signatures by selector to avoid duplicate Stalwart sig
 
 ## Backup And Restore
 
-Read `docs/backup-restore.md` before relying on backups. The metadata backup tools export API metadata, audit logs, and DKIM key material; they intentionally exclude admin sessions, mailbox sessions, outbound rate-limit counters, push-device registrations, and Stalwart mail-store data.
+Read `docs/backup-restore.md` before relying on backups. The metadata backup tools export API metadata, audit logs, encrypted admin MFA secrets, and DKIM key material; they intentionally exclude admin sessions, mailbox sessions, outbound rate-limit counters, push-device registrations, and Stalwart mail-store data.
 
 Collect both release-packet backup artifacts into one ignored directory:
 
@@ -418,7 +421,7 @@ Restore metadata into a new database:
 .\.venv\Scripts\python.exe scripts\restore_metadata.py --database data\freemail-restored.sqlite --input .freemail-qa\backups\metadata.json
 ```
 
-Metadata backups include DKIM private keys and password hashes. Store them encrypted and outside the repository.
+Metadata backups include DKIM private keys, encrypted admin MFA secrets, and password hashes. Store them encrypted and outside the repository.
 
 Mail-store messages, attachments, indexes, and queue state live in the Stalwart Docker volume. Archive that volume only after stopping writers:
 

@@ -173,6 +173,7 @@
             <label>API <input id="admin-api-base-url" name="apiBaseUrl" type="url" value="http://127.0.0.1:18090" required></label>
             <label>Admin email <input id="admin-email" name="adminEmail" type="email" autocomplete="username"></label>
             <label>Admin password <input id="admin-password" name="adminPassword" type="password" autocomplete="current-password"></label>
+            <label>Authenticator code <input id="admin-totp-code" name="adminTotpCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="16"></label>
             <label>Admin token <input id="admin-token" name="adminToken" type="password" autocomplete="off"></label>
             <label>Bootstrap token <input id="bootstrap-token" name="bootstrapToken" type="password" autocomplete="off"></label>
             <button type="submit">Save admin session</button>
@@ -213,6 +214,14 @@
                 </select>
               </label>
               <button type="submit">Invite user</button>
+            </form>
+
+            <form class="admin-card" id="admin-mfa-form" aria-label="Set up admin MFA">
+              <h3>Admin MFA</h3>
+              <button id="admin-mfa-setup-action" type="button">Generate setup</button>
+              <label>Authenticator code <input name="totpCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="16"></label>
+              <button type="submit">Enable MFA</button>
+              <button id="admin-mfa-disable-action" type="button">Disable MFA</button>
             </form>
 
             <form class="admin-card" id="admin-mailbox-form" aria-label="Create mailbox">
