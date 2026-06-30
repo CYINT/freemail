@@ -32,6 +32,7 @@ import {
   searchMailbox,
   sendMailboxMessage,
 } from "./src/api";
+import { clearCachedMailboxSnapshots, loadCachedMailboxSnapshot, saveCachedMailboxSnapshot } from "./src/offlineCache";
 import { clearStoredMailboxSession, loadStoredMailboxSession, saveMailboxSession } from "./src/sessionStore";
 
 const defaultApiBaseUrl = "https://freemail.kuzuryu.ai";
@@ -95,6 +96,9 @@ export default function App() {
     setSelectedMessage(null);
     await clearStoredMailboxSession();
     if (activeSession) {
+      await clearCachedMailboxSnapshots(activeSession.email).catch(() => undefined);
+    }
+    if (activeSession) {
       await revokeMailboxSession(activeSession).catch(() => undefined);
     }
     setStatus("Signed out.");
@@ -107,6 +111,14 @@ export default function App() {
     setLoading(true);
     setStatus(`Loading ${targetFolder}...`);
     try {
+      const cached = await loadCachedMailboxSnapshot(activeSession, targetFolder);
+      if (cached) {
+        setFolder(cached.folder);
+        setFolders(cached.folders);
+        setMessages(cached.messages);
+        setContacts(cached.contacts);
+        setStatus(`Showing cached ${cached.folder} from ${formatCachedAt(cached.cachedAt)}.`);
+      }
       const [snapshot, contactList] = await Promise.all([
         loadMailboxSnapshot(activeSession, targetFolder),
         loadMailboxContacts(activeSession, targetFolder),
@@ -116,6 +128,7 @@ export default function App() {
       setMessages(snapshot.messages || []);
       setContacts(contactList.contacts || []);
       setSelectedMessage(null);
+      await saveCachedMailboxSnapshot(activeSession, targetFolder, snapshot, contactList.contacts || []);
       setStatus(`Loaded ${snapshot.messages?.length || 0} messages from ${targetFolder}.`);
     } catch (error) {
       setStatus(readableError(error));
@@ -452,6 +465,13 @@ function quoteBody(body: string): string {
     .split("\n")
     .map((line) => `> ${line}`)
     .join("\n");
+}
+
+function formatCachedAt(cachedAt: string): string {
+  if (!cachedAt) {
+    return "offline cache";
+  }
+  return new Date(cachedAt).toLocaleString();
 }
 
 const styles = StyleSheet.create({

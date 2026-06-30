@@ -22,6 +22,7 @@ def validate_mobile(root: Path) -> list[str]:
         "app.json": mobile / "app.json",
         "App.tsx": mobile / "App.tsx",
         "src/api.ts": mobile / "src" / "api.ts",
+        "src/offlineCache.ts": mobile / "src" / "offlineCache.ts",
         "src/sessionStore.ts": mobile / "src" / "sessionStore.ts",
     }
     failures = [f"missing mobile file: {name}" for name, path in files.items() if not path.is_file()]
@@ -56,6 +57,11 @@ def validate_mobile(root: Path) -> list[str]:
         "renameMailboxFolder",
         "deleteMailboxFolder",
         "loadMailboxAttachment",
+        "saveCachedMailboxSnapshot",
+        "loadCachedMailboxSnapshot",
+        "clearCachedMailboxSnapshots",
+        "freemail.mobile.offlineCache",
+        "Showing cached",
         "Authorization",
         "Bearer",
         "SecureStore.setItemAsync",
@@ -77,6 +83,10 @@ def validate_mobile(root: Path) -> list[str]:
             failures.append(f"forbidden mobile marker found: {marker}")
     if "password" in files["src/sessionStore.ts"].read_text(encoding="utf-8").lower():
         failures.append("mobile session store must not persist mailbox passwords")
+    offline_cache = files["src/offlineCache.ts"].read_text(encoding="utf-8").lower()
+    for marker in ["password", "token", "authorization", "bearer"]:
+        if marker in offline_cache:
+            failures.append(f"mobile offline cache must not persist credential marker: {marker}")
     return failures
 
 

@@ -85,6 +85,7 @@ The current mobile foundation covers:
 - folder navigation and non-core folder create/rename/delete controls
 - folder-scoped search and contacts
 - attachment metadata display and authenticated availability checks
+- SecureStore-backed offline metadata cache for last loaded folder, message header, and contact snapshots
 - static QA that forbids provider trade-dress references and insecure browser-style credential storage
 
-Native build, app-store signing, push notifications, offline cache, and richer attachment UX remain future mobile milestones.
+Native build, app-store signing, push notifications, and richer attachment UX remain future mobile milestones.

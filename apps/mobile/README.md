@@ -13,7 +13,8 @@ The current mobile implementation is a source-level foundation, not a production
 - Folder navigation plus create, rename, and delete controls for non-core folders.
 - Folder-scoped search and contacts loaded from mailbox headers.
 - Attachment metadata display with an authenticated attachment availability check.
-- Future offline cache, push, richer attachment handling, and native release workflows.
+- Secure offline metadata cache for the last loaded folder, messages, and contacts.
+- Future push, richer attachment handling, and native release workflows.
 
 ## Development
 
@@ -41,4 +42,4 @@ Static mobile QA runs from the repository root and does not require a native too
 .\.venv\Scripts\python.exe scripts\qa_mobile_static.py
 ```
 
-The static gate checks that the mobile client uses provider-neutral FreeMail language, references the expected mailbox API endpoints for sessions, snapshots, search, contacts, folders, message details, attachments, and send, defaults to the VPN hostname, and does not persist mailbox passwords or bearer sessions in insecure browser-style storage.
+The static gate checks that the mobile client uses provider-neutral FreeMail language, references the expected mailbox API endpoints for sessions, snapshots, search, contacts, folders, message details, attachments, and send, defaults to the VPN hostname, and does not persist mailbox passwords or bearer sessions in insecure browser-style storage. The offline cache stores mailbox metadata only and the static gate fails if credential markers are added to that cache path.
