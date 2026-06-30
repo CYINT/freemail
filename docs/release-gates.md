@@ -60,6 +60,14 @@ For a controlled domain, first export DNS guidance from the admin API, capture o
 
 If `--observed-dns` is omitted, the gate resolves live MX/TXT DNS for the expected record names. The output JSON is release evidence and should be stored outside Git with the other private-beta artifacts. Backup evidence checks include the path, byte count, and SHA-256 checksum for both metadata and mail-store files.
 
+Generate queue evidence with the Stalwart queue helper after controlled mail-flow tests:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\qa_stalwart_queue.py > .freemail-qa\queue-example.com.json
+```
+
+The queue JSON must show a clear queue. The private-beta gate accepts the helper output fields `passed`, `clear`, `pending`, `due`, `pendingCount`, `dueCount`, `reviewedAt`, and `messages`; nonzero pending or due counts fail the gate.
+
 The acceptance JSON must include:
 
 ```json

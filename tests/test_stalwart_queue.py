@@ -33,4 +33,18 @@ def test_summarize_queue_counts_due_messages():
     assert summary.clear is False
     assert summary.pending_count == 3
     assert summary.due_count == 1
+    assert summary.as_dict()["passed"] is False
+    assert summary.as_dict()["pending"] == 3
+    assert summary.as_dict()["due"] == 1
     assert summary.as_dict()["pendingCount"] == 3
+    assert summary.as_dict()["dueCount"] == 1
+    assert summary.as_dict()["reviewedAt"] == "2026-06-30T01:00:00Z"
+
+
+def test_summarize_queue_marks_empty_queue_as_passed():
+    summary = summarize_queue([], now=datetime(2026, 6, 30, 1, 0, tzinfo=UTC))
+
+    assert summary.clear is True
+    assert summary.as_dict()["passed"] is True
+    assert summary.as_dict()["pending"] == 0
+    assert summary.as_dict()["due"] == 0

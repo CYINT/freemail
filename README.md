@@ -375,6 +375,8 @@ For a real beta domain, pass admin DNS guidance plus observed DNS evidence, mail
   --acceptance .freemail-qa\private-beta-acceptance-example.com.json
 ```
 
+Generate queue evidence with `scripts\qa_stalwart_queue.py` after controlled mail-flow tests; the private-beta gate requires a clear queue with zero pending and due messages.
+
 ## VPN-Only Deployment
 
 Read `docs/deployment-vpn.md`. The intended local hostname is:

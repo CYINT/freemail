@@ -170,13 +170,21 @@ def _check_queue_evidence(path: Path | None) -> dict[str, Any]:
     if path is None:
         return _check("queue-evidence", False, {"error": "--queue-evidence is required"})
     payload = _load_json(path)
-    pending = int(payload.get("pending", payload.get("pendingMessages", 0)) or 0)
-    due = int(payload.get("due", payload.get("dueMessages", 0)) or 0)
-    passed = payload.get("passed", True) is True and pending == 0 and due == 0
+    pending = _coerce_int(payload.get("pending", payload.get("pendingCount", payload.get("pendingMessages", 0))))
+    due = _coerce_int(payload.get("due", payload.get("dueCount", payload.get("dueMessages", 0))))
+    clear = payload.get("clear", pending == 0 and due == 0)
+    passed = payload.get("passed", True) is True and clear is True and pending == 0 and due == 0
     return _check(
         "queue-evidence",
         passed,
-        {"path": str(path), "passed": payload.get("passed", True), "pending": pending, "due": due},
+        {
+            "path": str(path),
+            "passed": payload.get("passed", True),
+            "clear": clear,
+            "pending": pending,
+            "due": due,
+            "reviewedAt": payload.get("reviewedAt"),
+        },
     )
 
 
@@ -251,3 +259,10 @@ def _load_json(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError(f"{path} must contain a JSON object")
     return payload
+
+
+def _coerce_int(value: object) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return -1

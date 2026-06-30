@@ -12,16 +12,21 @@ class QueueSummary:
     pending_count: int
     due_count: int
     messages: list[dict[str, Any]]
+    reviewed_at: datetime
 
     @property
     def clear(self) -> bool:
-        return self.pending_count == 0
+        return self.pending_count == 0 and self.due_count == 0
 
     def as_dict(self) -> dict[str, object]:
         return {
+            "passed": self.clear,
             "clear": self.clear,
+            "pending": self.pending_count,
+            "due": self.due_count,
             "pendingCount": self.pending_count,
             "dueCount": self.due_count,
+            "reviewedAt": self.reviewed_at.isoformat().replace("+00:00", "Z"),
             "messages": self.messages,
         }
 
@@ -75,7 +80,7 @@ def parse_queue_ndjson(output: str) -> list[dict[str, Any]]:
 def summarize_queue(messages: list[dict[str, Any]], now: datetime | None = None) -> QueueSummary:
     current_time = now or datetime.now(UTC)
     due_count = sum(1 for message in messages if _is_due(message.get("nextRetry"), current_time))
-    return QueueSummary(pending_count=len(messages), due_count=due_count, messages=messages)
+    return QueueSummary(pending_count=len(messages), due_count=due_count, reviewed_at=current_time, messages=messages)
 
 
 def _is_due(next_retry: object, now: datetime) -> bool:

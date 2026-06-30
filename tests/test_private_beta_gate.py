@@ -121,6 +121,63 @@ def test_private_beta_gate_accepts_utf8_bom_json_evidence(tmp_path):
     assert check["status"] == "pass"
 
 
+def test_private_beta_gate_accepts_queue_helper_output(tmp_path):
+    queue = tmp_path / "queue.json"
+    queue.write_text(
+        json.dumps(
+            {
+                "passed": True,
+                "clear": True,
+                "pending": 0,
+                "due": 0,
+                "pendingCount": 0,
+                "dueCount": 0,
+                "reviewedAt": "2026-06-30T00:00:00Z",
+                "messages": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    check = private_beta_gate._check_queue_evidence(queue)
+
+    assert check["status"] == "pass"
+    assert check["details"]["reviewedAt"] == "2026-06-30T00:00:00Z"
+
+
+def test_private_beta_gate_rejects_non_clear_queue_helper_output(tmp_path):
+    queue = tmp_path / "queue.json"
+    queue.write_text(
+        json.dumps(
+            {
+                "passed": False,
+                "clear": False,
+                "pendingCount": 2,
+                "dueCount": 1,
+                "reviewedAt": "2026-06-30T00:00:00Z",
+                "messages": [{"id": "q1"}, {"id": "q2"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    check = private_beta_gate._check_queue_evidence(queue)
+
+    assert check["status"] == "fail"
+    assert check["details"]["pending"] == 2
+    assert check["details"]["due"] == 1
+
+
+def test_private_beta_gate_rejects_malformed_queue_counts(tmp_path):
+    queue = tmp_path / "queue.json"
+    queue.write_text(json.dumps({"passed": True, "pendingCount": "many", "dueCount": 0}), encoding="utf-8")
+
+    check = private_beta_gate._check_queue_evidence(queue)
+
+    assert check["status"] == "fail"
+    assert check["details"]["pending"] == -1
+
+
 def test_private_beta_gate_rejects_malformed_abuse_complaint_count(tmp_path):
     deliverability = tmp_path / "deliverability.json"
     deliverability.write_text(
