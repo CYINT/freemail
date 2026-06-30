@@ -22,5 +22,5 @@ FreeMail is licensed as `AGPL-3.0-or-later`.
 ## Required Practice
 
 - Update `THIRD_PARTY_NOTICES.md` when adding runtime dependencies.
-- Add license scanning to CI before the first release tag.
+- Run `python scripts/qa_license_policy.py` before publishing changes. CI runs this gate for direct Python runtime dependencies and direct mobile runtime dependencies.
 - Document any ambiguous component before bundling it.

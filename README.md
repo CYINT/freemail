@@ -54,10 +54,11 @@ Copy-Item .env.example .env
 
 Then open `http://127.0.0.1:8080/health`.
 
-Run the tracked-file secret/material scan before publishing changes:
+Run repository hygiene scans before publishing changes:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\qa_repo_secrets.py
+.\.venv\Scripts\python.exe scripts\qa_license_policy.py
 ```
 
 ## Admin API
