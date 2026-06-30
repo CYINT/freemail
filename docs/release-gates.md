@@ -81,7 +81,13 @@ Mobile release evidence can also be inspected directly before adding it to the r
 
 This mobile status command is read-only and reports missing or failing signed-build and store-submission checks without running native build tools or contacting store APIs.
 
-Run the gate from a clean checkout after pushing the candidate commit to `CYINT/freemail` and after GitHub Actions CI has passed for that exact commit:
+Stamp the runtime with the candidate commit before collecting release evidence:
+
+```powershell
+$env:FREEMAIL_RELEASE_COMMIT=(git rev-parse HEAD)
+```
+
+Run the gate from a clean checkout after pushing the candidate commit to `CYINT/freemail`, deploying that exact commit to the VPN-only runtime, and after GitHub Actions CI has passed for that exact commit:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\release_gate.py `
@@ -119,7 +125,7 @@ The gate verifies:
 - mobile signed-build and store-submission evidence passes `scripts/mobile_release_gate.py` with credential-free proof for both iOS and Android
 - private-beta gate output passes for at least one controlled domain and includes DNS, mail-flow, queue, mail-core apply, deliverability/abuse, backup, restore-drill, and decision-owner acceptance checks
 - release notes exist, are non-empty, include the candidate version, include verification, known-limitations, and VPN-boundary language, contain no placeholder markers, and have a SHA-256 checksum recorded in the gate output
-- `https://freemail.kuzuryu.ai/health` reports VPN-only health and release metadata
+- `https://freemail.kuzuryu.ai/health` reports VPN-only health and the exact candidate commit
 - `https://freemail.kuzuryu.ai/api/v1/deployment` reports `vpn-only` exposure and `publicInternet: false`
 - `https://freemail.kuzuryu.ai/api/v1/metadata/readiness` reports the expected SQLite metadata schema revision and required table/column checks
 - `https://freemail.kuzuryu.ai/api/v1/mail-core/readiness` reports SMTP, submission, IMAP, and JMAP readiness

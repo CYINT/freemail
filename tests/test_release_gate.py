@@ -391,12 +391,14 @@ def test_assert_release_gate_raises_for_failed_checks(tmp_path, monkeypatch):
         )
 
 
-def test_runtime_health_accepts_unknown_commit_for_unstamped_local_container(monkeypatch):
+def test_runtime_health_requires_exact_candidate_commit(monkeypatch):
     monkeypatch.setattr(release_gate, "_fetch_json", lambda _url: {"status": "ok", "vpnOnly": True, "release": {"commit": "unknown"}})
 
     checks = release_gate._check_runtime("https://freemail.kuzuryu.ai/health", None, None, "abc123")
 
-    assert checks[0]["status"] == "pass"
+    assert checks[0]["name"] == "runtime-health"
+    assert checks[0]["status"] == "fail"
+    assert checks[0]["details"]["releaseCommit"] == "unknown"
 
 
 def test_runtime_deployment_boundary_requires_vpn_only(monkeypatch):

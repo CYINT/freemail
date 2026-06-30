@@ -484,7 +484,7 @@ def _check_runtime(
                 "runtime-health",
                 health.get("status") == "ok"
                 and health.get("vpnOnly") is True
-                and release.get("commit") in {commit, "unknown"},
+                and release.get("commit") == commit,
                 {
                     "url": health_url,
                     "status": health.get("status"),
