@@ -2074,6 +2074,61 @@ def test_mailbox_message_source_returns_eml_download(tmp_path, monkeypatch):
     assert "freemail-INBOX-1.eml" in response.headers["content-disposition"]
 
 
+def test_mailbox_message_import_requires_mailbox_credentials(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.post(
+            "/api/v1/mailbox/message/import",
+            json={"folder": "INBOX", "filename": "message.eml", "contentBase64": "U3ViamVjdDogSGVsbG8NCg0KQm9keQ=="},
+        )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Mailbox credentials required"
+
+
+def test_mailbox_message_import_appends_eml_payload(tmp_path, monkeypatch):
+    class Imported:
+        def as_dict(self):
+            return {"folder": "INBOX", "filename": "message.eml", "size": 22, "imported": True}
+
+    def fake_import(**kwargs):
+        assert kwargs["email"] == "admin@example.com"
+        assert kwargs["password"] == "secret"
+        assert kwargs["folder"] == "INBOX"
+        assert kwargs["filename"] == "message.eml"
+        assert kwargs["content"] == b"Subject: Hello\r\n\r\nBody"
+        return Imported()
+
+    monkeypatch.setattr("freemail_api.main.import_mailbox_message_source", fake_import)
+
+    with make_client(tmp_path) as client:
+        response = client.post(
+            "/api/v1/mailbox/message/import",
+            json={"folder": "INBOX", "filename": "message.eml", "contentBase64": "U3ViamVjdDogSGVsbG8NCg0KQm9keQ=="},
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"folder": "INBOX", "filename": "message.eml", "size": 22, "imported": True}
+
+
+def test_mailbox_message_import_rejects_invalid_base64(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.post(
+            "/api/v1/mailbox/message/import",
+            json={"folder": "INBOX", "filename": "message.eml", "contentBase64": "not base64"},
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+        )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Invalid EML payload"
+
+
 def test_mailbox_send_requires_mailbox_credentials(tmp_path):
     with make_client(tmp_path) as client:
         response = client.post(

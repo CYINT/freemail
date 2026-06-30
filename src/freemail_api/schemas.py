@@ -291,6 +291,19 @@ class MailboxBulkActionRecord(ApiModel):
     target_folder: str | None = None
 
 
+class MailboxMessageImportCreate(ApiModel):
+    folder: str = Field(min_length=1, max_length=160, pattern=r'^[^"/\\\r\n]+$')
+    filename: str = Field(default="message.eml", min_length=1, max_length=180)
+    content_base64: str = Field(min_length=1, max_length=2_800_000)
+
+
+class MailboxMessageImportRecord(ApiModel):
+    folder: str
+    filename: str
+    size: int
+    imported: bool
+
+
 class MailboxFolderCreate(ApiModel):
     folder: str = Field(min_length=1, max_length=160, pattern=r'^[^"/\\\r\n]+$')
 

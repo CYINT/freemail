@@ -61,7 +61,7 @@ def test_static_web_validation_flags_credential_storage():
         '<button id="bulk-archive-action">Archive</button><button id="bulk-spam-action">Spam</button>'
         '<button id="bulk-delete-action">Delete</button><button id="load-more-action">Load more</button>'
         '<section class="message-list"><div class="bulk-toolbar"></div><article class="message-row reader compose-panel">'
-        "Inbox Compose Reply Forward Download EML Mark read Mark unread Attach Send Junk Mail Spam Delete</article></section></main>"
+        "Inbox Compose Reply Forward Download EML Import EML Mark read Mark unread Attach Send Junk Mail Spam Delete</article></section></main>"
     )
 
     failures = _validate(
@@ -74,6 +74,7 @@ def test_static_web_validation_flags_credential_storage():
         "fetch('/api/v1/mailbox/saved-contacts'); saveMailboxContact({}); deleteMailboxContact(1); saved-contact; "
         "fetch('/api/v1/mailbox/folder'); fetch('/api/v1/mailbox/folder/empty'); "
         "fetch('/api/v1/mailbox/message/attachment'); fetch('/api/v1/mailbox/message/source'); "
+        "fetch('/api/v1/mailbox/message/import'); "
         "fetch('/api/v1/mailbox/message/archive'); "
         "fetch('/api/v1/mailbox/message/move'); "
         "fetch('/api/v1/mailbox/message/read-state'); "
@@ -81,6 +82,7 @@ def test_static_web_validation_flags_credential_storage():
         "fetch('/api/v1/mailbox/message/bulk'); "
         "renderMessageBody('body'); renderMessageAttachments({}); downloadMailboxAttachment({}, {}); "
         "downloadMailboxMessageSource({}); download-source-action; Download EML; "
+        "importMailboxMessageSource({}); import-source-action; import-source-file; Import EML; "
         "filesToAttachments([]); fileToBase64({}); archiveMailboxMessage({}); moveMailboxMessage({}, 'Trash', 'Done'); "
         "setMailboxMessageReadState({}, true); Message marked read; Message marked unread; "
         "setMailboxMessageStarState({}, true); Message starred; Message unstarred; "

@@ -28,6 +28,7 @@ import {
   deleteMailboxContact,
   deleteMailboxFolder,
   emptyMailboxFolder,
+  importMailboxMessageSource,
   loadMailboxAttachment,
   loadMailboxContacts,
   loadMailboxMessage,
@@ -68,6 +69,7 @@ const defaultApiBaseUrl = "https://freemail.kuzuryu.ai";
 const mailboxPageSize = 25;
 const maxComposeAttachments = 5;
 const maxComposeAttachmentBytes = 1_048_576;
+const maxImportMessageBytes = 2_097_152;
 const allowedComposeAttachmentTypes = new Set(["text/plain", "text/csv", "application/pdf", "image/png", "image/jpeg"]);
 const protectedFolders = new Set(["INBOX", "Archive", "Deleted Items", "Junk Mail", "Sent Items", "Drafts"]);
 const emptyProtectedFolders = new Set(["INBOX", "Archive", "Sent Items", "Drafts"]);
@@ -657,6 +659,47 @@ export default function App() {
     }
   }
 
+  async function pickImportMessageSource() {
+    if (!session) {
+      return;
+    }
+    setLoading(true);
+    setStatus(`Selecting EML to import into ${folder}...`);
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["message/rfc822", "text/plain", "application/octet-stream"],
+        copyToCacheDirectory: true,
+        multiple: false,
+        base64: false,
+      });
+      if (result.canceled) {
+        setStatus("EML import cancelled.");
+        return;
+      }
+      const asset = result.assets[0];
+      if (!asset) {
+        setStatus("No EML file selected.");
+        return;
+      }
+      if (!asset.name.toLowerCase().endsWith(".eml") && asset.mimeType !== "message/rfc822") {
+        throw new Error("Choose an .eml message source file.");
+      }
+      if ((asset.size || 0) > maxImportMessageBytes) {
+        throw new Error(`EML import exceeds ${formatBytes(maxImportMessageBytes)}: ${asset.name}`);
+      }
+      const contentBase64 = await FileSystem.readAsStringAsync(asset.uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      const imported = await importMailboxMessageSource(session, folder, safeCacheFilename(asset.name), contentBase64);
+      await refreshMailbox(session, folder);
+      setStatus(`Imported ${imported.filename} into ${imported.folder}.`);
+    } catch (error) {
+      setStatus(readableError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function removeComposeAttachment(id: string) {
     setComposeAttachments((current) => current.filter((attachment) => attachment.id !== id));
   }
@@ -897,6 +940,9 @@ export default function App() {
                 </Pressable>
                 <Pressable style={[styles.secondaryButton, !canEmptyFolder ? styles.disabledButton : null]} onPress={confirmEmptyCurrentFolder}>
                   <Text>Empty</Text>
+                </Pressable>
+                <Pressable style={styles.secondaryButton} onPress={pickImportMessageSource}>
+                  <Text>Import EML</Text>
                 </Pressable>
                 <Pressable style={[styles.dangerButton, !canMutateFolder ? styles.disabledButton : null]} onPress={deleteCurrentFolder}>
                   <Text style={styles.dangerButtonText}>Delete</Text>

@@ -11,6 +11,7 @@ from freemail_api.mailbox_imap import (
     MailboxMessageDetail,
     MailboxMessagePage,
     MailboxMessageSource,
+    ImportedMailboxMessage,
     MailboxSearchResult,
     MovedMailboxMessage,
     MailboxSnapshot,
@@ -36,6 +37,7 @@ from freemail_api.mailbox_imap import (
     _get_attachment,
     _get_message,
     _get_message_source,
+    _append_message_source,
     _list_contacts,
     _list_folders,
     _list_messages,
@@ -65,6 +67,7 @@ class FakeImap:
         self.search_calls = []
         self.renamed_folders = []
         self.deleted_folders = []
+        self.appended = []
 
     def list(self):
         return "OK", [b'(\\HasNoChildren) "/" "INBOX"', b'(\\HasNoChildren) "/" "Sent Items"']
@@ -118,6 +121,17 @@ class FakeImap:
 
     def expunge(self):
         self.expunge_called = True
+        return "OK", []
+
+    def append(self, folder, flags, date_time, content):
+        self.appended.append(
+            {
+                "folder": folder.strip('"'),
+                "flags": flags,
+                "dateTime": date_time,
+                "content": content,
+            }
+        )
         return "OK", []
 
 
@@ -206,6 +220,12 @@ def test_message_source_carries_raw_content_and_filename():
 
     assert source.filename == "freemail-INBOX-3.eml"
     assert b"Subject: Hello" in source.content
+
+
+def test_imported_message_serializes():
+    imported = ImportedMailboxMessage(folder="INBOX", filename="message.eml", size=27, imported=True)
+
+    assert imported.as_dict() == {"folder": "INBOX", "filename": "message.eml", "size": 27, "imported": True}
 
 
 def test_search_result_serializes_messages():
@@ -487,6 +507,22 @@ def test_get_message_source_returns_raw_eml_content_and_filename():
     assert source.filename == "freemail-INBOX-3.eml"
     assert b"Subject: Hello" in source.content
     assert b"Body text" in source.content
+
+
+def test_append_message_source_imports_raw_eml_into_folder():
+    imap = FakeImap()
+    content = b"Subject: Imported\r\nFrom: sender@example.com\r\n\r\nBody"
+
+    _append_message_source(imap, folder="INBOX", content=content)
+
+    assert imap.appended == [
+        {
+            "folder": "INBOX",
+            "flags": r"(\Seen)",
+            "dateTime": None,
+            "content": content,
+        }
+    ]
 
 
 def test_thread_metadata_prefers_reference_root_and_normalizes_subject():

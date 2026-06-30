@@ -219,6 +219,17 @@ class BulkActionMailboxMessages:
 
 
 @dataclass(frozen=True)
+class ImportedMailboxMessage:
+    folder: str
+    filename: str
+    size: int
+    imported: bool
+
+    def as_dict(self) -> dict[str, object]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class MutatedMailboxFolder:
     folder: str
     action: str
@@ -512,6 +523,26 @@ def get_mailbox_message_source(
     with imaplib.IMAP4_SSL(host, port, ssl_context=tls_context, timeout=timeout_seconds) as imap:
         imap.login(email, password)
         return _get_message_source(imap, folder=folder, message_id=message_id)
+
+
+def import_mailbox_message_source(
+    *,
+    email: str,
+    password: str,
+    host: str,
+    port: int,
+    folder: str,
+    filename: str,
+    content: bytes,
+    timeout_seconds: float = 10.0,
+    verify_tls: bool = False,
+) -> ImportedMailboxMessage:
+    _validate_message_source(content)
+    tls_context = _tls_context(verify_tls=verify_tls)
+    with imaplib.IMAP4_SSL(host, port, ssl_context=tls_context, timeout=timeout_seconds) as imap:
+        imap.login(email, password)
+        _append_message_source(imap, folder=folder, content=content)
+    return ImportedMailboxMessage(folder=folder, filename=filename, size=len(content), imported=True)
 
 
 def create_mailbox_folder(
@@ -1019,6 +1050,21 @@ def _get_message_source(imap: imaplib.IMAP4_SSL, *, folder: str, message_id: str
 
 def _source_filename_part(value: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]", "_", value).strip("._-")[:64] or "message"
+
+
+def _append_message_source(imap: imaplib.IMAP4_SSL, *, folder: str, content: bytes) -> None:
+    _ensure_folder(imap, folder)
+    append_status, _append_data = imap.append(f'"{folder}"', r"(\Seen)", None, content)
+    if append_status != "OK":
+        raise imaplib.IMAP4.error(f"Mailbox message import failed: {folder}")
+
+
+def _validate_message_source(content: bytes) -> None:
+    if not content:
+        raise ValueError("Message source is empty")
+    parsed = BytesParser(policy=default).parsebytes(content)
+    if not parsed.keys():
+        raise ValueError("Message source must contain RFC 822 headers")
 
 
 def _body_from_message(message) -> str:

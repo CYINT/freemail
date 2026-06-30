@@ -149,6 +149,13 @@ export type DraftMessage = {
   draftFolder: string;
 };
 
+export type ImportedMessage = {
+  folder: string;
+  filename: string;
+  size: number;
+  imported: boolean;
+};
+
 export type BulkMessageAction = {
   folder: string;
   action: string;
@@ -289,6 +296,23 @@ export async function loadMailboxMessageSource(
     `&message_id=${encodeURIComponent(messageId)}`;
   const response = await request(session.apiBaseUrl, path, { headers: mailboxHeaders(session) });
   return response.blob();
+}
+
+export async function importMailboxMessageSource(
+  session: MailboxSession,
+  folder: string,
+  filename: string,
+  contentBase64: string,
+): Promise<ImportedMessage> {
+  const response = await request(session.apiBaseUrl, "/api/v1/mailbox/message/import", {
+    method: "POST",
+    headers: {
+      ...mailboxHeaders(session),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ folder, filename, contentBase64 }),
+  });
+  return response.json();
 }
 
 export async function archiveMailboxMessage(

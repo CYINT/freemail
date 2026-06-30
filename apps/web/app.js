@@ -23,6 +23,8 @@ const forwardAction = document.querySelector("#forward-action");
 const loadThreadAction = document.querySelector("#load-thread-action");
 const editDraftAction = document.querySelector("#edit-draft-action");
 const downloadSourceAction = document.querySelector("#download-source-action");
+const importSourceAction = document.querySelector("#import-source-action");
+const importSourceFile = document.querySelector("#import-source-file");
 const starAction = document.querySelector("#star-action");
 const unstarAction = document.querySelector("#unstar-action");
 const markReadAction = document.querySelector("#mark-read-action");
@@ -193,6 +195,23 @@ downloadSourceAction?.addEventListener("click", async () => {
     return;
   }
   await downloadMailboxMessageSource(selectedMessageDetail);
+});
+
+importSourceAction?.addEventListener("click", () => {
+  if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
+    setStatus("Load a mailbox before importing EML.", "error");
+    return;
+  }
+  importSourceFile?.click();
+});
+
+importSourceFile?.addEventListener("change", async () => {
+  const file = importSourceFile.files?.[0];
+  if (!file) {
+    return;
+  }
+  await importMailboxMessageSource(file);
+  importSourceFile.value = "";
 });
 
 starAction?.addEventListener("click", async () => {
@@ -1465,6 +1484,40 @@ async function downloadMailboxMessageSource(message) {
     setStatus("Downloaded message EML.", "ready");
   } catch (error) {
     setStatus(`EML download failed: ${readableError(error)}`, "error");
+  }
+}
+
+async function importMailboxMessageSource(file) {
+  if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
+    setStatus("Load a mailbox before importing EML.", "error");
+    return;
+  }
+  if (!file.name.toLowerCase().endsWith(".eml") && file.type !== "message/rfc822") {
+    setStatus("Choose an .eml message source file.", "error");
+    return;
+  }
+  setStatus(`Importing ${file.name} into ${mailboxSession.folder}...`, "loading");
+  try {
+    const response = await fetch(new URL("/api/v1/mailbox/message/import", mailboxSession.apiBaseUrl), {
+      method: "POST",
+      headers: {
+        ...mailboxHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        folder: mailboxSession.folder,
+        filename: safeDownloadName(file.name),
+        contentBase64: await fileToBase64(file),
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const imported = await response.json();
+    await loadMailboxSnapshot(mailboxSession.folder);
+    setStatus(`Imported ${imported.filename || file.name} into ${imported.folder || mailboxSession.folder}.`, "ready");
+  } catch (error) {
+    setStatus(`EML import failed: ${readableError(error)}`, "error");
   }
 }
 

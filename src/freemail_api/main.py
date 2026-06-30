@@ -2,6 +2,7 @@ import binascii
 from collections.abc import Iterator
 from contextlib import asynccontextmanager
 from hashlib import sha256
+import base64
 import imaplib
 import smtplib
 import sqlite3
@@ -27,6 +28,7 @@ from .mailbox_imap import empty_mailbox_folder
 from .mailbox_imap import get_mailbox_attachment
 from .mailbox_imap import get_mailbox_message
 from .mailbox_imap import get_mailbox_message_source
+from .mailbox_imap import import_mailbox_message_source
 from .mailbox_imap import list_mailbox_contacts
 from .mailbox_imap import list_mailbox_snapshot
 from .mailbox_imap import list_mailbox_thread
@@ -79,6 +81,8 @@ from .schemas import (
     MailboxFolderMutationRecord,
     MailboxFolderRename,
     MailboxMessageDetailRecord,
+    MailboxMessageImportCreate,
+    MailboxMessageImportRecord,
     MailboxMoveCreate,
     MailboxMoveRecord,
     MailboxPreferencesRecord,
@@ -176,7 +180,7 @@ COMPONENT_READINESS = {
     "webmail": {
         "status": "beta-ready",
         "evidence": [
-            "mailbox session login, paginated and thread-aware folder navigation and search, conversation lookup, contacts, message read, EML export, read/unread state, star state, compose, attachments, archive, move, delete, and empty-folder controls",
+            "mailbox session login, paginated and thread-aware folder navigation and search, conversation lookup, contacts, message read, EML import/export, read/unread state, star state, compose, attachments, archive, move, delete, and empty-folder controls",
             "bulk message actions for read/unread, star/unstar, archive, spam, delete, and move",
             "persistent mailbox preferences with default compose signatures and saved address-book contacts",
             "server-side Drafts persistence and compose reopen support for saved drafts",
@@ -191,7 +195,7 @@ COMPONENT_READINESS = {
     "mobile": {
         "status": "source-ready",
         "evidence": [
-            "Expo/React Native client with VPN API target, mailbox sessions, paginated and thread-aware message workflows, conversation lookup, EML export/share, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder and empty-folder controls, extracted and saved contacts, attachments, offline metadata cache, and push-device flows",
+            "Expo/React Native client with VPN API target, mailbox sessions, paginated and thread-aware message workflows, conversation lookup, EML import/export/share, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder and empty-folder controls, extracted and saved contacts, attachments, offline metadata cache, and push-device flows",
             "bulk read/star/archive/spam/delete/move client controls over the shared mailbox API",
             "mobile preference controls for default compose signatures",
             "compose/send path uses the shared mailbox API contract with Sent Items persistence status",
@@ -1075,6 +1079,39 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 )
             },
         )
+
+    @app.post("/api/v1/mailbox/message/import", response_model=MailboxMessageImportRecord)
+    def mailbox_message_import(
+        payload: MailboxMessageImportCreate,
+        authorization: str | None = Header(default=None),
+        x_freemail_mailbox_email: str | None = Header(default=None),
+        x_freemail_mailbox_password: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=x_freemail_mailbox_email,
+            x_freemail_mailbox_password=x_freemail_mailbox_password,
+            connection=connection,
+        )
+        try:
+            content = base64.b64decode(payload.content_base64, validate=True)
+            imported = import_mailbox_message_source(
+                email=credentials.email,
+                password=credentials.password,
+                host=active_settings.mail_core_host,
+                port=active_settings.imap_port,
+                folder=payload.folder,
+                filename=payload.filename,
+                content=content,
+            )
+        except (ValueError, binascii.Error) as error:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Invalid EML payload") from error
+        except OSError as error:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+        except imaplib.IMAP4.error as error:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)) from error
+        return imported.as_dict()
 
     @app.post("/api/v1/mailbox/message/archive", response_model=MailboxArchiveRecord)
     def mailbox_archive(
