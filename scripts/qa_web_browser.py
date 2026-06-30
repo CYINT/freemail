@@ -4,10 +4,12 @@ import argparse
 from contextlib import contextmanager
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+import json
 from pathlib import Path
 import sys
 from threading import Thread
 from typing import Iterator
+from urllib.parse import urlparse
 
 
 VIEWPORTS = {
@@ -47,6 +49,7 @@ def main() -> int:
                 try:
                     for name, viewport in VIEWPORTS.items():
                         failures.extend(_check_viewport(browser, expect, base_url, output_dir, name, viewport))
+                    failures.extend(_check_admin_console(browser, expect, base_url, output_dir))
                 finally:
                     browser.close()
         except PlaywrightError as exc:
@@ -115,6 +118,83 @@ def _check_viewport(browser, expect, base_url: str, output_dir: Path, name: str,
     finally:
         page.close()
     return failures
+
+
+def _check_admin_console(browser, expect, base_url: str, output_dir: Path) -> list[str]:
+    page = browser.new_page(viewport=VIEWPORTS["desktop"])
+    screenshot_path = output_dir / "webmail-admin-console.png"
+    status_updates: list[dict[str, str]] = []
+    failures = []
+
+    def api_response(route):
+        request = route.request
+        parsed = urlparse(request.url)
+        if request.method == "GET" and parsed.path == "/api/v1/admin/domains":
+            return _fulfill_json(route, [{"id": 1, "name": "example.com", "status": "active"}])
+        if request.method == "GET" and parsed.path == "/api/v1/admin/users":
+            return _fulfill_json(route, [{"id": 2, "email": "user@example.com", "displayName": "User", "isAdmin": False, "status": "invited"}])
+        if request.method == "GET" and parsed.path == "/api/v1/admin/mailboxes":
+            return _fulfill_json(route, [{"id": 3, "address": "user@example.com", "userId": 2, "status": "active"}])
+        if request.method == "GET" and parsed.path == "/api/v1/admin/aliases":
+            return _fulfill_json(route, [{"id": 4, "source": "info@example.com", "destination": "user@example.com", "status": "active"}])
+        if request.method == "GET" and parsed.path == "/api/v1/admin/dkim-keys":
+            return _fulfill_json(
+                route,
+                [{"id": 5, "domainId": 1, "selector": "default", "dnsName": "default._domainkey.example.com", "status": "active"}],
+            )
+        if request.method == "GET" and parsed.path == "/api/v1/admin/audit-log":
+            return _fulfill_json(route, [{"id": 6, "actor": "admin-api", "action": "domain.create", "targetType": "domain", "targetId": 1, "createdAt": "2026-06-30T00:00:00Z"}])
+        if request.method == "GET" and parsed.path == "/api/v1/admin/domains/1/dns":
+            return _fulfill_json(
+                route,
+                {
+                    "domain": "example.com",
+                    "records": [
+                        {"type": "MX", "name": "example.com", "value": "10 freemail.kuzuryu.ai", "ttl": 3600, "purpose": "Inbound mail"},
+                        {"type": "TXT", "name": "example.com", "value": "v=spf1 mx -all", "ttl": 3600, "purpose": "SPF"},
+                    ],
+                },
+            )
+        if request.method == "PATCH" and parsed.path == "/api/v1/admin/domains/1/status":
+            status_updates.append(json.loads(request.post_data or "{}"))
+            return _fulfill_json(route, {"id": 1, "name": "example.com", "status": "suspended"})
+        return route.fulfill(status=404, body="{}")
+
+    try:
+        page.route("**/api/v1/admin/**", api_response)
+        page.goto(base_url, wait_until="networkidle")
+        page.locator("#admin-api-base-url").fill(base_url.rstrip("/"))
+        page.locator("#admin-token").fill("test-admin-token")
+        page.locator("#bootstrap-token").fill("test-bootstrap-token")
+        page.locator("#admin-auth button[type='submit']").click()
+        expect(page.locator("#admin-status")).to_contain_text("Admin session saved")
+        page.locator("#admin-refresh-action").click()
+        expect(page.get_by_role("heading", name="Domains (1)")).to_be_visible()
+        expect(page.get_by_role("button", name="DNS")).to_be_visible()
+        expect(page.get_by_role("button", name="Suspend").first).to_be_visible()
+        page.get_by_role("button", name="DNS").click()
+        expect(page.locator("#admin-results")).to_contain_text("DNS guidance for example.com")
+        expect(page.locator("#admin-results")).to_contain_text("v=spf1 mx -all")
+        page.locator("#admin-refresh-action").click()
+        expect(page.get_by_role("heading", name="Domains (1)")).to_be_visible()
+        page.get_by_role("button", name="Suspend").first.click()
+        expect(page.locator("#admin-status")).to_contain_text("Status updated")
+        if status_updates != [{"status": "suspended"}]:
+            failures.append(f"admin console did not submit expected status update: {status_updates}")
+        page.screenshot(path=screenshot_path, full_page=True)
+        if screenshot_path.stat().st_size < 10_000:
+            failures.append("admin console screenshot appears too small to be a rendered page")
+    finally:
+        page.close()
+    return failures
+
+
+def _fulfill_json(route, payload: object):
+    return route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps(payload),
+    )
 
 
 @contextmanager

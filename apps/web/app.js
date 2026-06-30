@@ -990,11 +990,27 @@ function renderAdminOverview({ domains, users, mailboxes, aliases, dkimKeys, aud
     return;
   }
   adminResults.replaceChildren(
-    adminTable("Domains", domains, ["id", "name", "status"]),
-    adminTable("Users", users, ["id", "email", "displayName", "isAdmin", "status"]),
-    adminTable("Mailboxes", mailboxes, ["id", "address", "userId", "status"]),
-    adminTable("Aliases", aliases, ["id", "source", "destination", "status"]),
-    adminTable("DKIM keys", dkimKeys, ["id", "domainId", "selector", "dnsName", "status"]),
+    adminTable("Domains", domains, ["id", "name", "status"], {
+      statusPath: "/api/v1/admin/domains",
+      statusActiveValue: "active",
+      extraActions: [domainDnsAction],
+    }),
+    adminTable("Users", users, ["id", "email", "displayName", "isAdmin", "status"], {
+      statusPath: "/api/v1/admin/users",
+      statusActiveValue: "invited",
+    }),
+    adminTable("Mailboxes", mailboxes, ["id", "address", "userId", "status"], {
+      statusPath: "/api/v1/admin/mailboxes",
+      statusActiveValue: "active",
+    }),
+    adminTable("Aliases", aliases, ["id", "source", "destination", "status"], {
+      statusPath: "/api/v1/admin/aliases",
+      statusActiveValue: "active",
+    }),
+    adminTable("DKIM keys", dkimKeys, ["id", "domainId", "selector", "dnsName", "status"], {
+      statusPath: "/api/v1/admin/dkim-keys",
+      statusActiveValue: "active",
+    }),
     adminTable("Audit log", auditLog.slice(0, 10), ["id", "actor", "action", "targetType", "targetId", "createdAt"]),
   );
 }
@@ -1013,7 +1029,7 @@ function renderAdminResult(title, result) {
   adminResults.replaceChildren(section);
 }
 
-function adminTable(title, rows, columns) {
+function adminTable(title, rows, columns, options = {}) {
   const section = document.createElement("section");
   section.className = "admin-result-card";
   const heading = document.createElement("h3");
@@ -1027,19 +1043,106 @@ function adminTable(title, rows, columns) {
   const table = document.createElement("table");
   const thead = document.createElement("thead");
   const headerRow = document.createElement("tr");
-  headerRow.replaceChildren(...columns.map(tableHeader));
+  headerRow.replaceChildren(
+    ...columns.map(tableHeader),
+    ...(adminTableHasActions(options) ? [tableHeader("actions")] : []),
+  );
   thead.replaceChildren(headerRow);
   const tbody = document.createElement("tbody");
   tbody.replaceChildren(
     ...rows.map((row) => {
       const tableRow = document.createElement("tr");
-      tableRow.replaceChildren(...columns.map((column) => tableCell(row[column])));
+      tableRow.replaceChildren(
+        ...columns.map((column) => tableCell(row[column])),
+        ...(adminTableHasActions(options) ? [adminActionsCell(row, options)] : []),
+      );
       return tableRow;
     }),
   );
   table.replaceChildren(thead, tbody);
   section.replaceChildren(heading, table);
   return section;
+}
+
+function adminTableHasActions(options) {
+  return Boolean(options.statusPath || options.extraActions?.length);
+}
+
+function adminActionsCell(row, options) {
+  const cell = document.createElement("td");
+  const actions = document.createElement("div");
+  actions.className = "admin-row-actions";
+  if (options.statusPath) {
+    actions.append(
+      adminActionButton("Suspend", () => updateAdminStatus(options.statusPath, row.id, "suspended")),
+      adminActionButton(options.statusActiveValue === "invited" ? "Invite" : "Activate", () =>
+        updateAdminStatus(options.statusPath, row.id, options.statusActiveValue),
+      ),
+    );
+  }
+  for (const actionFactory of options.extraActions || []) {
+    actions.append(actionFactory(row));
+  }
+  cell.append(actions);
+  return cell;
+}
+
+function adminActionButton(label, onClick) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "admin-row-action";
+  button.textContent = label;
+  button.addEventListener("click", onClick);
+  return button;
+}
+
+function domainDnsAction(row) {
+  return adminActionButton("DNS", () => loadDomainDnsGuidance(row.id));
+}
+
+async function updateAdminStatus(basePath, recordId, statusValue) {
+  if (!adminSession.apiBaseUrl || !adminSession.adminToken) {
+    setAdminStatus("Save API and admin token before changing status.", "error");
+    return;
+  }
+  setAdminStatus(`Updating status to ${statusValue}...`, "loading");
+  try {
+    const response = await fetch(new URL(`${basePath}/${recordId}/status`, adminSession.apiBaseUrl), {
+      method: "PATCH",
+      headers: adminHeaders(),
+      body: JSON.stringify({ status: statusValue }),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const result = await response.json();
+    renderAdminResult("Status updated", result);
+    setAdminStatus("Status updated.", "ready");
+    await loadAdminOverview({ quiet: true });
+  } catch (error) {
+    setAdminStatus(`Status update failed: ${readableError(error)}`, "error");
+  }
+}
+
+async function loadDomainDnsGuidance(domainId) {
+  if (!adminSession.apiBaseUrl || !adminSession.adminToken) {
+    setAdminStatus("Save API and admin token before loading DNS guidance.", "error");
+    return;
+  }
+  setAdminStatus("Loading DNS guidance...", "loading");
+  try {
+    const response = await fetch(new URL(`/api/v1/admin/domains/${domainId}/dns`, adminSession.apiBaseUrl), {
+      headers: adminHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const result = await response.json();
+    renderAdminResult(`DNS guidance for ${result.domain || `domain ${domainId}`}`, result);
+    setAdminStatus("DNS guidance loaded.", "ready");
+  } catch (error) {
+    setAdminStatus(`DNS guidance failed: ${readableError(error)}`, "error");
+  }
 }
 
 function tableHeader(value) {

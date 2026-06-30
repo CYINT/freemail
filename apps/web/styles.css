@@ -598,6 +598,18 @@ h2 {
   white-space: pre-wrap;
 }
 
+.admin-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.admin-row-action {
+  min-height: 30px;
+  padding: 0.2rem 0.5rem;
+  white-space: nowrap;
+}
+
 @media (max-width: 920px) {
   .app-shell {
     grid-template-columns: 1fr;

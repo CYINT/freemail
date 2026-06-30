@@ -147,6 +147,8 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         "/api/v1/admin/aliases",
         "/api/v1/admin/dkim-keys",
         "/api/v1/admin/audit-log",
+        "/api/v1/admin/domains/${domainId}/dns",
+        "/status",
         "archiveMailboxMessage",
         "moveMailboxMessage",
         "searchMailboxMessages",
@@ -177,6 +179,10 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         "createAdminRecord",
         "loadAdminOverview",
         "renderAdminOverview",
+        "adminActionsCell",
+        "updateAdminStatus",
+        "loadDomainDnsGuidance",
+        "domainDnsAction",
         "clearSearch",
     ]:
         if marker not in js_text:
