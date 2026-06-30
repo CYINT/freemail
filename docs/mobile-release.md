@@ -90,6 +90,34 @@ Inspect the evidence packet before using it in a release candidate:
 
 The status command is read-only. It reports the evidence file path, checksum, failed mobile-release checks, and whether the packet is ready for the hard release gate. It does not run native builds, access app-store APIs, sign artifacts, or connect to real devices.
 
+After each real-device private-beta test, update the credential-free `deviceValidation` section through the collector instead of hand-editing JSON:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\collect_mobile_device_validation.py `
+  --evidence .freemail-qa\mobile-release-evidence.json `
+  --platform ios `
+  --tester "release operator" `
+  --device-model "iPhone 15" `
+  --os-version "iOS 18" `
+  --evidence-url "https://example.invalid/ios-device-validation" `
+  --tested `
+  --tested-at "2026-06-30T00:00:00Z" `
+  --all-checks-passed
+
+.\.venv\Scripts\python.exe scripts\collect_mobile_device_validation.py `
+  --evidence .freemail-qa\mobile-release-evidence.json `
+  --platform android `
+  --tester "release operator" `
+  --device-model "Pixel 8" `
+  --os-version "Android 15" `
+  --evidence-url "https://example.invalid/android-device-validation" `
+  --tested `
+  --tested-at "2026-06-30T00:00:00Z" `
+  --all-checks-passed
+```
+
+The collector exits nonzero for partial records. Omit `--all-checks-passed` and provide individual `--passed-check` or `--failed-check` flags when recording an incomplete run for diagnosis; incomplete runs remain failing release evidence.
+
 After TestFlight and Play internal-testing submission, require store submission evidence too:
 
 ```powershell
