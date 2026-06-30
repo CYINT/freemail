@@ -13,6 +13,7 @@ from .release_gate import _check_private_beta_evidence, _check_release_notes
 class ReleasePacketStatusOptions:
     metadata_backup: Path | None = None
     mail_store_backup: Path | None = None
+    restore_drill_evidence: Path | None = None
     mobile_release_evidence: Path | None = None
     mobile_app_config: Path = Path("apps/mobile/app.json")
     private_beta_evidence: Path | None = None
@@ -25,6 +26,7 @@ def summarize_release_packet(options: ReleasePacketStatusOptions) -> dict[str, A
     artifacts = [
         _artifact("--metadata-backup", options.metadata_backup),
         _artifact("--mail-store-backup", options.mail_store_backup),
+        _artifact("--restore-drill-evidence", options.restore_drill_evidence),
         _artifact("--mobile-release-evidence", options.mobile_release_evidence),
         _artifact("--mobile-app-config", options.mobile_app_config),
         _artifact("--private-beta-evidence", options.private_beta_evidence),

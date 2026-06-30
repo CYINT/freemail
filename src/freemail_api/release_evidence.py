@@ -16,6 +16,7 @@ class ReleaseEvidenceManifestOptions:
     output: Path
     metadata_backup: Path | None = None
     mail_store_backup: Path | None = None
+    restore_drill_evidence: Path | None = None
     mobile_release_evidence: Path | None = None
     mobile_app_config: Path = Path("apps/mobile/app.json")
     private_beta_evidence: Path | None = None
@@ -38,6 +39,7 @@ def create_release_evidence_manifest(options: ReleaseEvidenceManifestOptions) ->
         "releaseGateInputs": {
             "--metadata-backup": _manifest_path(manifest_dir, options.metadata_backup),
             "--mail-store-backup": _manifest_path(manifest_dir, options.mail_store_backup),
+            "--restore-drill-evidence": _manifest_path(manifest_dir, options.restore_drill_evidence),
             "--mobile-release-evidence": _manifest_path(manifest_dir, options.mobile_release_evidence),
             "--mobile-app-config": _manifest_path(manifest_dir, options.mobile_app_config),
             "--private-beta-evidence": _manifest_path(manifest_dir, options.private_beta_evidence),
@@ -59,6 +61,7 @@ def load_release_gate_options_from_manifest(path: Path) -> ReleaseGateOptions:
     return ReleaseGateOptions(
         metadata_backup=_manifest_input_path(path, inputs, "--metadata-backup"),
         mail_store_backup=_manifest_input_path(path, inputs, "--mail-store-backup"),
+        restore_drill_evidence=_manifest_input_path(path, inputs, "--restore-drill-evidence"),
         mobile_release_evidence=_manifest_input_path(path, inputs, "--mobile-release-evidence"),
         mobile_app_config=_manifest_input_path(path, inputs, "--mobile-app-config") or Path("apps/mobile/app.json"),
         private_beta_evidence=_manifest_input_path(path, inputs, "--private-beta-evidence"),
@@ -74,6 +77,7 @@ def load_release_packet_status_options_from_manifest(path: Path) -> ReleasePacke
     return ReleasePacketStatusOptions(
         metadata_backup=_manifest_input_path(path, inputs, "--metadata-backup"),
         mail_store_backup=_manifest_input_path(path, inputs, "--mail-store-backup"),
+        restore_drill_evidence=_manifest_input_path(path, inputs, "--restore-drill-evidence"),
         mobile_release_evidence=_manifest_input_path(path, inputs, "--mobile-release-evidence"),
         mobile_app_config=_manifest_input_path(path, inputs, "--mobile-app-config") or Path("apps/mobile/app.json"),
         private_beta_evidence=_manifest_input_path(path, inputs, "--private-beta-evidence"),

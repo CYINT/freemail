@@ -21,6 +21,7 @@ def test_release_evidence_manifest_loads_release_gate_and_status_options(tmp_pat
             output=manifest,
             metadata_backup=artifacts["metadata_backup"],
             mail_store_backup=artifacts["mail_store_backup"],
+            restore_drill_evidence=artifacts["restore_drill_evidence"],
             mobile_release_evidence=artifacts["mobile_release_evidence"],
             mobile_app_config=artifacts["mobile_app_config"],
             private_beta_evidence=artifacts["private_beta_evidence"],
@@ -40,6 +41,7 @@ def test_release_evidence_manifest_loads_release_gate_and_status_options(tmp_pat
     assert payload["requireMobileStoreSubmission"] is True
     assert payload["releaseGateInputs"]["--metadata-backup"] == str(Path("..") / "metadata.json")
     assert gate_options.metadata_backup == artifacts["metadata_backup"]
+    assert gate_options.restore_drill_evidence == artifacts["restore_drill_evidence"]
     assert gate_options.mobile_app_config == artifacts["mobile_app_config"]
     assert gate_options.release_version == "v0.1.0-private-beta"
     assert gate_options.require_mobile_store_submission is True
@@ -55,6 +57,7 @@ def test_release_packet_status_script_accepts_manifest(tmp_path):
             output=manifest,
             metadata_backup=artifacts["metadata_backup"],
             mail_store_backup=artifacts["mail_store_backup"],
+            restore_drill_evidence=artifacts["restore_drill_evidence"],
             mobile_release_evidence=artifacts["mobile_release_evidence"],
             mobile_app_config=artifacts["mobile_app_config"],
             private_beta_evidence=artifacts["private_beta_evidence"],
@@ -92,6 +95,7 @@ def test_release_packet_status_script_cli_paths_override_manifest(tmp_path):
             output=manifest,
             metadata_backup=artifacts["metadata_backup"],
             mail_store_backup=artifacts["mail_store_backup"],
+            restore_drill_evidence=artifacts["restore_drill_evidence"],
             mobile_release_evidence=artifacts["mobile_release_evidence"],
             mobile_app_config=artifacts["mobile_app_config"],
             private_beta_evidence=artifacts["private_beta_evidence"],
@@ -141,12 +145,14 @@ def test_create_release_evidence_manifest_script_refuses_overwrite_without_force
 def create_artifacts(tmp_path):
     metadata_backup = tmp_path / "metadata.json"
     mail_store_backup = tmp_path / "mail-store.tar.gz"
+    restore_drill_evidence = tmp_path / "restore-drill-evidence.json"
     mobile_release_evidence = tmp_path / "mobile-release-evidence.json"
     mobile_app_config = tmp_path / "app.json"
     private_beta_evidence = tmp_path / "private-beta-gate.json"
     release_notes = tmp_path / "release-notes.md"
     metadata_backup.write_text("{}", encoding="utf-8")
     mail_store_backup.write_bytes(b"archive")
+    write_json(restore_drill_evidence, valid_restore_drill_evidence())
     write_json(mobile_app_config, valid_mobile_app_config())
     write_json(mobile_release_evidence, valid_mobile_release_evidence())
     write_json(private_beta_evidence, valid_private_beta_evidence())
@@ -159,6 +165,7 @@ def create_artifacts(tmp_path):
     return {
         "metadata_backup": metadata_backup,
         "mail_store_backup": mail_store_backup,
+        "restore_drill_evidence": restore_drill_evidence,
         "mobile_release_evidence": mobile_release_evidence,
         "mobile_app_config": mobile_app_config,
         "private_beta_evidence": private_beta_evidence,
@@ -244,6 +251,15 @@ def valid_private_beta_evidence():
             {"name": "mail-store-backup-evidence", "status": "pass", "details": {}},
             {"name": "private-beta-acceptance", "status": "pass", "details": {}},
         ],
+    }
+
+
+def valid_restore_drill_evidence():
+    return {
+        "credentialFree": True,
+        "metadataRestore": {"restored": True, "tableCounts": {"domains": 1}},
+        "mailStoreRestore": {"restored": True, "drillVolume": "freemail_stalwart_restore_drill"},
+        "stalwartApplyPlan": {"exported": True, "summary": {"operations": 1}},
     }
 
 

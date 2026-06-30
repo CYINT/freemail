@@ -11,12 +11,14 @@ from freemail_api.release_gate import assert_release_gate, ReleaseGateError, Rel
 def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monkeypatch):
     metadata = tmp_path / "metadata.json"
     mail_store = tmp_path / "mail-store.tar.gz"
+    restore_drill = tmp_path / "restore-drill-evidence.json"
     mobile_evidence = tmp_path / "mobile-release-evidence.json"
     mobile_app_config = tmp_path / "app.json"
     private_beta_evidence = tmp_path / "private-beta-gate.json"
     release_notes = tmp_path / "release-notes.md"
     metadata.write_text("{}", encoding="utf-8")
     mail_store.write_bytes(b"archive")
+    write_json(restore_drill, valid_restore_drill_evidence())
     write_json(mobile_app_config, valid_mobile_app_config())
     write_json(mobile_evidence, valid_mobile_release_evidence())
     write_json(private_beta_evidence, valid_private_beta_evidence())
@@ -67,6 +69,7 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
         ReleaseGateOptions(
             metadata_backup=metadata,
             mail_store_backup=mail_store,
+            restore_drill_evidence=restore_drill,
             mobile_release_evidence=mobile_evidence,
             mobile_app_config=mobile_app_config,
             require_mobile_store_submission=True,
@@ -80,6 +83,9 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
     checks_by_name = {check["name"]: check for check in result["checks"]}
     assert checks_by_name["metadata-backup"]["details"]["sha256"] == hashlib.sha256(b"{}").hexdigest()
     assert checks_by_name["mail-store-backup"]["details"]["sha256"] == hashlib.sha256(b"archive").hexdigest()
+    assert checks_by_name["restore-drill-evidence"]["details"]["sha256"] == hashlib.sha256(
+        restore_drill.read_bytes()
+    ).hexdigest()
     assert checks_by_name["mobile-release-evidence"]["details"]["evidenceDetails"]["sha256"] == hashlib.sha256(
         mobile_evidence.read_bytes()
     ).hexdigest()
@@ -99,6 +105,7 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
         "github-ci",
         "metadata-backup",
         "mail-store-backup",
+        "restore-drill-evidence",
         "mobile-release-evidence",
         "private-beta-evidence",
         "release-notes",
@@ -116,6 +123,7 @@ def test_release_gate_fails_without_backup_evidence(tmp_path, monkeypatch):
         ReleaseGateOptions(
             metadata_backup=None,
             mail_store_backup=None,
+            restore_drill_evidence=None,
             skip_github_ci=True,
             skip_repo_secret_scan=True,
             skip_license_policy_scan=True,
@@ -133,14 +141,17 @@ def test_release_gate_fails_without_backup_evidence(tmp_path, monkeypatch):
 def test_release_gate_fails_without_mobile_release_evidence(tmp_path, monkeypatch):
     metadata = tmp_path / "metadata.json"
     mail_store = tmp_path / "mail-store.tar.gz"
+    restore_drill = tmp_path / "restore-drill-evidence.json"
     metadata.write_text("{}", encoding="utf-8")
     mail_store.write_bytes(b"archive")
+    write_json(restore_drill, valid_restore_drill_evidence())
     monkeypatch.setattr(release_gate, "_command", fake_basic_release_command)
 
     result = run_release_gate(
         ReleaseGateOptions(
             metadata_backup=metadata,
             mail_store_backup=mail_store,
+            restore_drill_evidence=restore_drill,
             skip_github_ci=True,
             skip_repo_secret_scan=True,
             skip_license_policy_scan=True,
@@ -348,6 +359,20 @@ def test_backup_file_check_records_sha256_for_non_empty_file(tmp_path):
     assert check["details"]["sha256"] == hashlib.sha256(b"backup").hexdigest()
 
 
+def test_restore_drill_evidence_check_requires_successful_drill(tmp_path):
+    evidence = tmp_path / "restore-drill-evidence.json"
+    payload = valid_restore_drill_evidence()
+    payload["mailStoreRestore"]["restored"] = False
+    write_json(evidence, payload)
+
+    check = release_gate._check_restore_drill_evidence(evidence)
+
+    assert check["status"] == "fail"
+    assert check["details"]["credentialFree"] is True
+    assert check["details"]["metadataRestored"] is True
+    assert check["details"]["mailStoreRestored"] is False
+
+
 def test_release_notes_check_requires_version_and_required_sections(tmp_path):
     release_notes = tmp_path / "release-notes.md"
     release_notes.write_text(
@@ -529,6 +554,15 @@ def valid_private_beta_evidence():
             {"name": "mail-store-backup-evidence", "status": "pass", "details": {}},
             {"name": "private-beta-acceptance", "status": "pass", "details": {}},
         ],
+    }
+
+
+def valid_restore_drill_evidence():
+    return {
+        "credentialFree": True,
+        "metadataRestore": {"restored": True, "tableCounts": {"domains": 1}},
+        "mailStoreRestore": {"restored": True, "drillVolume": "freemail_stalwart_restore_drill"},
+        "stalwartApplyPlan": {"exported": True, "summary": {"operations": 1}},
     }
 
 

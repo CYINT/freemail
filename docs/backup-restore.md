@@ -32,6 +32,20 @@ The collector writes:
 
 The manifest records relative release-gate input names, but the backup files themselves remain sensitive because they may include DKIM private keys, password hashes, mailbox contents, attachments, indexes, and queue state.
 
+After collecting backups, run a restore drill into isolated targets:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\collect_restore_drill_evidence.py `
+  --metadata-backup .freemail-qa\backups\metadata.json `
+  --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
+  --output .freemail-qa\backups\restore-drill-evidence.json `
+  --drill-database .freemail-qa\restore-drill\metadata-restored.sqlite `
+  --drill-mail-store-volume freemail_stalwart_restore_drill `
+  --force
+```
+
+The restore-drill evidence file is credential-free. It records input byte counts and SHA-256 checksums, restored metadata table counts, Stalwart apply-plan export status, and the drill mail-store volume name. It does not embed metadata rows, DKIM private keys, password hashes, or mailbox content.
+
 ## Export API Metadata
 
 ```powershell
@@ -92,8 +106,7 @@ After any restore drill, validate the restored stack with:
 Before private beta, record evidence that:
 
 - Metadata export completes and the JSON is stored outside the repository.
-- Metadata restore succeeds into a new database.
-- The restored metadata can export a Stalwart apply plan.
-- Mail-core volume backup and restore are tested in the target deployment environment, first into a drill volume and then against the active volume only when a rollback archive exists.
+- `scripts\collect_restore_drill_evidence.py` proves metadata restore into a new database, Stalwart apply-plan export from restored metadata, and mail-store archive restore into a drill Docker volume.
+- Active-volume restore is tested only when all writers are stopped and a fresh rollback archive exists.
 - DKIM records generated from restored key material match the active DNS guidance.
 - Release and private-beta gate outputs record SHA-256 checksums for the metadata and mail-store backup files. Private-beta gate output also records checksums for mail-flow, queue, deliverability/abuse, and acceptance evidence files.

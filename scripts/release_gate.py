@@ -21,6 +21,7 @@ def main() -> int:
     parser.add_argument("--readiness-url", default="https://freemail.kuzuryu.ai/api/v1/mail-core/readiness")
     parser.add_argument("--metadata-backup", type=Path)
     parser.add_argument("--mail-store-backup", type=Path)
+    parser.add_argument("--restore-drill-evidence", type=Path)
     parser.add_argument("--mobile-release-evidence", type=Path)
     parser.add_argument("--mobile-app-config", type=Path)
     parser.add_argument("--private-beta-evidence", type=Path)
@@ -59,6 +60,7 @@ def _options_from_args(args: argparse.Namespace, manifest: ReleaseGateOptions | 
         readiness_url=args.readiness_url,
         metadata_backup=args.metadata_backup or _manifest_value(manifest, "metadata_backup"),
         mail_store_backup=args.mail_store_backup or _manifest_value(manifest, "mail_store_backup"),
+        restore_drill_evidence=args.restore_drill_evidence or _manifest_value(manifest, "restore_drill_evidence"),
         mobile_release_evidence=args.mobile_release_evidence or _manifest_value(manifest, "mobile_release_evidence"),
         mobile_app_config=args.mobile_app_config
         or _manifest_value(manifest, "mobile_app_config")

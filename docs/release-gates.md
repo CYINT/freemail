@@ -9,6 +9,7 @@ After collecting backups, mobile evidence, private-beta gate output, and release
   --output .freemail-qa\release\release-evidence-manifest.json `
   --metadata-backup .freemail-qa\backups\metadata.json `
   --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
+  --restore-drill-evidence .freemail-qa\backups\restore-drill-evidence.json `
   --mobile-release-evidence .freemail-qa\mobile-release-evidence.json `
   --require-mobile-store-submission `
   --private-beta-evidence .freemail-qa\private-beta-gate-example.com.json `
@@ -32,6 +33,20 @@ docker compose --profile mail-core up -d mail-core
 
 The backup collector writes sensitive artifacts plus `backup-evidence-manifest.json` with byte counts and SHA-256 checksums. Keep the backup directory encrypted and outside Git.
 
+After collecting backups, run the restore drill against isolated targets:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\collect_restore_drill_evidence.py `
+  --metadata-backup .freemail-qa\backups\metadata.json `
+  --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
+  --output .freemail-qa\backups\restore-drill-evidence.json `
+  --drill-database .freemail-qa\restore-drill\metadata-restored.sqlite `
+  --drill-mail-store-volume freemail_stalwart_restore_drill `
+  --force
+```
+
+The restore-drill evidence JSON is credential-free. It proves metadata restore, Stalwart apply-plan export from restored metadata, and mail-store archive restore into a dedicated drill Docker volume.
+
 Before the hard gate, inspect the local release packet without touching Docker, GitHub, or live runtime URLs:
 
 ```powershell
@@ -46,6 +61,7 @@ Explicit artifact flags override manifest values when an artifact has been reloc
   --manifest .freemail-qa\release\release-evidence-manifest.json `
   --metadata-backup .freemail-qa\backups\metadata.json `
   --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
+  --restore-drill-evidence .freemail-qa\backups\restore-drill-evidence.json `
   --mobile-release-evidence .freemail-qa\mobile-release-evidence.json `
   --require-mobile-store-submission `
   --private-beta-evidence .freemail-qa\private-beta-gate-example.com.json `
@@ -79,6 +95,7 @@ The release gate also accepts explicit artifact flags, which override manifest v
   --manifest .freemail-qa\release\release-evidence-manifest.json `
   --metadata-backup .freemail-qa\backups\metadata.json `
   --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
+  --restore-drill-evidence .freemail-qa\backups\restore-drill-evidence.json `
   --mobile-release-evidence .freemail-qa\mobile-release-evidence.json `
   --require-mobile-store-submission `
   --private-beta-evidence .freemail-qa\private-beta-gate-example.com.json `
@@ -96,6 +113,7 @@ The gate verifies:
 - `docker compose config --quiet`
 - resolved Compose port bindings for the API, web, and mail-core profiles are loopback-only
 - metadata and mail-store backup evidence files exist, are non-empty, and have SHA-256 checksums recorded in the gate output
+- restore-drill evidence exists and proves metadata restore, Stalwart apply-plan export, and mail-store restore into a drill volume
 - mobile signed-build and store-submission evidence passes `scripts/mobile_release_gate.py` with credential-free proof for both iOS and Android
 - private-beta gate output passes for at least one controlled domain and includes DNS, mail-flow, queue, mail-core apply, deliverability/abuse, backup, and decision-owner acceptance checks
 - release notes exist, are non-empty, include the candidate version, include verification, known-limitations, and VPN-boundary language, contain no placeholder markers, and have a SHA-256 checksum recorded in the gate output

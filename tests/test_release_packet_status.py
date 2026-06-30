@@ -11,6 +11,7 @@ def test_release_packet_status_reports_missing_artifacts(tmp_path):
         ReleasePacketStatusOptions(
             metadata_backup=tmp_path / "missing-metadata.json",
             mail_store_backup=tmp_path / "missing-mail-store.tar.gz",
+            restore_drill_evidence=tmp_path / "missing-restore-drill.json",
             mobile_release_evidence=tmp_path / "missing-mobile.json",
             mobile_app_config=tmp_path / "missing-app.json",
             private_beta_evidence=tmp_path / "missing-private-beta.json",
@@ -22,6 +23,7 @@ def test_release_packet_status_reports_missing_artifacts(tmp_path):
     assert result["missingArtifacts"] == [
         "--metadata-backup",
         "--mail-store-backup",
+        "--restore-drill-evidence",
         "--mobile-release-evidence",
         "--mobile-app-config",
         "--private-beta-evidence",
@@ -35,11 +37,13 @@ def test_release_packet_status_reports_mobile_draft_failures(tmp_path):
     metadata = tmp_path / "metadata.json"
     mail_store = tmp_path / "mail-store.tar.gz"
     mobile_evidence = tmp_path / "mobile-release-evidence.json"
+    restore_drill = tmp_path / "restore-drill-evidence.json"
     mobile_app_config = tmp_path / "app.json"
     private_beta_evidence = tmp_path / "private-beta-gate.json"
     release_notes = tmp_path / "release-notes.md"
     metadata.write_text("{}", encoding="utf-8")
     mail_store.write_bytes(b"archive")
+    write_json(restore_drill, valid_restore_drill_evidence())
     write_json(mobile_app_config, valid_mobile_app_config())
     mobile_payload = valid_mobile_release_evidence()
     mobile_payload["builds"]["ios"]["signed"] = False
@@ -51,6 +55,7 @@ def test_release_packet_status_reports_mobile_draft_failures(tmp_path):
         ReleasePacketStatusOptions(
             metadata_backup=metadata,
             mail_store_backup=mail_store,
+            restore_drill_evidence=restore_drill,
             mobile_release_evidence=mobile_evidence,
             mobile_app_config=mobile_app_config,
             private_beta_evidence=private_beta_evidence,
@@ -70,11 +75,13 @@ def test_release_packet_status_accepts_complete_local_packet(tmp_path):
     metadata = tmp_path / "metadata.json"
     mail_store = tmp_path / "mail-store.tar.gz"
     mobile_evidence = tmp_path / "mobile-release-evidence.json"
+    restore_drill = tmp_path / "restore-drill-evidence.json"
     mobile_app_config = tmp_path / "app.json"
     private_beta_evidence = tmp_path / "private-beta-gate.json"
     release_notes = tmp_path / "release-notes.md"
     metadata.write_text("{}", encoding="utf-8")
     mail_store.write_bytes(b"archive")
+    write_json(restore_drill, valid_restore_drill_evidence())
     write_json(mobile_app_config, valid_mobile_app_config())
     write_json(mobile_evidence, valid_mobile_release_evidence())
     write_json(private_beta_evidence, valid_private_beta_evidence())
@@ -84,6 +91,7 @@ def test_release_packet_status_accepts_complete_local_packet(tmp_path):
         ReleasePacketStatusOptions(
             metadata_backup=metadata,
             mail_store_backup=mail_store,
+            restore_drill_evidence=restore_drill,
             mobile_release_evidence=mobile_evidence,
             mobile_app_config=mobile_app_config,
             private_beta_evidence=private_beta_evidence,
@@ -98,6 +106,9 @@ def test_release_packet_status_accepts_complete_local_packet(tmp_path):
     assert result["failedChecks"] == []
     assert artifacts["--metadata-backup"]["sha256"] == hashlib.sha256(b"{}").hexdigest()
     assert artifacts["--mail-store-backup"]["sha256"] == hashlib.sha256(b"archive").hexdigest()
+    assert artifacts["--restore-drill-evidence"]["sha256"] == hashlib.sha256(
+        restore_drill.read_bytes()
+    ).hexdigest()
 
 
 def test_release_packet_status_script_exits_nonzero_until_packet_ready(tmp_path):
@@ -192,6 +203,15 @@ def valid_private_beta_evidence():
             {"name": "mail-store-backup-evidence", "status": "pass", "details": {}},
             {"name": "private-beta-acceptance", "status": "pass", "details": {}},
         ],
+    }
+
+
+def valid_restore_drill_evidence():
+    return {
+        "credentialFree": True,
+        "metadataRestore": {"restored": True, "tableCounts": {"domains": 1}},
+        "mailStoreRestore": {"restored": True, "drillVolume": "freemail_stalwart_restore_drill"},
+        "stalwartApplyPlan": {"exported": True, "summary": {"operations": 1}},
     }
 
 

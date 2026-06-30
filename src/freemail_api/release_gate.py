@@ -25,6 +25,7 @@ class ReleaseGateOptions:
     readiness_url: str | None = "https://freemail.kuzuryu.ai/api/v1/mail-core/readiness"
     metadata_backup: Path | None = None
     mail_store_backup: Path | None = None
+    restore_drill_evidence: Path | None = None
     mobile_release_evidence: Path | None = None
     mobile_app_config: Path = Path("apps/mobile/app.json")
     private_beta_evidence: Path | None = None
@@ -56,7 +57,9 @@ def run_release_gate(options: ReleaseGateOptions) -> dict[str, Any]:
     if not options.skip_github_ci:
         checks.append(_check_github_ci(options.repo, commit))
     if not options.skip_backup_evidence:
-        checks.extend(_check_backup_evidence(options.metadata_backup, options.mail_store_backup))
+        checks.extend(
+            _check_backup_evidence(options.metadata_backup, options.mail_store_backup, options.restore_drill_evidence)
+        )
     if not options.skip_mobile_evidence:
         checks.append(
             _check_mobile_release_evidence(
@@ -194,12 +197,20 @@ def _check_license_policy_scan() -> dict[str, Any]:
 def _check_backup_evidence(
     metadata_backup: Path | None,
     mail_store_backup: Path | None,
+    restore_drill_evidence: Path | None,
 ) -> list[dict[str, Any]]:
-    if metadata_backup is None or mail_store_backup is None:
-        return [_check("backup-evidence", False, {"error": "metadata and mail-store backup paths are required"})]
+    if metadata_backup is None or mail_store_backup is None or restore_drill_evidence is None:
+        return [
+            _check(
+                "backup-evidence",
+                False,
+                {"error": "metadata, mail-store, and restore-drill evidence paths are required"},
+            )
+        ]
     return [
         _check_backup_file("metadata-backup", metadata_backup),
         _check_backup_file("mail-store-backup", mail_store_backup),
+        _check_restore_drill_evidence(restore_drill_evidence),
     ]
 
 
@@ -207,6 +218,34 @@ def _check_backup_file(name: str, path: Path) -> dict[str, Any]:
     exists = path.is_file()
     size = path.stat().st_size if exists else 0
     return _check(name, exists and size > 0, _file_evidence_details(path, exists, size))
+
+
+def _check_restore_drill_evidence(path: Path) -> dict[str, Any]:
+    exists = path.is_file()
+    size = path.stat().st_size if exists else 0
+    details = _file_evidence_details(path, exists, size)
+    if not exists or size == 0:
+        details["error"] = "restore drill evidence file must exist and be non-empty"
+        return _check("restore-drill-evidence", False, details)
+    payload = _load_json_file(path)
+    metadata_restore = payload.get("metadataRestore") if isinstance(payload.get("metadataRestore"), dict) else {}
+    mail_store_restore = payload.get("mailStoreRestore") if isinstance(payload.get("mailStoreRestore"), dict) else {}
+    apply_plan = payload.get("stalwartApplyPlan") if isinstance(payload.get("stalwartApplyPlan"), dict) else {}
+    details.update(
+        {
+            "credentialFree": payload.get("credentialFree"),
+            "metadataRestored": metadata_restore.get("restored"),
+            "mailStoreRestored": mail_store_restore.get("restored"),
+            "stalwartApplyPlanExported": apply_plan.get("exported"),
+        }
+    )
+    passed = (
+        payload.get("credentialFree") is True
+        and metadata_restore.get("restored") is True
+        and mail_store_restore.get("restored") is True
+        and apply_plan.get("exported") is True
+    )
+    return _check("restore-drill-evidence", passed, details)
 
 
 def _check_mobile_release_evidence(

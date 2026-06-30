@@ -13,6 +13,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--metadata-backup", type=Path)
     parser.add_argument("--mail-store-backup", type=Path)
+    parser.add_argument("--restore-drill-evidence", type=Path)
     parser.add_argument("--mobile-release-evidence", type=Path)
     parser.add_argument("--mobile-app-config", type=Path, default=Path("apps/mobile/app.json"))
     parser.add_argument("--private-beta-evidence", type=Path)
@@ -27,6 +28,7 @@ def main() -> int:
             output=args.output,
             metadata_backup=args.metadata_backup,
             mail_store_backup=args.mail_store_backup,
+            restore_drill_evidence=args.restore_drill_evidence,
             mobile_release_evidence=args.mobile_release_evidence,
             mobile_app_config=args.mobile_app_config,
             private_beta_evidence=args.private_beta_evidence,

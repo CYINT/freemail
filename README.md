@@ -351,6 +351,20 @@ docker compose --profile mail-core up -d mail-core
 
 The collector writes `metadata.json`, `stalwart-mail-store.tar.gz`, and `backup-evidence-manifest.json` with checksums. These files are sensitive and must stay encrypted/outside Git.
 
+Then run a restore drill into isolated targets:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\collect_restore_drill_evidence.py `
+  --metadata-backup .freemail-qa\backups\metadata.json `
+  --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
+  --output .freemail-qa\backups\restore-drill-evidence.json `
+  --drill-database .freemail-qa\restore-drill\metadata-restored.sqlite `
+  --drill-mail-store-volume freemail_stalwart_restore_drill `
+  --force
+```
+
+The restore-drill evidence file is credential-free. It proves metadata restore, Stalwart apply-plan export, and mail-store archive restore into a dedicated drill volume without embedding metadata rows, keys, password hashes, or mailbox content.
+
 Export metadata:
 
 ```powershell
@@ -391,6 +405,7 @@ Create a top-level release evidence manifest after the private-beta packet, back
   --output .freemail-qa\release\release-evidence-manifest.json `
   --metadata-backup .freemail-qa\backups\metadata.json `
   --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
+  --restore-drill-evidence .freemail-qa\backups\restore-drill-evidence.json `
   --mobile-release-evidence .freemail-qa\mobile-release-evidence.json `
   --require-mobile-store-submission `
   --private-beta-evidence .freemail-qa\private-beta-gate-example.com.json `
@@ -412,6 +427,7 @@ Explicit artifact flags can override manifest entries when evidence is stored in
   --manifest .freemail-qa\release\release-evidence-manifest.json `
   --metadata-backup .freemail-qa\backups\metadata.json `
   --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
+  --restore-drill-evidence .freemail-qa\backups\restore-drill-evidence.json `
   --mobile-release-evidence .freemail-qa\mobile-release-evidence.json `
   --require-mobile-store-submission `
   --private-beta-evidence .freemail-qa\private-beta-gate-example.com.json `
@@ -435,6 +451,7 @@ The release gate also accepts explicit artifact flags, which override manifest v
   --manifest .freemail-qa\release\release-evidence-manifest.json `
   --metadata-backup .freemail-qa\backups\metadata.json `
   --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
+  --restore-drill-evidence .freemail-qa\backups\restore-drill-evidence.json `
   --mobile-release-evidence .freemail-qa\mobile-release-evidence.json `
   --require-mobile-store-submission `
   --private-beta-evidence .freemail-qa\private-beta-gate-example.com.json `
@@ -442,7 +459,7 @@ The release gate also accepts explicit artifact flags, which override manifest v
   --release-version v0.1.0-private-beta
 ```
 
-The release gate checks clean Git state, remote SHA, GitHub Actions CI, repository secret scan, license-policy scan, Compose config, loopback-only Compose port bindings for API, web, and mail-core profiles, backup evidence, mobile signed-build/store-submission evidence, controlled-domain private-beta evidence, mail-core apply evidence, release-notes evidence, VPN-only health/deployment metadata, metadata-store readiness, and mail-core protocol readiness.
+The release gate checks clean Git state, remote SHA, GitHub Actions CI, repository secret scan, license-policy scan, Compose config, loopback-only Compose port bindings for API, web, and mail-core profiles, backup and restore-drill evidence, mobile signed-build/store-submission evidence, controlled-domain private-beta evidence, mail-core apply evidence, release-notes evidence, VPN-only health/deployment metadata, metadata-store readiness, and mail-core protocol readiness.
 
 Offline development can skip individual external or slow checks with explicit `--skip-*` flags, including `--skip-github-ci`, `--skip-repo-secret-scan`, `--skip-license-policy-scan`, `--skip-runtime`, `--skip-backup-evidence`, `--skip-mobile-evidence`, `--skip-private-beta-evidence`, and `--skip-release-notes`. Do not use skipped gates as release evidence.
 
