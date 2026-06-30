@@ -68,6 +68,8 @@ from .schemas import (
     MailboxMessageDetailRecord,
     MailboxMoveCreate,
     MailboxMoveRecord,
+    MailCoreSyncPlanStatusCreate,
+    MailCoreSyncPlanStatusRecord,
     MailboxPushDeviceCreate,
     MailboxPushDeviceDeleteRecord,
     MailboxPushDeviceRecord,
@@ -102,6 +104,7 @@ from .secret_box import SecretBoxConfigurationError
 from .secret_box import SecretBoxDecryptionError
 from .settings import get_settings
 from .settings import Settings
+from .stalwart_plan import build_apply_plan_status
 
 
 ROLE_PERMISSIONS = {
@@ -1109,6 +1112,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             expected_records=records,
             observed_records=[record.model_dump() for record in payload.observed_records],
         ).as_dict()
+
+    @app.post("/api/v1/admin/mail-core/sync-plan/status", response_model=MailCoreSyncPlanStatusRecord)
+    def mail_core_sync_plan_status(
+        payload: MailCoreSyncPlanStatusCreate,
+        principal: AdminPrincipal = Depends(require_admin),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        require_permission(principal, "admin.manage")
+        available = {str(email).lower() for email in payload.available_user_secrets}
+        return build_apply_plan_status(connection, available)
 
     @app.get("/api/v1/admin/audit-log", response_model=list[AuditRecord])
     def audit_log(

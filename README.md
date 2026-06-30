@@ -87,6 +87,7 @@ Initial endpoints:
 - `PATCH /api/v1/admin/dkim-keys/{dkimKeyId}/status`
 - `GET /api/v1/admin/domains/{domainId}/dns`
 - `POST /api/v1/admin/domains/{domainId}/dns/verify`
+- `POST /api/v1/admin/mail-core/sync-plan/status`
 - `GET /api/v1/admin/audit-log`
 
 The current metadata store is SQLite at `FREEMAIL_DB_PATH`, defaulting to `data/freemail.sqlite` locally and a Docker volume path in Compose. PostgreSQL is not yet a supported metadata backend; see `docs/architecture.md` for the adapter, migration, backup, and release-gate work required before production/private-beta PostgreSQL use. Mail-store persistence remains part of the Stalwart mail-core spike.
@@ -308,6 +309,14 @@ FreeMail can export a Stalwart `apply` plan from admin metadata:
 ```
 
 Keep `secrets\mail-core-users.json` ignored and local. It maps mailbox email addresses to Stalwart account secrets because FreeMail stores password hashes only and cannot recover user passwords for mail-core provisioning.
+
+The admin API and web admin console can report a secret-free mail-core sync-plan status before running the CLI exporter:
+
+```text
+POST /api/v1/admin/mail-core/sync-plan/status
+```
+
+Pass `availableUserSecrets` as mailbox email addresses that are present in the ignored local secrets file. The response includes operation counts and missing account-secret emails, but it does not return DKIM private keys, account passwords, or provider credentials.
 
 The plan is newline-delimited JSON for `stalwart-cli apply`. Stalwart must be taken out of first-boot bootstrap mode before domain, account, or DKIM objects can be applied:
 

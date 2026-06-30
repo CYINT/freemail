@@ -168,6 +168,20 @@ class DomainDnsPostureRecord(ApiModel):
     checks: list[DnsCheckRecord]
 
 
+class MailCoreSyncPlanStatusCreate(ApiModel):
+    available_user_secrets: list[EmailStr] = Field(default_factory=list)
+
+
+class MailCoreSyncPlanStatusRecord(ApiModel):
+    ready: bool
+    operation_types: list[str]
+    domains: int
+    dkim_keys: int
+    accounts: int
+    aliases: int
+    missing_provisioning_secrets: list[EmailStr]
+
+
 class AuditRecord(ApiModel):
     id: int
     actor: str

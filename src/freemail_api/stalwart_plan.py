@@ -14,6 +14,33 @@ class MissingProvisioningSecretError(ValueError):
     pass
 
 
+def build_apply_plan_status(connection: sqlite3.Connection, available_user_secrets: set[str]) -> dict[str, object]:
+    connection.row_factory = sqlite3.Row
+    active_domains = _domain_values(connection)
+    active_dkim = _dkim_values(connection)
+    accounts = _account_rows(connection)
+    missing_secrets = sorted(
+        str(row["email"]) for row in accounts if str(row["email"]).lower() not in available_user_secrets
+    )
+    account_alias_count = sum(len(_account_aliases(connection, str(row["email"]))) for row in accounts)
+    operation_types = []
+    if active_domains:
+        operation_types.append("Domain")
+    if active_dkim:
+        operation_types.append("DkimSignature")
+    if accounts and not missing_secrets:
+        operation_types.append("Account")
+    return {
+        "ready": not missing_secrets,
+        "operationTypes": operation_types,
+        "domains": len(active_domains),
+        "dkimKeys": len(active_dkim),
+        "accounts": len(accounts),
+        "aliases": account_alias_count,
+        "missingProvisioningSecrets": missing_secrets,
+    }
+
+
 def build_apply_plan(connection: sqlite3.Connection, options: PlanOptions) -> list[dict[str, object]]:
     connection.row_factory = sqlite3.Row
     operations: list[dict[str, object]] = []
@@ -71,19 +98,7 @@ def _dkim_values(connection: sqlite3.Connection) -> dict[str, dict[str, object]]
 
 def _account_values(connection: sqlite3.Connection, options: PlanOptions) -> dict[str, dict[str, object]]:
     values: dict[str, dict[str, object]] = {}
-    rows = connection.execute(
-        """
-        SELECT DISTINCT users.email, users.display_name
-        FROM users
-        JOIN mailboxes ON mailboxes.user_id = users.id
-        JOIN domains ON domains.id = mailboxes.domain_id
-        WHERE users.status = 'invited'
-          AND mailboxes.status = 'active'
-          AND domains.status = 'active'
-        ORDER BY users.id
-        """
-    )
-    for row in rows:
+    for row in _account_rows(connection):
         email = row["email"]
         secret = options.user_secrets.get(email)
         if not secret:
@@ -111,6 +126,23 @@ def _account_values(connection: sqlite3.Connection, options: PlanOptions) -> dic
             "roles": {"@type": "User"},
         }
     return values
+
+
+def _account_rows(connection: sqlite3.Connection) -> list[sqlite3.Row]:
+    return list(
+        connection.execute(
+            """
+            SELECT DISTINCT users.email, users.display_name
+            FROM users
+            JOIN mailboxes ON mailboxes.user_id = users.id
+            JOIN domains ON domains.id = mailboxes.domain_id
+            WHERE users.status = 'invited'
+              AND mailboxes.status = 'active'
+              AND domains.status = 'active'
+            ORDER BY users.id
+            """
+        )
+    )
 
 
 def _account_aliases(connection: sqlite3.Connection, email: str) -> dict[str, dict[str, object]]:

@@ -88,6 +88,8 @@ FreeMail exports Stalwart `apply` NDJSON through `scripts/export_stalwart_apply_
 
 The exporter intentionally requires a separate ignored secrets JSON file for account secrets. FreeMail stores password hashes only, so it cannot derive plaintext mail-core credentials from the admin database.
 
+The admin API exposes `POST /api/v1/admin/mail-core/sync-plan/status` as a secret-free readiness surface for this exporter. It reports domain, DKIM, account, and alias counts plus missing account-secret email addresses based on operator-provided `availableUserSecrets` email names. It does not expose DKIM private keys or account password values.
+
 The exported plan uses Stalwart CLI upsert operations grouped by object type. It is intended to run after Stalwart's initial `Bootstrap` singleton has been completed; while the server remains in bootstrap mode, Stalwart rejects all object access except `Bootstrap`.
 
 The exporter currently matches DKIM signatures by selector to avoid duplicate signatures on repeated `apply` runs with the current Stalwart CLI. Operators should use unique selectors per hosted domain until reference-based matching on `DkimSignature.domainId` is proven reliable across supported Stalwart versions.

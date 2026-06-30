@@ -121,6 +121,7 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         "bootstrap-token",
         "admin-status",
         "admin-logout",
+        "admin-sync-plan-action",
         "admin-refresh-action",
         "bootstrap-admin-form",
         "admin-domain-form",
@@ -157,6 +158,7 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         "/api/v1/admin/dkim-keys",
         "/api/v1/admin/audit-log",
         "/api/v1/admin/domains/${domainId}/dns",
+        "/api/v1/admin/mail-core/sync-plan/status",
         "/status",
         "archiveMailboxMessage",
         "moveMailboxMessage",
@@ -195,6 +197,7 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         "adminActionsCell",
         "updateAdminStatus",
         "loadDomainDnsGuidance",
+        "loadMailCoreSyncPlanStatus",
         "domainDnsAction",
         "clearSearch",
     ]:

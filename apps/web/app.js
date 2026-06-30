@@ -33,6 +33,7 @@ const adminTokenInput = document.querySelector("#admin-token");
 const bootstrapTokenInput = document.querySelector("#bootstrap-token");
 const adminStatus = document.querySelector("#admin-status");
 const adminLogoutAction = document.querySelector("#admin-logout");
+const adminSyncPlanAction = document.querySelector("#admin-sync-plan-action");
 const adminRefreshAction = document.querySelector("#admin-refresh-action");
 const bootstrapAdminForm = document.querySelector("#bootstrap-admin-form");
 const adminDomainForm = document.querySelector("#admin-domain-form");
@@ -170,6 +171,10 @@ adminAuthForm?.addEventListener("submit", async (event) => {
 
 adminLogoutAction?.addEventListener("click", async () => {
   await revokeAdminSession();
+});
+
+adminSyncPlanAction?.addEventListener("click", async () => {
+  await loadMailCoreSyncPlanStatus();
 });
 
 adminRefreshAction?.addEventListener("click", async () => {
@@ -1219,6 +1224,29 @@ async function loadDomainDnsGuidance(domainId) {
     setAdminStatus("DNS guidance loaded.", "ready");
   } catch (error) {
     setAdminStatus(`DNS guidance failed: ${readableError(error)}`, "error");
+  }
+}
+
+async function loadMailCoreSyncPlanStatus() {
+  if (!adminSession.apiBaseUrl || !hasAdminCredential()) {
+    setAdminStatus("Save an admin login session or admin token before loading sync status.", "error");
+    return;
+  }
+  setAdminStatus("Loading mail-core sync status...", "loading");
+  try {
+    const response = await fetch(new URL("/api/v1/admin/mail-core/sync-plan/status", adminSession.apiBaseUrl), {
+      method: "POST",
+      headers: adminHeaders(),
+      body: JSON.stringify({ availableUserSecrets: [] }),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const result = await response.json();
+    renderAdminResult("Mail-core sync status", result);
+    setAdminStatus(result.ready ? "Mail-core sync plan is ready." : "Mail-core sync plan needs account secrets.", "ready");
+  } catch (error) {
+    setAdminStatus(`Mail-core sync status failed: ${readableError(error)}`, "error");
   }
 }
 

@@ -12,7 +12,7 @@ from freemail_api.database import (
     update_status,
 )
 from freemail_api.schemas import AliasCreate, DkimKeyCreate, DomainCreate, MailboxCreate, StoredUserCreate
-from freemail_api.stalwart_plan import MissingProvisioningSecretError, PlanOptions, build_apply_plan
+from freemail_api.stalwart_plan import MissingProvisioningSecretError, PlanOptions, build_apply_plan, build_apply_plan_status
 
 
 def test_build_apply_plan_exports_domains_dkim_accounts_and_aliases(tmp_path):
@@ -74,6 +74,56 @@ def test_build_apply_plan_exports_domains_dkim_accounts_and_aliases(tmp_path):
         "0": {"name": "hello", "domainId": "#domain-example-com"}
     }
     assert plan[2]["value"]["account-admin-example-com"]["roles"] == {"@type": "User"}
+
+
+def test_build_apply_plan_status_reports_counts_and_missing_secrets(tmp_path):
+    db_path = tmp_path / "freemail.sqlite"
+    initialize(str(db_path))
+    with sqlite3.connect(db_path) as connection:
+        connection.row_factory = sqlite3.Row
+        domain = create_domain(connection, DomainCreate(name="example.com"), "test")
+        user = create_user(
+            connection,
+            StoredUserCreate(
+                email="admin@example.com",
+                displayName="Admin User",
+                passwordHash="argon2id-placeholder-hash",
+            ),
+            "test",
+        )
+        create_mailbox(
+            connection,
+            MailboxCreate(userId=int(user["id"]), localPart="admin", domainId=int(domain["id"])),
+            "test",
+        )
+        create_alias(
+            connection,
+            AliasCreate(source="hello@example.com", destination="admin@example.com"),
+            "test",
+        )
+        create_dkim_key(
+            connection,
+            DkimKeyCreate(domainId=int(domain["id"]), selector="mail"),
+            "v=DKIM1; k=rsa; p=public",
+            "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----\n",
+            "test",
+        )
+
+        missing = build_apply_plan_status(connection, set())
+        ready = build_apply_plan_status(connection, {"admin@example.com"})
+
+    assert missing == {
+        "ready": False,
+        "operationTypes": ["Domain", "DkimSignature"],
+        "domains": 1,
+        "dkimKeys": 1,
+        "accounts": 1,
+        "aliases": 1,
+        "missingProvisioningSecrets": ["admin@example.com"],
+    }
+    assert ready["ready"] is True
+    assert ready["operationTypes"] == ["Domain", "DkimSignature", "Account"]
+    assert ready["missingProvisioningSecrets"] == []
 
 
 def test_build_apply_plan_requires_user_secret_by_default(tmp_path):

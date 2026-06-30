@@ -398,6 +398,124 @@ def test_auditor_can_read_but_cannot_mutate_admin_metadata(tmp_path):
     assert denied.json()["detail"] == "Admin role lacks admin.manage permission"
 
 
+def test_operator_can_read_mail_core_sync_plan_status_without_secret_material(tmp_path):
+    with make_client(tmp_path) as client:
+        domain = client.post("/api/v1/admin/domains", headers=admin_headers(), json={"name": "example.com"}).json()
+        user = client.post(
+            "/api/v1/admin/users",
+            headers=admin_headers(),
+            json={
+                "email": "admin@example.com",
+                "displayName": "Admin User",
+                "initialPassword": "correct horse battery",
+            },
+        ).json()
+        client.post(
+            "/api/v1/admin/mailboxes",
+            headers=admin_headers(),
+            json={"userId": user["id"], "localPart": "admin", "domainId": domain["id"]},
+        )
+        client.post(
+            "/api/v1/admin/aliases",
+            headers=admin_headers(),
+            json={"source": "hello@example.com", "destination": "admin@example.com"},
+        )
+        client.post(
+            "/api/v1/admin/dkim-keys",
+            headers=admin_headers(),
+            json={"domainId": domain["id"], "selector": "mail"},
+        )
+        client.post(
+            "/api/v1/admin/users",
+            headers=admin_headers(),
+            json={
+                "email": "operator@example.com",
+                "displayName": "Operator User",
+                "initialPassword": "correct horse battery",
+                "isAdmin": True,
+                "adminRole": "operator",
+            },
+        )
+        login = client.post(
+            "/api/v1/admin/session",
+            json={"email": "operator@example.com", "password": "correct horse battery"},
+        )
+        response = client.post(
+            "/api/v1/admin/mail-core/sync-plan/status",
+            headers={"Authorization": f"Bearer {login.json()['token']}"},
+            json={"availableUserSecrets": ["admin@example.com"]},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "ready": True,
+        "operationTypes": ["Domain", "DkimSignature", "Account"],
+        "domains": 1,
+        "dkimKeys": 1,
+        "accounts": 1,
+        "aliases": 1,
+        "missingProvisioningSecrets": [],
+    }
+    assert "PRIVATE KEY" not in response.text
+    assert "correct horse battery" not in response.text
+
+
+def test_mail_core_sync_plan_status_reports_missing_account_secrets(tmp_path):
+    with make_client(tmp_path) as client:
+        domain = client.post("/api/v1/admin/domains", headers=admin_headers(), json={"name": "example.com"}).json()
+        user = client.post(
+            "/api/v1/admin/users",
+            headers=admin_headers(),
+            json={
+                "email": "admin@example.com",
+                "displayName": "Admin User",
+                "initialPassword": "correct horse battery",
+            },
+        ).json()
+        client.post(
+            "/api/v1/admin/mailboxes",
+            headers=admin_headers(),
+            json={"userId": user["id"], "localPart": "admin", "domainId": domain["id"]},
+        )
+        response = client.post(
+            "/api/v1/admin/mail-core/sync-plan/status",
+            headers=admin_headers(),
+            json={"availableUserSecrets": []},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["ready"] is False
+    assert response.json()["missingProvisioningSecrets"] == ["admin@example.com"]
+    assert response.json()["operationTypes"] == ["Domain"]
+
+
+def test_auditor_cannot_read_mail_core_sync_plan_status(tmp_path):
+    with make_client(tmp_path) as client:
+        client.post(
+            "/api/v1/admin/users",
+            headers=admin_headers(),
+            json={
+                "email": "auditor@example.com",
+                "displayName": "Auditor User",
+                "initialPassword": "correct horse battery",
+                "isAdmin": True,
+                "adminRole": "auditor",
+            },
+        )
+        login = client.post(
+            "/api/v1/admin/session",
+            json={"email": "auditor@example.com", "password": "correct horse battery"},
+        )
+        response = client.post(
+            "/api/v1/admin/mail-core/sync-plan/status",
+            headers={"Authorization": f"Bearer {login.json()['token']}"},
+            json={"availableUserSecrets": []},
+        )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Admin role lacks admin.manage permission"
+
+
 def test_non_admin_user_role_is_forced_to_member(tmp_path):
     with make_client(tmp_path) as client:
         response = client.post(
