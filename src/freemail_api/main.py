@@ -8,7 +8,7 @@ import smtplib
 import sqlite3
 from urllib.parse import quote
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import database
@@ -59,6 +59,7 @@ from .schemas import (
     AdminTotpVerifyCreate,
     AliasCreate,
     AliasRecord,
+    AuditLogPage,
     AuditRecord,
     BootstrapAdminCreate,
     BootstrapAdminRecord,
@@ -172,7 +173,7 @@ COMPONENT_READINESS = {
         "status": "ready",
         "evidence": [
             "administrator bootstrap, bearer-session login, and authenticator-app MFA",
-            "domain, user, user-password rotation, mailbox quota, alias, DKIM, DNS, status, and audit APIs",
+            "domain, user, user-password rotation, mailbox quota, alias, DKIM, DNS, status, and filterable audit APIs",
             "metadata readiness endpoint and backup/restore coverage",
         ],
         "remainingReleaseEvidence": [],
@@ -1752,6 +1753,29 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     ) -> list[dict[str, object]]:
         require_permission(principal, "admin.read")
         return _rows_to_dicts(database.list_rows(connection, "audit_log"))
+
+    @app.get("/api/v1/admin/audit-log/page", response_model=AuditLogPage)
+    def audit_log_page(
+        limit: int = Query(default=25, ge=1, le=100),
+        offset: int = Query(default=0, ge=0),
+        actor: str | None = Query(default=None, min_length=1, max_length=256),
+        action: str | None = Query(default=None, min_length=1, max_length=128),
+        target_type: str | None = Query(default=None, alias="targetType", min_length=1, max_length=64),
+        target_id: int | None = Query(default=None, alias="targetId", ge=1),
+        principal: AdminPrincipal = Depends(require_admin),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        require_permission(principal, "admin.read")
+        page = database.list_audit_log(
+            connection,
+            limit=limit,
+            offset=offset,
+            actor=actor,
+            action=action,
+            target_type=target_type,
+            target_id=target_id,
+        )
+        return {**page, "items": _rows_to_dicts(page["items"])}
 
     return app
 

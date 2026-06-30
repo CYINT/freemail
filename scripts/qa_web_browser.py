@@ -144,8 +144,39 @@ def _check_admin_console(browser, expect, base_url: str, output_dir: Path) -> li
                 route,
                 [{"id": 5, "domainId": 1, "selector": "default", "dnsName": "default._domainkey.example.com", "status": "active"}],
             )
+        if request.method == "GET" and parsed.path == "/api/v1/admin/audit-log/page":
+            return _fulfill_json(
+                route,
+                {
+                    "items": [
+                        {
+                            "id": 6,
+                            "actor": "admin-api",
+                            "action": "domain.create",
+                            "targetType": "domain",
+                            "targetId": 1,
+                            "createdAt": "2026-06-30T00:00:00Z",
+                        }
+                    ],
+                    "total": 1,
+                    "limit": 25,
+                    "offset": 0,
+                },
+            )
         if request.method == "GET" and parsed.path == "/api/v1/admin/audit-log":
-            return _fulfill_json(route, [{"id": 6, "actor": "admin-api", "action": "domain.create", "targetType": "domain", "targetId": 1, "createdAt": "2026-06-30T00:00:00Z"}])
+            return _fulfill_json(
+                route,
+                [
+                    {
+                        "id": 6,
+                        "actor": "admin-api",
+                        "action": "domain.create",
+                        "targetType": "domain",
+                        "targetId": 1,
+                        "createdAt": "2026-06-30T00:00:00Z",
+                    }
+                ],
+            )
         if request.method == "GET" and parsed.path == "/api/v1/admin/domains/1/dns":
             return _fulfill_json(
                 route,
@@ -172,6 +203,8 @@ def _check_admin_console(browser, expect, base_url: str, output_dir: Path) -> li
         expect(page.locator("#admin-status")).to_contain_text("Admin session saved")
         page.locator("#admin-refresh-action").click()
         expect(page.get_by_role("heading", name="Domains (1)")).to_be_visible()
+        expect(page.get_by_role("heading", name="Audit log (1 of 1)")).to_be_visible()
+        expect(page.locator("[data-qa='admin-audit-log-filter']")).to_be_visible()
         expect(page.get_by_role("button", name="DNS")).to_be_visible()
         expect(page.get_by_role("button", name="Suspend").first).to_be_visible()
         page.get_by_role("button", name="DNS").click()

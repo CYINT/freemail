@@ -109,6 +109,14 @@ let mailboxPreferences = {
   displayName: "",
   signature: "",
 };
+let adminAuditLogQuery = {
+  limit: 25,
+  offset: 0,
+  actor: "",
+  action: "",
+  targetType: "",
+  targetId: "",
+};
 
 restoreMailboxSession();
 restoreAdminSession();
@@ -1946,7 +1954,7 @@ async function loadAdminOverview({ quiet = false } = {}) {
         "/api/v1/admin/mailboxes",
         "/api/v1/admin/aliases",
         "/api/v1/admin/dkim-keys",
-        "/api/v1/admin/audit-log",
+        adminAuditLogPath(),
       ].map(fetchAdminJson),
     );
     renderAdminOverview({ domains, users, mailboxes, aliases, dkimKeys, auditLog });
@@ -2008,8 +2016,106 @@ function renderAdminOverview({ domains, users, mailboxes, aliases, dkimKeys, aud
       statusPath: "/api/v1/admin/dkim-keys",
       statusActiveValue: "active",
     }),
-    adminTable("Audit log", auditLog.slice(0, 10), ["id", "actor", "action", "targetType", "targetId", "createdAt"]),
+    adminAuditLogPanel(auditLog),
   );
+}
+
+function adminAuditLogPath() {
+  const params = new URLSearchParams({
+    limit: String(adminAuditLogQuery.limit),
+    offset: String(adminAuditLogQuery.offset),
+  });
+  ["actor", "action", "targetType", "targetId"].forEach((key) => {
+    const value = String(adminAuditLogQuery[key] || "").trim();
+    if (value) {
+      params.set(key, value);
+    }
+  });
+  return `/api/v1/admin/audit-log/page?${params.toString()}`;
+}
+
+function adminAuditLogPanel(page) {
+  const section = document.createElement("section");
+  section.className = "admin-result-card audit-log-card";
+  const heading = document.createElement("h3");
+  const shown = Math.min(page.offset + page.items.length, page.total);
+  heading.textContent = `Audit log (${shown} of ${page.total})`;
+
+  const form = document.createElement("form");
+  form.className = "audit-log-filter";
+  form.dataset.qa = "admin-audit-log-filter";
+  form.replaceChildren(
+    labeledAuditInput("Actor", "actor", "email or token actor"),
+    labeledAuditInput("Action", "action", "user.invite"),
+    labeledAuditInput("Target type", "targetType", "user"),
+    labeledAuditInput("Target ID", "targetId", "42", "number"),
+    auditFilterButton("Apply", "submit"),
+    auditFilterButton("Clear", "button", () => {
+      adminAuditLogQuery = { ...adminAuditLogQuery, offset: 0, actor: "", action: "", targetType: "", targetId: "" };
+      loadAdminOverview();
+    }),
+  );
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    adminAuditLogQuery = {
+      ...adminAuditLogQuery,
+      offset: 0,
+      actor: String(data.get("actor") || "").trim(),
+      action: String(data.get("action") || "").trim(),
+      targetType: String(data.get("targetType") || "").trim(),
+      targetId: String(data.get("targetId") || "").trim(),
+    };
+    loadAdminOverview();
+  });
+
+  const rows = page.items || [];
+  const table = rows.length
+    ? adminTableElement(rows, ["id", "actor", "action", "targetType", "targetId", "createdAt"])
+    : emptyAdminMessage("No audit events match these filters.");
+
+  const pager = document.createElement("div");
+  pager.className = "audit-log-pager";
+  const previous = auditFilterButton("Previous", "button", () => changeAuditPage(-adminAuditLogQuery.limit));
+  previous.disabled = page.offset <= 0;
+  const next = auditFilterButton("Next", "button", () => changeAuditPage(adminAuditLogQuery.limit));
+  next.disabled = page.offset + page.limit >= page.total;
+  const summary = document.createElement("span");
+  summary.textContent = `Offset ${page.offset}`;
+  pager.replaceChildren(previous, summary, next);
+
+  section.replaceChildren(heading, form, table, pager);
+  return section;
+}
+
+function labeledAuditInput(labelText, name, placeholder, type = "search") {
+  const label = document.createElement("label");
+  label.textContent = labelText;
+  const input = document.createElement("input");
+  input.name = name;
+  input.type = type;
+  input.placeholder = placeholder;
+  input.value = String(adminAuditLogQuery[name] || "");
+  if (type === "number") {
+    input.min = "1";
+  }
+  label.append(input);
+  return label;
+}
+
+function auditFilterButton(text, type, onClick) {
+  const button = document.createElement("button");
+  button.type = type;
+  button.textContent = text;
+  if (onClick) {
+    button.addEventListener("click", onClick);
+  }
+  return button;
+}
+
+function changeAuditPage(delta) {
+  adminAuditLogQuery.offset = Math.max(0, adminAuditLogQuery.offset + delta);
+  loadAdminOverview();
 }
 
 function renderAdminResult(title, result) {
@@ -2032,11 +2138,14 @@ function adminTable(title, rows, columns, options = {}) {
   const heading = document.createElement("h3");
   heading.textContent = `${title} (${rows.length})`;
   if (!rows.length) {
-    const empty = document.createElement("p");
-    empty.textContent = "No records yet.";
-    section.replaceChildren(heading, empty);
+    section.replaceChildren(heading, emptyAdminMessage("No records yet."));
     return section;
   }
+  section.replaceChildren(heading, adminTableElement(rows, columns, options));
+  return section;
+}
+
+function adminTableElement(rows, columns, options = {}) {
   const table = document.createElement("table");
   const thead = document.createElement("thead");
   const headerRow = document.createElement("tr");
@@ -2057,8 +2166,13 @@ function adminTable(title, rows, columns, options = {}) {
     }),
   );
   table.replaceChildren(thead, tbody);
-  section.replaceChildren(heading, table);
-  return section;
+  return table;
+}
+
+function emptyAdminMessage(text) {
+  const empty = document.createElement("p");
+  empty.textContent = text;
+  return empty;
 }
 
 function adminTableHasActions(options) {

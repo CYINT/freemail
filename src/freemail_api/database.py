@@ -308,6 +308,51 @@ def list_rows(connection: sqlite3.Connection, table: str) -> list[sqlite3.Row]:
     return list(connection.execute(f"SELECT * FROM {table} ORDER BY {order_column}"))
 
 
+def list_audit_log(
+    connection: sqlite3.Connection,
+    *,
+    limit: int = 25,
+    offset: int = 0,
+    actor: str | None = None,
+    action: str | None = None,
+    target_type: str | None = None,
+    target_id: int | None = None,
+) -> dict[str, object]:
+    clauses: list[str] = []
+    values: list[object] = []
+    if actor:
+        clauses.append("actor LIKE ?")
+        values.append(f"%{actor}%")
+    if action:
+        clauses.append("action = ?")
+        values.append(action)
+    if target_type:
+        clauses.append("target_type = ?")
+        values.append(target_type)
+    if target_id is not None:
+        clauses.append("target_id = ?")
+        values.append(target_id)
+    where_clause = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    total = int(
+        connection.execute(
+            f"SELECT COUNT(*) FROM audit_log {where_clause}",
+            values,
+        ).fetchone()[0]
+    )
+    rows = list(
+        connection.execute(
+            f"""
+            SELECT * FROM audit_log
+            {where_clause}
+            ORDER BY id DESC
+            LIMIT ? OFFSET ?
+            """,
+            [*values, limit, offset],
+        )
+    )
+    return {"items": rows, "total": total, "limit": limit, "offset": offset}
+
+
 def has_admin_user(connection: sqlite3.Connection) -> bool:
     row = connection.execute("SELECT 1 FROM users WHERE is_admin = 1 LIMIT 1").fetchone()
     return row is not None

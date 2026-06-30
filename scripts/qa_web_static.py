@@ -235,6 +235,8 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         "/api/v1/admin/aliases",
         "/api/v1/admin/dkim-keys",
         "/api/v1/admin/audit-log",
+        "/api/v1/admin/audit-log/page",
+        "admin-audit-log-filter",
         "/api/v1/admin/domains/${domainId}/dns",
         "/api/v1/admin/mail-core/sync-plan/status",
         "/status",

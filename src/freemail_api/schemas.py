@@ -219,6 +219,13 @@ class AuditRecord(ApiModel):
     model_config = ConfigDict(alias_generator=to_camel, from_attributes=True, populate_by_name=True)
 
 
+class AuditLogPage(ApiModel):
+    items: list[AuditRecord]
+    total: int
+    limit: int
+    offset: int
+
+
 class MailboxFolderSummary(ApiModel):
     name: str
     message_count: int

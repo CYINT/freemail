@@ -141,6 +141,60 @@ def test_admin_can_create_domain_user_mailbox_alias_and_audit_log(tmp_path):
         ]
 
 
+def test_admin_audit_log_page_filters_and_paginates(tmp_path):
+    with make_client(tmp_path) as client:
+        domain = client.post(
+            "/api/v1/admin/domains",
+            headers=admin_headers(),
+            json={"name": "example.com"},
+        )
+        user = client.post(
+            "/api/v1/admin/users",
+            headers=admin_headers(),
+            json={
+                "email": "admin@example.com",
+                "displayName": "Admin User",
+                "initialPassword": "correct horse battery",
+                "isAdmin": True,
+            },
+        )
+        client.post(
+            "/api/v1/admin/mailboxes",
+            headers=admin_headers(),
+            json={"userId": user.json()["id"], "localPart": "admin", "domainId": domain.json()["id"]},
+        )
+        client.post(
+            "/api/v1/admin/aliases",
+            headers=admin_headers(),
+            json={"source": "hello@example.com", "destination": "admin@example.com"},
+        )
+
+        first_page = client.get("/api/v1/admin/audit-log/page?limit=2", headers=admin_headers())
+        second_page = client.get("/api/v1/admin/audit-log/page?limit=2&offset=2", headers=admin_headers())
+        user_events = client.get(
+            f"/api/v1/admin/audit-log/page?targetType=user&targetId={user.json()['id']}",
+            headers=admin_headers(),
+        )
+        alias_events = client.get("/api/v1/admin/audit-log/page?action=alias.create", headers=admin_headers())
+
+    assert first_page.status_code == 200
+    assert first_page.json()["total"] == 4
+    assert [entry["action"] for entry in first_page.json()["items"]] == ["alias.create", "mailbox.create"]
+    assert second_page.status_code == 200
+    assert [entry["action"] for entry in second_page.json()["items"]] == ["user.invite", "domain.create"]
+    assert user_events.status_code == 200
+    assert [entry["action"] for entry in user_events.json()["items"]] == ["user.invite"]
+    assert alias_events.status_code == 200
+    assert [entry["targetType"] for entry in alias_events.json()["items"]] == ["alias"]
+
+
+def test_admin_audit_log_page_rejects_unbounded_limit(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.get("/api/v1/admin/audit-log/page?limit=1000", headers=admin_headers())
+
+    assert response.status_code == 422
+
+
 def test_admin_user_create_rejects_client_supplied_password_hash(tmp_path):
     with make_client(tmp_path) as client:
         response = client.post(

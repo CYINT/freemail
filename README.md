@@ -24,7 +24,7 @@ The FreeMail program includes:
 
 This repository is at the implementation baseline. It contains:
 
-- A FastAPI admin/runtime API with persistent SQLite-backed domain, user, user-password rotation, mailbox, mailbox-quota, alias, and audit-log surfaces.
+- A FastAPI admin/runtime API with persistent SQLite-backed domain, user, user-password rotation, mailbox, mailbox-quota, alias, and filterable audit-log surfaces.
 - A static webmail preview shell with inbox, paginated search and folder loading, thread-aware conversation lookup, saved and extracted contacts, message reader, header inspection, read/unread and star controls, EML import/export, bulk message actions, persistent preferences/signatures, compose, draft saving and editing, folder navigation and empty-folder controls, token-gated admin setup, and responsive layout QA.
 - An Expo/React Native mobile client scaffold with secure session storage, paginated and thread-aware mailbox workflows, conversation lookup, saved and extracted contacts, persistent preferences/signatures, draft saving and editing, message header inspection, read/unread and star controls, EML import/export/share, bulk archive/spam/delete/read/star actions, folder emptying, and static QA.
 - A Docker Compose stack with VPN-only loopback bindings by default.
@@ -99,6 +99,7 @@ Initial endpoints:
 - `POST /api/v1/admin/domains/{domainId}/dns/verify`
 - `POST /api/v1/admin/mail-core/sync-plan/status`
 - `GET /api/v1/admin/audit-log`
+- `GET /api/v1/admin/audit-log/page?limit=25&offset=0`
 
 The current metadata store is SQLite at `FREEMAIL_DB_PATH`, defaulting to `data/freemail.sqlite` locally and a Docker volume path in Compose. PostgreSQL is not yet a supported metadata backend; see `docs/architecture.md` for the adapter, migration, backup, and release-gate work required before production/private-beta PostgreSQL use. Mail-store persistence remains part of the Stalwart mail-core spike.
 
