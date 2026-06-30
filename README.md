@@ -273,6 +273,20 @@ Restore drills should target a separate volume before replacing the active Stalw
 .\.venv\Scripts\python.exe scripts\restore_mail_store.py --volume freemail_stalwart_restore --input .freemail-qa\backups\stalwart-mail-store.tar.gz --force
 ```
 
+## Upgrade And Release Gates
+
+Read `docs/upgrade.md` and `docs/release-gates.md` before private-beta upgrades or release-candidate work.
+
+Run the local release gate only after the candidate commit has been pushed and GitHub Actions CI has passed for that exact commit:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\release_gate.py `
+  --metadata-backup .freemail-qa\backups\metadata.json `
+  --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz
+```
+
+The release gate checks clean Git state, remote SHA, GitHub Actions CI, Compose config, backup evidence, VPN-only health metadata, and mail-core protocol readiness.
+
 ## VPN-Only Deployment
 
 Read `docs/deployment-vpn.md`. The intended local hostname is:
@@ -285,7 +299,7 @@ The app and candidate mail-core ports must remain bound to `127.0.0.1` on the ho
 
 ## Codecov
 
-CI is ready to upload `coverage.xml` when `CODECOV_TOKEN` is configured as a GitHub Actions secret. Tell the maintainer when a Codecov repository token is available.
+CI uploads `coverage.xml` to Codecov when `CODECOV_TOKEN` is configured as a GitHub Actions secret.
 
 ## Roadmap
 

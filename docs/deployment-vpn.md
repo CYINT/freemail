@@ -24,9 +24,10 @@ freemail.kuzuryu.ai
 | Admin API | `18090` | loopback |
 | Web shell | `18091` | loopback |
 | SMTP candidate | `2525` | loopback |
-| Submission candidate | `2587` | loopback |
-| IMAP candidate | `2143` | loopback |
+| Implicit-TLS submission candidate | `2465` | loopback |
+| Implicit-TLS IMAP candidate | `2993` | loopback |
 | JMAP/management candidate | `18092` | loopback |
+| HTTPS candidate | `18443` | loopback |
 
 ## Verification
 

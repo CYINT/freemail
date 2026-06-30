@@ -50,7 +50,7 @@ Current progress: DKIM signing is locally verified in the mail-flow smoke for th
 - Release provenance.
 - Automated release gates.
 
-Current progress: API metadata export and restore tooling exists for domains, users, mailboxes, aliases, DKIM keys, and audit logs. The backup format intentionally excludes browser mailbox sessions and outbound rate-limit counters, and the restore path refuses to replace existing metadata unless forced. Mail-store archive and restore scripts now cover the Stalwart Docker volume through a helper container, require explicit restore force, and document drill-volume validation before active-volume replacement. Remaining work is a live tested mail-store backup/restore run, upgrade guide, release provenance, and automated release gates.
+Current progress: API metadata export and restore tooling exists for domains, users, mailboxes, aliases, DKIM keys, and audit logs. The backup format intentionally excludes browser mailbox sessions and outbound rate-limit counters, and the restore path refuses to replace existing metadata unless forced. Mail-store archive and restore scripts now cover the Stalwart Docker volume through a helper container, require explicit restore force, and document drill-volume validation before active-volume replacement. Release gate tooling now checks clean Git state, remote SHA, GitHub Actions CI for the exact commit, Compose config, backup evidence, VPN-only health metadata, and mail-core readiness. Remaining work is production release-candidate evidence after controlled-domain validation.
 
 ## M6 - Private Beta
 

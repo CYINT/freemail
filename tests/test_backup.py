@@ -127,6 +127,30 @@ def test_metadata_backup_and_restore_scripts_round_trip(tmp_path):
         assert connection.execute("SELECT name FROM domains").fetchone()["name"] == "example.com"
 
 
+def test_metadata_backup_script_initializes_missing_schema(tmp_path):
+    source_path = tmp_path / "source.sqlite"
+    backup_path = tmp_path / "metadata.json"
+
+    export_result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/backup_metadata.py",
+            "--database",
+            str(source_path),
+            "--output",
+            str(backup_path),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert export_result.returncode == 0, export_result.stderr
+    payload = json.loads(backup_path.read_text(encoding="utf-8"))
+    assert payload["schemaVersion"] == 1
+    assert payload["tables"]["dkim_keys"] == []
+
+
 def _seed_metadata(connection: sqlite3.Connection) -> None:
     domain = database.create_domain(connection, DomainCreate(name="example.com"), "test")
     user = database.create_user(

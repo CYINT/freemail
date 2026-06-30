@@ -20,6 +20,7 @@ def main() -> int:
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
+    database.initialize(database_path)
     with database.connect(database_path) as connection:
         payload = export_metadata_backup(connection)
 
