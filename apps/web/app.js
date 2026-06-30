@@ -18,6 +18,8 @@ const logoutAction = document.querySelector("#mailbox-logout");
 const replyAction = document.querySelector("#reply-action");
 const forwardAction = document.querySelector("#forward-action");
 const editDraftAction = document.querySelector("#edit-draft-action");
+const starAction = document.querySelector("#star-action");
+const unstarAction = document.querySelector("#unstar-action");
 const markReadAction = document.querySelector("#mark-read-action");
 const markUnreadAction = document.querySelector("#mark-unread-action");
 const archiveAction = document.querySelector("#archive-action");
@@ -130,6 +132,22 @@ editDraftAction?.addEventListener("click", () => {
     return;
   }
   prefillSavedDraft(selectedMessageDetail);
+});
+
+starAction?.addEventListener("click", async () => {
+  if (!selectedMessageDetail) {
+    setStatus("Select a message before starring.", "error");
+    return;
+  }
+  await setMailboxMessageStarState(selectedMessageDetail, true);
+});
+
+unstarAction?.addEventListener("click", async () => {
+  if (!selectedMessageDetail) {
+    setStatus("Select a message before unstarring.", "error");
+    return;
+  }
+  await setMailboxMessageStarState(selectedMessageDetail, false);
 });
 
 markReadAction?.addEventListener("click", async () => {
@@ -481,6 +499,37 @@ async function setMailboxMessageReadState(message, read) {
   }
 }
 
+async function setMailboxMessageStarState(message, starred) {
+  if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
+    setStatus("Load a mailbox before changing star state.", "error");
+    return;
+  }
+  setStatus(starred ? "Starring message..." : "Unstarring message...", "loading");
+  try {
+    const url = new URL("/api/v1/mailbox/message/star-state", mailboxSession.apiBaseUrl);
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        ...mailboxHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        folder: message.folder,
+        messageId: message.messageId,
+        starred,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    selectedMessageDetail = { ...message, starred };
+    setStatus(starred ? "Message starred." : "Message unstarred.", "ready");
+    await loadMailboxSnapshot(mailboxSession.folder);
+  } catch (error) {
+    setStatus(`Star state update failed: ${readableError(error)}`, "error");
+  }
+}
+
 async function loadMailboxContacts({ quiet = false } = {}) {
   if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
     if (!quiet) {
@@ -735,7 +784,7 @@ function messageRow(message, selected) {
   row.tabIndex = 0;
   row.innerHTML = `
     <span class="sender">${escapeHtml(message.sender || "Unknown sender")}</span>
-    <strong>${escapeHtml(message.subject || "(no subject)")}</strong>
+    <strong>${escapeHtml(message.starred ? `* ${message.subject || "(no subject)"}` : message.subject || "(no subject)")}</strong>
     <p>${escapeHtml(message.recipients || "")}</p>
     <time>${escapeHtml(shortDate(message.date))}</time>
   `;

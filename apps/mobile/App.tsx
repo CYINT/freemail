@@ -47,6 +47,7 @@ import {
   saveMailboxDraft,
   sendMailboxMessage,
   setMailboxMessageReadState,
+  setMailboxMessageStarState,
 } from "./src/api";
 import { clearCachedMailboxSnapshots, loadCachedMailboxSnapshot, saveCachedMailboxSnapshot } from "./src/offlineCache";
 import { clearStoredMailboxSession, loadStoredMailboxSession, saveMailboxSession } from "./src/sessionStore";
@@ -518,6 +519,24 @@ export default function App() {
     }
   }
 
+  async function setSelectedMessageStarState(starred: boolean) {
+    if (!session || !selectedMessage) {
+      return;
+    }
+    setLoading(true);
+    setStatus(starred ? "Starring message..." : "Unstarring message...");
+    try {
+      await setMailboxMessageStarState(session, selectedMessage.folder, selectedMessage.messageId, starred);
+      setSelectedMessage({ ...selectedMessage, starred });
+      await refreshMailbox(session, folder);
+      setStatus(starred ? "Message starred." : "Message unstarred.");
+    } catch (error) {
+      setStatus(readableError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function addContactToDraft(contact: MailContact) {
     const existing = composeTo
       .split(",")
@@ -615,7 +634,7 @@ export default function App() {
                 renderItem={({ item }) => (
                   <Pressable style={styles.messageRow} onPress={() => openMessage(item)}>
                     <Text style={styles.sender}>{item.sender || "Unknown sender"}</Text>
-                    <Text style={styles.subject}>{item.subject || "(no subject)"}</Text>
+                    <Text style={styles.subject}>{item.starred ? `* ${item.subject || "(no subject)"}` : item.subject || "(no subject)"}</Text>
                     <Text style={styles.meta}>{item.recipients}</Text>
                   </Pressable>
                 )}
@@ -644,6 +663,12 @@ export default function App() {
                   </Pressable>
                   <Pressable style={styles.secondaryButton} onPress={() => setSelectedMessageReadState(false)}>
                     <Text>Mark unread</Text>
+                  </Pressable>
+                  <Pressable style={styles.secondaryButton} onPress={() => setSelectedMessageStarState(true)}>
+                    <Text>Star</Text>
+                  </Pressable>
+                  <Pressable style={styles.secondaryButton} onPress={() => setSelectedMessageStarState(false)}>
+                    <Text>Unstar</Text>
                   </Pressable>
                   <Pressable style={styles.secondaryButton} onPress={archiveSelectedMessage}>
                     <Text>Archive</Text>

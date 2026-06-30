@@ -207,6 +207,7 @@ class MailboxMessageSummary(ApiModel):
     recipients: str
     date: str
     unread: bool
+    starred: bool = False
 
 
 class MailboxAttachmentRecord(ApiModel):
@@ -258,6 +259,18 @@ class MailboxReadStateRecord(ApiModel):
     message_id: str
     read: bool
     unread: bool
+
+
+class MailboxStarStateCreate(ApiModel):
+    folder: str = Field(min_length=1, max_length=160)
+    message_id: str = Field(min_length=1, max_length=64)
+    starred: bool
+
+
+class MailboxStarStateRecord(ApiModel):
+    folder: str
+    message_id: str
+    starred: bool
 
 
 class MailboxFolderCreate(ApiModel):

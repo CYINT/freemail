@@ -18,6 +18,7 @@ export type MailMessage = {
   recipients: string;
   date: string;
   unread: boolean;
+  starred: boolean;
 };
 
 export type MailAttachment = {
@@ -221,6 +222,22 @@ export async function setMailboxMessageReadState(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ folder, messageId, read }),
+  });
+}
+
+export async function setMailboxMessageStarState(
+  session: MailboxSession,
+  folder: string,
+  messageId: string,
+  starred: boolean,
+): Promise<void> {
+  await request(session.apiBaseUrl, "/api/v1/mailbox/message/star-state", {
+    method: "POST",
+    headers: {
+      ...mailboxHeaders(session),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ folder, messageId, starred }),
   });
 }
 

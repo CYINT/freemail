@@ -81,6 +81,8 @@ def _check_viewport(browser, expect, base_url: str, output_dir: Path, name: str,
             "#compose-form",
             "#reply-action",
             "#forward-action",
+            "#star-action",
+            "#unstar-action",
             "#archive-action",
         ]:
             expect(page.locator(selector)).to_be_visible()

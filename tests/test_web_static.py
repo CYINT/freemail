@@ -47,6 +47,7 @@ def test_static_web_validation_flags_credential_storage():
         '<button id="contacts-action">Load</button><div id="contacts-list"></div>'
         '<button id="reply-action">Reply</button><button id="forward-action">Forward</button>'
         '<button id="edit-draft-action">Edit draft</button>'
+        '<button id="star-action">Star</button><button id="unstar-action">Unstar</button>'
         '<button id="mark-read-action">Mark read</button><button id="mark-unread-action">Mark unread</button>'
         '<button id="archive-action">Archive</button>'
         '<button id="spam-action">Spam</button><button id="delete-action">Delete</button>'
@@ -64,9 +65,11 @@ def test_static_web_validation_flags_credential_storage():
         "fetch('/api/v1/mailbox/message/attachment'); fetch('/api/v1/mailbox/message/archive'); "
         "fetch('/api/v1/mailbox/message/move'); "
         "fetch('/api/v1/mailbox/message/read-state'); "
+        "fetch('/api/v1/mailbox/message/star-state'); "
         "renderMessageBody('body'); renderMessageAttachments({}); downloadMailboxAttachment({}, {}); "
         "filesToAttachments([]); fileToBase64({}); archiveMailboxMessage({}); moveMailboxMessage({}, 'Trash', 'Done'); "
         "setMailboxMessageReadState({}, true); Message marked read; Message marked unread; "
+        "setMailboxMessageStarState({}, true); Message starred; Message unstarred; "
         "fetch('/api/v1/mailbox/draft'); saveMailboxDraft({}); Draft saved; composePayload(); "
         "searchMailboxMessages('term'); loadMailboxContacts(); renderContacts([]); "
         "createMailboxFolder('x'); renameMailboxFolder('y'); deleteMailboxFolder('z'); mutateMailboxFolder('POST', {}); "

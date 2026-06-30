@@ -1592,6 +1592,50 @@ def test_mailbox_read_state_returns_imap_state_payload(tmp_path, monkeypatch):
     assert response.json() == {"folder": "INBOX", "messageId": "1", "read": True, "unread": False}
 
 
+def test_mailbox_star_state_requires_mailbox_credentials(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.post(
+            "/api/v1/mailbox/message/star-state",
+            json={"folder": "INBOX", "messageId": "1", "starred": True},
+        )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Mailbox credentials required"
+
+
+def test_mailbox_star_state_returns_imap_state_payload(tmp_path, monkeypatch):
+    class State:
+        def as_dict(self):
+            return {
+                "folder": "INBOX",
+                "message_id": "1",
+                "starred": True,
+            }
+
+    def fake_star_state(**kwargs):
+        assert kwargs["email"] == "admin@example.com"
+        assert kwargs["password"] == "secret"
+        assert kwargs["folder"] == "INBOX"
+        assert kwargs["message_id"] == "1"
+        assert kwargs["starred"] is True
+        return State()
+
+    monkeypatch.setattr("freemail_api.main.set_mailbox_message_star_state", fake_star_state)
+
+    with make_client(tmp_path) as client:
+        response = client.post(
+            "/api/v1/mailbox/message/star-state",
+            headers={
+                "X-FreeMail-Mailbox-Email": "admin@example.com",
+                "X-FreeMail-Mailbox-Password": "secret",
+            },
+            json={"folder": "INBOX", "messageId": "1", "starred": True},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"folder": "INBOX", "messageId": "1", "starred": True}
+
+
 def test_mailbox_message_requires_mailbox_credentials(tmp_path):
     with make_client(tmp_path) as client:
         response = client.get("/api/v1/mailbox/message?folder=INBOX&message_id=1")

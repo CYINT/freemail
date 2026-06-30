@@ -13,6 +13,7 @@ from freemail_api.mailbox_imap import (
     MailboxSnapshot,
     MutatedMailboxFolder,
     ReadStateMailboxMessage,
+    StarStateMailboxMessage,
     _archive_message,
     _attachment_contents_from_message,
     _attachments_from_message,
@@ -34,6 +35,7 @@ from freemail_api.mailbox_imap import (
     _rename_folder,
     _search_criteria,
     _search_messages,
+    _set_message_flagged,
     _set_message_seen,
     _tls_context,
 )
@@ -74,7 +76,7 @@ class FakeImap:
             b"\r\n"
         )
         payload = headers + body if "BODY.PEEK[]" in query else headers
-        prefix = b"3 (FLAGS (\\Seen) BODY[HEADER] {%d}" % len(payload)
+        prefix = b"3 (FLAGS (\\Seen \\Flagged) BODY[HEADER] {%d}" % len(payload)
         return "OK", [(prefix, payload)]
 
     def create(self, folder):
@@ -119,6 +121,7 @@ def test_snapshot_serializes_nested_records():
                 recipients="admin@example.com",
                 date="Mon, 01 Jan 2024 00:00:00 +0000",
                 unread=False,
+                starred=True,
             )
         ],
     )
@@ -135,6 +138,7 @@ def test_snapshot_serializes_nested_records():
                 "recipients": "admin@example.com",
                 "date": "Mon, 01 Jan 2024 00:00:00 +0000",
                 "unread": False,
+                "starred": True,
             }
         ],
     }
@@ -149,6 +153,7 @@ def test_message_detail_serializes_body():
         recipients="admin@example.com",
         date="Mon, 01 Jan 2024 00:00:00 +0000",
         unread=False,
+        starred=True,
         body="Body text",
         attachments=[MailboxAttachment("0", "report.txt", "text/plain", 6)],
     )
@@ -171,6 +176,7 @@ def test_search_result_serializes_messages():
                 recipients="admin@example.com",
                 date="Mon, 01 Jan 2024 00:00:00 +0000",
                 unread=False,
+                starred=True,
             )
         ],
     )
@@ -226,6 +232,16 @@ def test_read_state_message_serializes_flag_result():
     }
 
 
+def test_star_state_message_serializes_flag_result():
+    state = StarStateMailboxMessage(folder="INBOX", message_id="7", starred=True)
+
+    assert state.as_dict() == {
+        "folder": "INBOX",
+        "message_id": "7",
+        "starred": True,
+    }
+
+
 def test_mutated_folder_serializes_folder_action():
     mutation = MutatedMailboxFolder(folder="Clients", target_folder="Customers", action="rename", success=True)
 
@@ -253,6 +269,7 @@ def test_list_messages_parses_headers_and_seen_flag():
     assert messages[0].sender == "sender@example.com"
     assert messages[0].recipients == "admin@example.com"
     assert messages[0].unread is False
+    assert messages[0].starred is True
 
 
 def test_search_messages_uses_sender_recipient_subject_and_body_criteria():
@@ -313,6 +330,7 @@ def test_get_message_parses_body_and_headers():
     assert message.subject == "Hello"
     assert message.body == "Body text"
     assert message.unread is False
+    assert message.starred is True
     assert message.attachments == []
 
 
@@ -392,6 +410,24 @@ def test_set_message_seen_removes_seen_flag_for_unread_state():
 
     assert imap.selected_folders == [('"INBOX"', False)]
     assert imap.stored_flags == [(b"5", "-FLAGS", r"(\Seen)")]
+
+
+def test_set_message_flagged_adds_flagged_flag_for_star_state():
+    imap = FakeImap()
+
+    _set_message_flagged(imap, folder="INBOX", message_id="6", starred=True)
+
+    assert imap.selected_folders == [('"INBOX"', False)]
+    assert imap.stored_flags == [(b"6", "+FLAGS", r"(\Flagged)")]
+
+
+def test_set_message_flagged_removes_flagged_flag_for_unstar_state():
+    imap = FakeImap()
+
+    _set_message_flagged(imap, folder="INBOX", message_id="6", starred=False)
+
+    assert imap.selected_folders == [('"INBOX"', False)]
+    assert imap.stored_flags == [(b"6", "-FLAGS", r"(\Flagged)")]
 
 
 def test_ensure_folder_creates_missing_archive_folder():

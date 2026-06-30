@@ -17,6 +17,7 @@ class MailboxMessage:
     recipients: str
     date: str
     unread: bool
+    starred: bool
 
     def as_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -142,6 +143,16 @@ class ReadStateMailboxMessage:
 
 
 @dataclass(frozen=True)
+class StarStateMailboxMessage:
+    folder: str
+    message_id: str
+    starred: bool
+
+    def as_dict(self) -> dict[str, object]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class MutatedMailboxFolder:
     folder: str
     action: str
@@ -231,6 +242,25 @@ def set_mailbox_message_read_state(
         imap.login(email, password)
         _set_message_seen(imap, folder=folder, message_id=message_id, read=read)
     return ReadStateMailboxMessage(folder=folder, message_id=message_id, read=read, unread=not read)
+
+
+def set_mailbox_message_star_state(
+    *,
+    email: str,
+    password: str,
+    host: str,
+    port: int,
+    folder: str,
+    message_id: str,
+    starred: bool,
+    timeout_seconds: float = 10.0,
+    verify_tls: bool = False,
+) -> StarStateMailboxMessage:
+    tls_context = _tls_context(verify_tls=verify_tls)
+    with imaplib.IMAP4_SSL(host, port, ssl_context=tls_context, timeout=timeout_seconds) as imap:
+        imap.login(email, password)
+        _set_message_flagged(imap, folder=folder, message_id=message_id, starred=starred)
+    return StarStateMailboxMessage(folder=folder, message_id=message_id, starred=starred)
 
 
 def search_mailbox_messages(
@@ -390,6 +420,16 @@ def _set_message_seen(imap: imaplib.IMAP4_SSL, *, folder: str, message_id: str, 
         raise imaplib.IMAP4.error("Mailbox message read state could not be updated")
 
 
+def _set_message_flagged(imap: imaplib.IMAP4_SSL, *, folder: str, message_id: str, starred: bool) -> None:
+    status, _data = imap.select(f'"{folder}"', readonly=False)
+    if status != "OK":
+        raise imaplib.IMAP4.error(f"Mailbox folder not found: {folder}")
+    command = "+FLAGS" if starred else "-FLAGS"
+    store_status, _store_data = imap.store(message_id.encode("ascii"), command, r"(\Flagged)")
+    if store_status != "OK":
+        raise imaplib.IMAP4.error("Mailbox message star state could not be updated")
+
+
 def _ensure_folder(imap: imaplib.IMAP4_SSL, folder: str) -> None:
     select_status, _data = imap.select(f'"{folder}"', readonly=True)
     if select_status == "OK":
@@ -459,6 +499,7 @@ def _list_messages(imap: imaplib.IMAP4_SSL, *, folder: str, limit: int) -> list[
                 recipients=str(header.get("to", "")),
                 date=str(header.get("date", "")),
                 unread="\\Seen" not in flags,
+                starred="\\Flagged" in flags,
             )
         )
     return messages
@@ -535,6 +576,7 @@ def _message_header(imap: imaplib.IMAP4_SSL, *, folder: str, message_id: bytes) 
         recipients=str(header.get("to", "")),
         date=str(header.get("date", "")),
         unread="\\Seen" not in flags,
+        starred="\\Flagged" in flags,
     )
 
 
@@ -577,6 +619,7 @@ def _get_message(imap: imaplib.IMAP4_SSL, *, folder: str, message_id: str) -> Ma
         recipients=str(parsed.get("to", "")),
         date=str(parsed.get("date", "")),
         unread="\\Seen" not in flags,
+        starred="\\Flagged" in flags,
         body=_body_from_message(parsed),
         attachments=_attachments_from_message(parsed),
     )
