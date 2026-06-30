@@ -4,6 +4,7 @@ import imaplib
 import sqlite3
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 
 from . import database
 from . import dkim
@@ -46,6 +47,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         description="Admin and runtime API for the AGPL FreeMail mail platform.",
         lifespan=lifespan,
     )
+    cors_origins = [origin.strip() for origin in active_settings.web_cors_origins.split(",") if origin.strip()]
+    if cors_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=cors_origins,
+            allow_methods=["GET"],
+            allow_headers=["X-FreeMail-Mailbox-Email", "X-FreeMail-Mailbox-Password"],
+        )
 
     def require_admin(x_freemail_admin_token: str | None = Header(default=None)) -> str:
         if not active_settings.admin_api_token:

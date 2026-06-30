@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     submission_port: int = Field(default=2465, validation_alias="FREEMAIL_SUBMISSION_PORT")
     imap_port: int = Field(default=2993, validation_alias="FREEMAIL_IMAP_PORT")
     jmap_port: int = Field(default=18092, validation_alias="FREEMAIL_JMAP_PORT")
+    web_cors_origins: str = Field(
+        default="http://127.0.0.1:18091,http://localhost:18091",
+        validation_alias="FREEMAIL_WEB_CORS_ORIGINS",
+    )
     vpn_only: bool = True
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore", populate_by_name=True)

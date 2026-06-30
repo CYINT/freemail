@@ -31,7 +31,7 @@ Current progress: persistent token-gated APIs exist for administrator bootstrap,
 - Responsive UI.
 - Browser QA.
 
-Current progress: static webmail preview shell exists with inbox, message reader, compose, folder navigation, responsive CSS, and Python static QA. A first read-only mailbox snapshot API can list IMAP folders and message headers using per-request mailbox credentials. Remaining work is authenticated web sessions plus live compose/reply/forward/attachment integration.
+Current progress: static webmail preview shell exists with inbox, message reader, compose, folder navigation, responsive CSS, and Python static QA. A first read-only mailbox snapshot API can list IMAP folders and message headers using per-request mailbox credentials, and the webmail preview can load that snapshot from the split frontend/backend over scoped loopback CORS without storing mailbox passwords. Remaining work is authenticated web sessions plus live compose/reply/forward/attachment integration.
 
 ## M4 - Deliverability And Abuse Controls
 

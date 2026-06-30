@@ -94,6 +94,8 @@ docker compose --profile web up -d web
 .\.venv\Scripts\python.exe scripts\qa_web_static.py
 ```
 
+The webmail preview can load live mailbox folders and message headers from the API. Start `admin-api`, `mail-core`, and `web`, open `http://127.0.0.1:18091`, enter a mailbox address/password, and keep the API field pointed at `http://127.0.0.1:18090`. The browser client sends credentials only with the snapshot request and does not use `localStorage`, `sessionStorage`, or cookies for mailbox passwords. For a different local web origin, set `FREEMAIL_WEB_CORS_ORIGINS`.
+
 The first read-only mailbox API uses per-request IMAP credentials and does not store mailbox passwords:
 
 ```powershell

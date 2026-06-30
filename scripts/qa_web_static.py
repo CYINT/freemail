@@ -30,11 +30,13 @@ def main() -> int:
     root = Path(__file__).resolve().parents[1]
     html = root / "apps" / "web" / "index.html"
     css = root / "apps" / "web" / "styles.css"
+    js = root / "apps" / "web" / "app.js"
     parser = StaticWebParser()
     parser.feed(html.read_text(encoding="utf-8"))
     css_text = css.read_text(encoding="utf-8")
+    js_text = js.read_text(encoding="utf-8")
 
-    failures = _validate(parser, css_text)
+    failures = _validate(parser, css_text, js_text)
     if failures:
         for failure in failures:
             print(failure, file=sys.stderr)
@@ -43,7 +45,7 @@ def main() -> int:
     return 0
 
 
-def _validate(parser: StaticWebParser, css_text: str) -> list[str]:
+def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]:
     failures = []
     required_classes = {
         "app-shell",
@@ -53,6 +55,7 @@ def _validate(parser: StaticWebParser, css_text: str) -> list[str]:
         "message-row",
         "reader",
         "compose-panel",
+        "mailbox-login",
     }
     missing_classes = sorted(required_classes - parser.classes)
     if missing_classes:
@@ -81,6 +84,17 @@ def _validate(parser: StaticWebParser, css_text: str) -> list[str]:
         failures.append("missing visible focus styling")
     if "border-radius: 8px" not in css_text:
         failures.append("missing bounded 8px radius")
+    if "./app.js" not in parser.attributes.get("src", []):
+        failures.append("missing webmail client script")
+    for marker in ["mailbox-login", "api-base-url", "mailbox-status"]:
+        if marker not in " ".join(parser.attributes.get("id", [])):
+            failures.append(f"missing live mailbox UI marker: {marker}")
+    for marker in ["fetch(", "/api/v1/mailbox/snapshot", "X-FreeMail-Mailbox-Email", "X-FreeMail-Mailbox-Password"]:
+        if marker not in js_text:
+            failures.append(f"missing live mailbox client marker: {marker}")
+    for forbidden in ["localStorage", "sessionStorage", "document.cookie"]:
+        if forbidden in js_text:
+            failures.append(f"mailbox client must not store credentials with {forbidden}")
     return failures
 
 

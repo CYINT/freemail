@@ -17,12 +17,19 @@
           </div>
         </div>
         <button class="compose-primary" type="button">Compose</button>
-        <nav class="folder-nav" aria-label="Folders">
-          <a class="active" href="#inbox">Inbox <span>12</span></a>
-          <a href="#starred">Starred <span>3</span></a>
-          <a href="#sent">Sent <span>8</span></a>
-          <a href="#drafts">Drafts <span>1</span></a>
-          <a href="#junk">Junk Mail <span>4</span></a>
+        <form class="mailbox-login" id="mailbox-login" aria-label="Mailbox sign in">
+          <label>Email <input id="mailbox-email" name="email" type="email" autocomplete="username" value="admin@example.com" required></label>
+          <label>Password <input id="mailbox-password" name="password" type="password" autocomplete="current-password" required></label>
+          <label>API <input id="api-base-url" name="apiBaseUrl" type="url" value="http://127.0.0.1:18090" required></label>
+          <button type="submit">Load mailbox</button>
+          <p class="form-status" id="mailbox-status" role="status">Mailbox credentials stay in this browser session.</p>
+        </form>
+        <nav class="folder-nav" id="folder-nav" aria-label="Folders">
+          <a class="active" href="#INBOX" data-folder="INBOX">Inbox <span>0</span></a>
+          <a href="#Sent%20Items" data-folder="Sent Items">Sent <span>0</span></a>
+          <a href="#Drafts" data-folder="Drafts">Drafts <span>0</span></a>
+          <a href="#Junk%20Mail" data-folder="Junk Mail">Junk Mail <span>0</span></a>
+          <a href="#Deleted%20Items" data-folder="Deleted Items">Trash <span>0</span></a>
         </nav>
       </aside>
 
@@ -39,8 +46,8 @@
         </header>
 
         <section class="mail-layout" aria-label="Mailbox">
-          <section class="message-list" id="inbox" aria-label="Inbox messages">
-            <article class="message-row selected" tabindex="0">
+          <section class="message-list" id="message-list" aria-label="Inbox messages">
+            <article class="message-row selected" tabindex="0" data-preview-message>
               <span class="sender">Dan Fredriksen</span>
               <strong>FreeMail local smoke passed</strong>
               <p>Inbound SMTP, authenticated submission, IMAP access, and DKIM verification are green.</p>
@@ -60,12 +67,12 @@
             </article>
           </section>
 
-          <article class="reader" aria-label="Message reader">
+          <article class="reader" id="message-reader" aria-label="Message reader">
             <header class="reader-header">
               <div>
                 <p class="eyebrow">Message</p>
-                <h2>FreeMail local smoke passed</h2>
-                <p>From Dan Fredriksen to admin@example.com</p>
+                <h2 id="reader-subject">FreeMail local smoke passed</h2>
+                <p id="reader-meta">From Dan Fredriksen to admin@example.com</p>
               </div>
               <div class="reader-actions" aria-label="Message actions">
                 <button type="button">Reply</button>
@@ -91,5 +98,6 @@
         </section>
       </main>
     </div>
+    <script src="./app.js" defer></script>
   </body>
 </html>

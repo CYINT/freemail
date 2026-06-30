@@ -219,6 +219,21 @@ def test_mailbox_snapshot_requires_mailbox_credentials(tmp_path):
     assert response.json()["detail"] == "Mailbox credentials required"
 
 
+def test_mailbox_snapshot_allows_loopback_web_preview_cors(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.options(
+            "/api/v1/mailbox/snapshot",
+            headers={
+                "Origin": "http://127.0.0.1:18091",
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "X-FreeMail-Mailbox-Email, X-FreeMail-Mailbox-Password",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:18091"
+
+
 def test_mailbox_snapshot_returns_imap_adapter_payload(tmp_path, monkeypatch):
     class Snapshot:
         def as_dict(self):
