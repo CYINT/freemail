@@ -86,6 +86,11 @@ class MailboxCreate(ApiModel):
     user_id: int = Field(gt=0)
     local_part: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9._%+-]+$")
     domain_id: int = Field(gt=0)
+    quota_bytes: int | None = Field(default=None, ge=1, le=1_125_899_906_842_624)
+
+
+class MailboxQuotaUpdate(ApiModel):
+    quota_bytes: int | None = Field(default=None, ge=1, le=1_125_899_906_842_624)
 
 
 class MailboxRecord(ApiModel):
@@ -93,6 +98,7 @@ class MailboxRecord(ApiModel):
     user_id: int
     address: EmailStr
     status: str
+    quota_bytes: int | None = None
 
     model_config = ConfigDict(alias_generator=to_camel, from_attributes=True, populate_by_name=True)
 
@@ -179,6 +185,7 @@ class MailCoreSyncPlanStatusRecord(ApiModel):
     dkim_keys: int
     accounts: int
     aliases: int
+    quota_configured_accounts: int
     missing_provisioning_secrets: list[EmailStr]
 
 

@@ -23,6 +23,7 @@ def build_apply_plan_status(connection: sqlite3.Connection, available_user_secre
         str(row["email"]) for row in accounts if str(row["email"]).lower() not in available_user_secrets
     )
     account_alias_count = sum(len(_account_aliases(connection, str(row["email"]))) for row in accounts)
+    quota_configured_accounts = sum(1 for row in accounts if row["quota_bytes"] is not None)
     operation_types = []
     if active_domains:
         operation_types.append("Domain")
@@ -37,6 +38,7 @@ def build_apply_plan_status(connection: sqlite3.Connection, available_user_secre
         "dkimKeys": len(active_dkim),
         "accounts": len(accounts),
         "aliases": account_alias_count,
+        "quotaConfiguredAccounts": quota_configured_accounts,
         "missingProvisioningSecrets": missing_secrets,
     }
 
@@ -121,7 +123,7 @@ def _account_values(connection: sqlite3.Connection, options: PlanOptions) -> dic
             "encryptionAtRest": {"@type": "Disabled"},
             "memberGroupIds": {},
             "permissions": {"@type": "Inherit"},
-            "quotas": {},
+            "quotas": _account_quotas(row),
             "roles": {"@type": "User"},
         }
     return values
@@ -131,17 +133,25 @@ def _account_rows(connection: sqlite3.Connection) -> list[sqlite3.Row]:
     return list(
         connection.execute(
             """
-            SELECT DISTINCT users.email, users.display_name
+            SELECT users.email, users.display_name, MAX(mailboxes.quota_bytes) AS quota_bytes
             FROM users
             JOIN mailboxes ON mailboxes.user_id = users.id
             JOIN domains ON domains.id = mailboxes.domain_id
             WHERE users.status = 'invited'
               AND mailboxes.status = 'active'
               AND domains.status = 'active'
+            GROUP BY users.id, users.email, users.display_name
             ORDER BY users.id
             """
         )
     )
+
+
+def _account_quotas(row: sqlite3.Row) -> dict[str, object]:
+    quota_bytes = row["quota_bytes"]
+    if quota_bytes is None:
+        return {}
+    return {"maxDiskQuota": int(quota_bytes)}
 
 
 def _account_aliases(connection: sqlite3.Connection, email: str) -> dict[str, dict[str, object]]:

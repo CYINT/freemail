@@ -686,6 +686,7 @@ def write_mail_core_apply_evidence(path, **overrides):
             "dkimKeys": 1,
             "accounts": 1,
             "aliases": 0,
+            "quotaConfiguredAccounts": 0,
             "missingProvisioningSecrets": [],
         },
         "result": {"exitCode": 0, "stdoutSha256": "a" * 64, "stderrSha256": "b" * 64},

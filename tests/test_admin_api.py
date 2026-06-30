@@ -454,6 +454,7 @@ def test_operator_can_read_mail_core_sync_plan_status_without_secret_material(tm
         "dkimKeys": 1,
         "accounts": 1,
         "aliases": 1,
+        "quotaConfiguredAccounts": 0,
         "missingProvisioningSecrets": [],
     }
     assert "PRIVATE KEY" not in response.text
@@ -487,6 +488,48 @@ def test_mail_core_sync_plan_status_reports_missing_account_secrets(tmp_path):
     assert response.json()["ready"] is False
     assert response.json()["missingProvisioningSecrets"] == ["admin@example.com"]
     assert response.json()["operationTypes"] == ["Domain"]
+    assert response.json()["quotaConfiguredAccounts"] == 0
+
+
+def test_admin_can_create_and_update_mailbox_quota(tmp_path):
+    with make_client(tmp_path) as client:
+        domain = client.post("/api/v1/admin/domains", headers=admin_headers(), json={"name": "example.com"}).json()
+        user = client.post(
+            "/api/v1/admin/users",
+            headers=admin_headers(),
+            json={
+                "email": "admin@example.com",
+                "displayName": "Admin User",
+                "initialPassword": "correct horse battery",
+            },
+        ).json()
+        created = client.post(
+            "/api/v1/admin/mailboxes",
+            headers=admin_headers(),
+            json={
+                "userId": user["id"],
+                "localPart": "admin",
+                "domainId": domain["id"],
+                "quotaBytes": 10_737_418_240,
+            },
+        )
+        updated = client.patch(
+            f"/api/v1/admin/mailboxes/{created.json()['id']}/quota",
+            headers=admin_headers(),
+            json={"quotaBytes": 21_474_836_480},
+        )
+        cleared = client.patch(
+            f"/api/v1/admin/mailboxes/{created.json()['id']}/quota",
+            headers=admin_headers(),
+            json={"quotaBytes": None},
+        )
+
+    assert created.status_code == 201
+    assert created.json()["quotaBytes"] == 10_737_418_240
+    assert updated.status_code == 200
+    assert updated.json()["quotaBytes"] == 21_474_836_480
+    assert cleared.status_code == 200
+    assert cleared.json()["quotaBytes"] is None
 
 
 def test_auditor_cannot_read_mail_core_sync_plan_status(tmp_path):

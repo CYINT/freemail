@@ -89,6 +89,7 @@ from .schemas import (
     MailboxMoveRecord,
     MailboxPreferencesRecord,
     MailboxPreferencesUpdate,
+    MailboxQuotaUpdate,
     MailCoreSyncPlanStatusCreate,
     MailCoreSyncPlanStatusRecord,
     MailboxPushDeviceCreate,
@@ -164,7 +165,7 @@ COMPONENT_READINESS = {
         "status": "ready",
         "evidence": [
             "administrator bootstrap and bearer-session login",
-            "domain, user, mailbox, alias, DKIM, DNS, status, and audit APIs",
+            "domain, user, mailbox quota, alias, DKIM, DNS, status, and audit APIs",
             "metadata readiness endpoint and backup/restore coverage",
         ],
         "remainingReleaseEvidence": [],
@@ -175,7 +176,7 @@ COMPONENT_READINESS = {
             "Stalwart candidate starts through Docker Compose",
             "SMTP, submission, IMAP, and JMAP protocol readiness checks",
             "loopback-only port bindings and backup/restore drill evidence",
-            "controlled-domain DNS, Stalwart apply, mail-flow, queue, and deliverability evidence packet support",
+            "controlled-domain DNS, quota-aware Stalwart apply-plan status, mail-flow, queue, and deliverability evidence packet support",
         ],
         "remainingReleaseEvidence": [],
     },
@@ -1520,6 +1521,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return _row_to_dict(
             _create_or_raise(
                 lambda: database.update_status(connection, "mailboxes", mailbox_id, payload.status, principal.actor)
+            )
+        )
+
+    @app.patch("/api/v1/admin/mailboxes/{mailbox_id}/quota", response_model=MailboxRecord)
+    def update_mailbox_quota(
+        mailbox_id: int,
+        payload: MailboxQuotaUpdate,
+        principal: AdminPrincipal = Depends(require_admin),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        require_permission(principal, "admin.manage")
+        return _row_to_dict(
+            _create_or_raise(
+                lambda: database.update_mailbox_quota(
+                    connection,
+                    mailbox_id=mailbox_id,
+                    quota_bytes=payload.quota_bytes,
+                    actor=principal.actor,
+                )
             )
         )
 

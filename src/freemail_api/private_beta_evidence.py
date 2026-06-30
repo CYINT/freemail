@@ -183,6 +183,7 @@ def _mail_core_apply_template(domain: str, checked_at: str) -> dict[str, Any]:
             "dkimKeys": 0,
             "accounts": 0,
             "aliases": 0,
+            "quotaConfiguredAccounts": 0,
             "missingProvisioningSecrets": [],
         },
         "result": {

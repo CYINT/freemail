@@ -74,6 +74,7 @@ def test_metadata_backup_round_trip_preserves_core_metadata_and_key_material(tmp
     assert "mailbox_push_devices" not in backup["tables"]
     assert "mailbox_push_notifications" not in backup["tables"]
     assert backup["tables"]["dkim_keys"][0]["private_key_pem"] == "private-key-pem"
+    assert backup["tables"]["mailboxes"][0]["quota_bytes"] == 10_737_418_240
     assert backup["tables"]["mailbox_preferences"][0]["signature"] == "Regards,\nAdmin"
     assert backup["tables"]["mailbox_contacts"][0]["contact_email"] == "saved@example.net"
 
@@ -146,6 +147,48 @@ def test_initialize_migrates_existing_push_tables_for_encrypted_tokens(tmp_path)
         }
     assert "encrypted_push_token" in device_columns
     assert "encrypted_push_token" in notification_columns
+
+
+def test_initialize_migrates_existing_mailboxes_for_quota_bytes(tmp_path):
+    database_path = tmp_path / "existing.sqlite"
+    with sqlite3.connect(database_path) as connection:
+        connection.executescript(
+            """
+            CREATE TABLE domains (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                status TEXT NOT NULL DEFAULT 'active',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT NOT NULL UNIQUE,
+                display_name TEXT NOT NULL,
+                password_hash TEXT NOT NULL,
+                is_admin INTEGER NOT NULL DEFAULT 0,
+                admin_role TEXT NOT NULL DEFAULT 'member',
+                status TEXT NOT NULL DEFAULT 'invited',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE mailboxes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                local_part TEXT NOT NULL,
+                domain_id INTEGER NOT NULL REFERENCES domains(id) ON DELETE CASCADE,
+                address TEXT NOT NULL UNIQUE,
+                status TEXT NOT NULL DEFAULT 'active',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(local_part, domain_id)
+            );
+            """
+        )
+
+    database.initialize(str(database_path))
+
+    with database.connect(str(database_path)) as connection:
+        mailbox_columns = {row["name"] for row in connection.execute("PRAGMA table_info(mailboxes)")}
+
+    assert "quota_bytes" in mailbox_columns
 
 
 def test_metadata_restore_refuses_non_empty_database_without_force(tmp_path):
@@ -280,7 +323,12 @@ def _seed_metadata(connection: sqlite3.Connection) -> None:
     )
     database.create_mailbox(
         connection,
-        MailboxCreate(userId=int(user["id"]), localPart="admin", domainId=int(domain["id"])),
+        MailboxCreate(
+            userId=int(user["id"]),
+            localPart="admin",
+            domainId=int(domain["id"]),
+            quotaBytes=10_737_418_240,
+        ),
         "test",
     )
     database.create_alias(

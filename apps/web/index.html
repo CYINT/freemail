@@ -220,7 +220,15 @@
               <label>User ID <input name="userId" type="number" min="1" required></label>
               <label>Domain ID <input name="domainId" type="number" min="1" required></label>
               <label>Local part <input name="localPart" type="text" placeholder="user" required></label>
+              <label>Quota bytes <input name="quotaBytes" type="number" min="1" placeholder="unlimited"></label>
               <button type="submit">Create mailbox</button>
+            </form>
+
+            <form class="admin-card" id="admin-mailbox-quota-form" aria-label="Update mailbox quota">
+              <h3>Update mailbox quota</h3>
+              <label>Mailbox ID <input name="mailboxId" type="number" min="1" required></label>
+              <label>Quota bytes <input name="quotaBytes" type="number" min="1" placeholder="blank for unlimited"></label>
+              <button type="submit">Update quota</button>
             </form>
 
             <form class="admin-card" id="admin-alias-form" aria-label="Create alias">

@@ -119,6 +119,7 @@ def test_build_apply_plan_status_reports_counts_and_missing_secrets(tmp_path):
         "dkimKeys": 1,
         "accounts": 1,
         "aliases": 1,
+        "quotaConfiguredAccounts": 0,
         "missingProvisioningSecrets": ["admin@example.com"],
     }
     assert ready["ready"] is True
@@ -254,3 +255,34 @@ def test_build_apply_plan_excludes_suspended_alias_and_dkim_key(tmp_path):
 
     assert [operation["object"] for operation in plan] == ["Domain", "Account"]
     assert plan[1]["value"]["account-admin-example-com"]["aliases"] == {}
+
+
+def test_build_apply_plan_exports_configured_mailbox_quota(tmp_path):
+    db_path = tmp_path / "freemail.sqlite"
+    initialize(str(db_path))
+    with sqlite3.connect(db_path) as connection:
+        connection.row_factory = sqlite3.Row
+        domain = create_domain(connection, DomainCreate(name="example.com"), "test")
+        user = create_user(
+            connection,
+            StoredUserCreate(email="admin@example.com", displayName="Admin User", passwordHash="argon2id-placeholder"),
+            "test",
+        )
+        mailbox = create_mailbox(
+            connection,
+            MailboxCreate(
+                userId=int(user["id"]),
+                localPart="admin",
+                domainId=int(domain["id"]),
+                quotaBytes=10_737_418_240,
+            ),
+            "test",
+        )
+
+        plan = build_apply_plan(connection, PlanOptions(user_secrets={"admin@example.com": "mail-secret"}))
+        ready = build_apply_plan_status(connection, {"admin@example.com"})
+
+    account = plan[1]["value"]["account-admin-example-com"]
+    assert mailbox["quota_bytes"] == 10_737_418_240
+    assert account["quotas"] == {"maxDiskQuota": 10_737_418_240}
+    assert ready["quotaConfiguredAccounts"] == 1

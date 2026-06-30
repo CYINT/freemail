@@ -28,7 +28,7 @@ The first persistence boundary is:
 
 - `domains`: hosted domain names and lifecycle status
 - `users`: invite-created users with password hashes and coarse administrator role metadata
-- `mailboxes`: user-owned mailbox addresses under hosted domains
+- `mailboxes`: user-owned mailbox addresses under hosted domains plus optional quota-byte metadata
 - `aliases`: forwarding aliases
 - `dkim_keys`: generated DKIM private keys and public DNS TXT values
 - `audit_log`: administrative changes
@@ -91,7 +91,7 @@ FreeMail exports Stalwart `apply` NDJSON through `scripts/export_stalwart_apply_
 
 The exporter intentionally requires a separate ignored secrets JSON file for account secrets. FreeMail stores password hashes only, so it cannot derive plaintext mail-core credentials from the admin database.
 
-The admin API exposes `POST /api/v1/admin/mail-core/sync-plan/status` as a secret-free readiness surface for this exporter. It reports domain, DKIM, account, and alias counts plus missing account-secret email addresses based on operator-provided `availableUserSecrets` email names. It does not expose DKIM private keys or account password values.
+The admin API exposes `POST /api/v1/admin/mail-core/sync-plan/status` as a secret-free readiness surface for this exporter. It reports domain, DKIM, account, alias, and quota-configured account counts plus missing account-secret email addresses based on operator-provided `availableUserSecrets` email names. It does not expose DKIM private keys or account password values.
 
 Private-beta gates require separate credential-free mail-core apply evidence after the Stalwart apply workflow runs. `scripts/collect_stalwart_apply_evidence.py` runs `stalwart-cli apply --stdin`, then records only the controlled domain, operation counts, apply exit code, output hashes, post-apply readiness, and queue-clear status; it must not include raw Stalwart output, credentials, key material, bearer values, or passwords.
 

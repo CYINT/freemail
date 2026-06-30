@@ -266,6 +266,7 @@ The mail-core apply evidence JSON must be credential-free and include:
     "dkimKeys": 1,
     "accounts": 1,
     "aliases": 0,
+    "quotaConfiguredAccounts": 0,
     "missingProvisioningSecrets": []
   },
   "result": {

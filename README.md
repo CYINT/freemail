@@ -24,7 +24,7 @@ The FreeMail program includes:
 
 This repository is at the implementation baseline. It contains:
 
-- A FastAPI admin/runtime API with persistent SQLite-backed domain, user, mailbox, alias, and audit-log surfaces.
+- A FastAPI admin/runtime API with persistent SQLite-backed domain, user, mailbox, mailbox-quota, alias, and audit-log surfaces.
 - A static webmail preview shell with inbox, paginated search and folder loading, thread-aware conversation lookup, saved and extracted contacts, message reader, header inspection, read/unread and star controls, EML import/export, bulk message actions, persistent preferences/signatures, compose, draft saving and editing, folder navigation and empty-folder controls, token-gated admin setup, and responsive layout QA.
 - An Expo/React Native mobile client scaffold with secure session storage, paginated and thread-aware mailbox workflows, conversation lookup, saved and extracted contacts, persistent preferences/signatures, draft saving and editing, message header inspection, read/unread and star controls, EML import/export/share, bulk archive/spam/delete/read/star actions, folder emptying, and static QA.
 - A Docker Compose stack with VPN-only loopback bindings by default.
@@ -68,7 +68,7 @@ Run repository hygiene scans before publishing changes:
 
 ## Admin API
 
-Admin endpoints accept either a bearer token from `POST /api/v1/admin/session` or the legacy `X-FreeMail-Admin-Token` operator token. Static admin-token access remains disabled until `FREEMAIL_ADMIN_API_TOKEN` is set; do not commit a real token. The webmail preview includes an operator admin console for bootstrap, admin email/password sign-in, static-token fallback, domain, user, mailbox, alias, DKIM, DNS-guidance, suspension/reactivation, and audit-log workflows. Bootstrap and user creation accept one-time `initialPassword` values and hash them server-side with Argon2id before storage.
+Admin endpoints accept either a bearer token from `POST /api/v1/admin/session` or the legacy `X-FreeMail-Admin-Token` operator token. Static admin-token access remains disabled until `FREEMAIL_ADMIN_API_TOKEN` is set; do not commit a real token. The webmail preview includes an operator admin console for bootstrap, admin email/password sign-in, static-token fallback, domain, user, mailbox, mailbox quota, alias, DKIM, DNS-guidance, suspension/reactivation, and audit-log workflows. Bootstrap and user creation accept one-time `initialPassword` values and hash them server-side with Argon2id before storage.
 
 Initial endpoints:
 
@@ -83,6 +83,7 @@ Initial endpoints:
 - `PATCH /api/v1/admin/users/{userId}/status`
 - `POST /api/v1/admin/mailboxes`
 - `GET /api/v1/admin/mailboxes`
+- `PATCH /api/v1/admin/mailboxes/{mailboxId}/quota`
 - `PATCH /api/v1/admin/mailboxes/{mailboxId}/status`
 - `POST /api/v1/admin/aliases`
 - `GET /api/v1/admin/aliases`
@@ -354,7 +355,7 @@ The admin API and web admin console can report a secret-free mail-core sync-plan
 POST /api/v1/admin/mail-core/sync-plan/status
 ```
 
-Pass `availableUserSecrets` as mailbox email addresses that are present in the ignored local secrets file. The response includes operation counts and missing account-secret emails, but it does not return DKIM private keys, account passwords, or provider credentials.
+Pass `availableUserSecrets` as mailbox email addresses that are present in the ignored local secrets file. The response includes operation counts, quota-configured account count, and missing account-secret emails, but it does not return DKIM private keys, account passwords, or provider credentials.
 
 The plan is newline-delimited JSON for `stalwart-cli apply`. Stalwart must be taken out of first-boot bootstrap mode before domain, account, or DKIM objects can be applied. For private-beta evidence, run the apply workflow through the collector instead of hand-authoring the evidence JSON:
 

@@ -168,6 +168,7 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         "admin-domain-form",
         "admin-user-form",
         "admin-mailbox-form",
+        "admin-mailbox-quota-form",
         "admin-alias-form",
         "admin-dkim-form",
         "admin-results",
@@ -178,6 +179,8 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         failures.append("missing initialPassword admin form field")
     if "adminRole" not in html_text(parser) or "adminRole" not in js_text:
         failures.append("missing adminRole user form field")
+    if "quotaBytes" not in html_text(parser) or "quotaBytes" not in js_text:
+        failures.append("missing quotaBytes mailbox form field")
     for marker in [
         "fetch(",
         "/api/v1/mailbox/session",
@@ -198,6 +201,7 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         "/api/v1/mailbox/message/read-state",
         "/api/v1/mailbox/message/star-state",
         "/api/v1/mailbox/message/bulk",
+        "/api/v1/admin/mailboxes/${mailboxId}/quota",
         "/api/v1/mailbox/preferences",
         "/api/v1/mailbox/send",
         "/api/v1/mailbox/draft",

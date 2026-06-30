@@ -67,6 +67,7 @@ const bootstrapAdminForm = document.querySelector("#bootstrap-admin-form");
 const adminDomainForm = document.querySelector("#admin-domain-form");
 const adminUserForm = document.querySelector("#admin-user-form");
 const adminMailboxForm = document.querySelector("#admin-mailbox-form");
+const adminMailboxQuotaForm = document.querySelector("#admin-mailbox-quota-form");
 const adminAliasForm = document.querySelector("#admin-alias-form");
 const adminDkimForm = document.querySelector("#admin-dkim-form");
 const adminResults = document.querySelector("#admin-results");
@@ -366,14 +367,29 @@ adminUserForm?.addEventListener("submit", async (event) => {
 adminMailboxForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = new FormData(adminMailboxForm);
+  const quotaBytes = Number(form.get("quotaBytes"));
   await createAdminRecord(
     "/api/v1/admin/mailboxes",
     {
       userId: Number(form.get("userId")),
       domainId: Number(form.get("domainId")),
       localPart: String(form.get("localPart") || "").trim(),
+      quotaBytes: quotaBytes > 0 ? quotaBytes : null,
     },
     "Mailbox created.",
+  );
+});
+
+adminMailboxQuotaForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = new FormData(adminMailboxQuotaForm);
+  const mailboxId = Number(form.get("mailboxId"));
+  const quotaBytes = Number(form.get("quotaBytes"));
+  await createAdminRecord(
+    `/api/v1/admin/mailboxes/${mailboxId}/quota`,
+    { quotaBytes: quotaBytes > 0 ? quotaBytes : null },
+    "Mailbox quota updated.",
+    "PATCH",
   );
 });
 
@@ -1782,7 +1798,7 @@ async function bootstrapAdministrator(payload) {
   }
 }
 
-async function createAdminRecord(path, payload, successMessage) {
+async function createAdminRecord(path, payload, successMessage, method = "POST") {
   if (!adminSession.apiBaseUrl || !hasAdminCredential()) {
     setAdminStatus("Save an admin login session or admin token before making admin changes.", "error");
     return;
@@ -1790,7 +1806,7 @@ async function createAdminRecord(path, payload, successMessage) {
   setAdminStatus("Saving admin change...", "loading");
   try {
     const response = await fetch(new URL(path, adminSession.apiBaseUrl), {
-      method: "POST",
+      method,
       headers: adminHeaders(),
       body: JSON.stringify(payload),
     });
@@ -1872,7 +1888,7 @@ function renderAdminOverview({ domains, users, mailboxes, aliases, dkimKeys, aud
       statusPath: "/api/v1/admin/users",
       statusActiveValue: "invited",
     }),
-    adminTable("Mailboxes", mailboxes, ["id", "address", "userId", "status"], {
+    adminTable("Mailboxes", mailboxes, ["id", "address", "userId", "quotaBytes", "status"], {
       statusPath: "/api/v1/admin/mailboxes",
       statusActiveValue: "active",
     }),

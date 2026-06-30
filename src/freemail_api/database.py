@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS mailboxes (
     local_part TEXT NOT NULL,
     domain_id INTEGER NOT NULL REFERENCES domains(id) ON DELETE CASCADE,
     address TEXT NOT NULL UNIQUE,
+    quota_bytes INTEGER,
     status TEXT NOT NULL DEFAULT 'active',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(local_part, domain_id)
@@ -183,7 +184,7 @@ METADATA_SCHEMA_REVISION = "sqlite-schema-v1"
 REQUIRED_TABLE_COLUMNS = {
     "domains": {"id", "name", "status", "created_at"},
     "users": {"id", "email", "display_name", "password_hash", "is_admin", "admin_role", "status", "created_at"},
-    "mailboxes": {"id", "user_id", "local_part", "domain_id", "address", "status", "created_at"},
+    "mailboxes": {"id", "user_id", "local_part", "domain_id", "address", "quota_bytes", "status", "created_at"},
     "aliases": {"id", "source", "destination", "status", "created_at"},
     "audit_log": {"id", "actor", "action", "target_type", "target_id", "created_at"},
     "dkim_keys": {
@@ -377,14 +378,28 @@ def create_mailbox(connection: sqlite3.Connection, payload: MailboxCreate, actor
     row_id = _execute_insert(
         connection,
         """
-        INSERT INTO mailboxes (user_id, local_part, domain_id, address)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO mailboxes (user_id, local_part, domain_id, address, quota_bytes)
+        VALUES (?, ?, ?, ?, ?)
         """,
-        [payload.user_id, payload.local_part.lower(), payload.domain_id, address],
+        [payload.user_id, payload.local_part.lower(), payload.domain_id, address, payload.quota_bytes],
     )
     _audit(connection, actor, "mailbox.create", "mailbox", row_id)
     connection.commit()
     return _get_row(connection, "mailboxes", row_id)
+
+
+def update_mailbox_quota(
+    connection: sqlite3.Connection,
+    *,
+    mailbox_id: int,
+    quota_bytes: int | None,
+    actor: str,
+) -> sqlite3.Row:
+    _get_row(connection, "mailboxes", mailbox_id)
+    connection.execute("UPDATE mailboxes SET quota_bytes = ? WHERE id = ?", [quota_bytes, mailbox_id])
+    _audit(connection, actor, "mailbox.quota.update", "mailbox", mailbox_id)
+    connection.commit()
+    return _get_row(connection, "mailboxes", mailbox_id)
 
 
 def update_status(connection: sqlite3.Connection, table: str, row_id: int, status: str, actor: str) -> sqlite3.Row:
@@ -874,6 +889,10 @@ def _migrate_schema(connection: sqlite3.Connection) -> None:
     if "admin_role" not in user_columns:
         connection.execute("ALTER TABLE users ADD COLUMN admin_role TEXT NOT NULL DEFAULT 'member'")
         connection.execute("UPDATE users SET admin_role = 'owner' WHERE is_admin = 1")
+        connection.commit()
+    mailbox_columns = {row["name"] for row in connection.execute("PRAGMA table_info(mailboxes)")}
+    if "quota_bytes" not in mailbox_columns:
+        connection.execute("ALTER TABLE mailboxes ADD COLUMN quota_bytes INTEGER")
         connection.commit()
     connection.execute(
         """
