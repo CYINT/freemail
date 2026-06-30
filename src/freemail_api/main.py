@@ -129,6 +129,55 @@ ROLE_PERMISSIONS = {
 }
 
 
+COMPONENT_READINESS = {
+    "adminApi": {
+        "status": "ready",
+        "evidence": [
+            "administrator bootstrap and bearer-session login",
+            "domain, user, mailbox, alias, DKIM, DNS, status, and audit APIs",
+            "metadata readiness endpoint and backup/restore coverage",
+        ],
+        "remainingReleaseEvidence": [],
+    },
+    "mailCore": {
+        "status": "runtime-ready",
+        "evidence": [
+            "Stalwart candidate starts through Docker Compose",
+            "SMTP, submission, IMAP, and JMAP protocol readiness checks",
+            "loopback-only port bindings and backup/restore drill evidence",
+        ],
+        "remainingReleaseEvidence": [
+            "controlled-domain DNS/mail-flow evidence",
+            "live Stalwart apply evidence for the controlled domain",
+            "deliverability, abuse, retry, and queue evidence",
+        ],
+    },
+    "webmail": {
+        "status": "beta-ready",
+        "evidence": [
+            "mailbox session login, folder navigation, search, contacts, message read, compose, attachments, archive, move, and delete controls",
+            "token-gated admin console for bootstrap, users, domains, mailboxes, aliases, DKIM, DNS guidance, status actions, sync status, and audit logs",
+            "browser and static QA in CI",
+        ],
+        "remainingReleaseEvidence": [
+            "controlled-domain private-beta validation",
+        ],
+    },
+    "mobile": {
+        "status": "source-ready",
+        "evidence": [
+            "Expo/React Native client with VPN API target, mailbox sessions, message workflows, folder controls, contacts, attachments, offline metadata cache, and push-device flows",
+            "mobile static QA, config validation, native prebuild drill, typecheck, and dependency audit in CI",
+        ],
+        "remainingReleaseEvidence": [
+            "real signed native mobile builds",
+            "real store-submission evidence",
+            "private-beta device validation",
+        ],
+    },
+}
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     active_settings = settings or get_settings()
     protected_folders = {"inbox", "sent items", "drafts", "junk mail", "deleted items", "archive"}
@@ -274,12 +323,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "version": active_settings.release_version,
                 "commit": active_settings.release_commit,
             },
-            "components": {
-                "adminApi": "ready",
-                "mailCore": "candidate-spike",
-                "webmail": "scaffolded",
-                "mobile": "foundation",
-            },
+            "components": {name: details["status"] for name, details in COMPONENT_READINESS.items()},
         }
 
     @app.get("/api/v1/product")
@@ -295,6 +339,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "deliverability-controls",
                 "backup-restore",
             ],
+        }
+
+    @app.get("/api/v1/product/readiness")
+    def product_readiness() -> dict[str, object]:
+        release_blockers = sorted(
+            {
+                blocker
+                for details in COMPONENT_READINESS.values()
+                for blocker in details["remainingReleaseEvidence"]
+            }
+        )
+        return {
+            "project": active_settings.app_name,
+            "license": "AGPL-3.0-or-later",
+            "credentialFreePublicRepo": True,
+            "vpnOnly": active_settings.vpn_only,
+            "releaseReady": not release_blockers,
+            "components": COMPONENT_READINESS,
+            "releaseBlockers": release_blockers,
         }
 
     @app.get("/api/v1/deployment")

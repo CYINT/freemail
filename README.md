@@ -64,6 +64,8 @@ Run repository hygiene scans before publishing changes:
 
 `scripts\open_source_readiness.py` verifies public-repository hygiene: AGPL license files, contributor/security documents, third-party notices, CI publication gates, ignored secret/signing-material boundaries, dependency-license policy, and VPN/private-beta disclosure. It intentionally reports product-release blockers separately from open-source publication readiness.
 
+`GET /api/v1/product/readiness` reports credential-free component readiness for the admin API, mail-core integration, webmail client, and mobile client. It lists evidence for each component and the remaining release blockers without exposing secrets or operational artifacts.
+
 ## Admin API
 
 Admin endpoints accept either a bearer token from `POST /api/v1/admin/session` or the legacy `X-FreeMail-Admin-Token` operator token. Static admin-token access remains disabled until `FREEMAIL_ADMIN_API_TOKEN` is set; do not commit a real token. The webmail preview includes an operator admin console for bootstrap, admin email/password sign-in, static-token fallback, domain, user, mailbox, alias, DKIM, DNS-guidance, suspension/reactivation, and audit-log workflows. Bootstrap and user creation accept one-time `initialPassword` values and hash them server-side with Argon2id before storage.

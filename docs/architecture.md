@@ -8,6 +8,8 @@ FreeMail is a product program with multiple deliverables:
 - Mobile client.
 - Deployment and release tooling.
 
+`GET /api/v1/product/readiness` is the credential-free component-readiness surface for this boundary. It reports evidence-backed statuses for the admin API, mail-core integration, webmail client, and mobile client, plus remaining release evidence blockers. Operators and contributors should use this endpoint for product-state inspection instead of inferring readiness from the terse `/health` component map.
+
 ## Boundary
 
 The implementation should not become one mail-server blob. Keep the mail-core candidate, admin API, web UI, mobile client, and ops tooling independently testable.

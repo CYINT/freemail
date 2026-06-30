@@ -17,6 +17,12 @@ def test_health_reports_vpn_only_release_metadata():
     assert payload["hostname"] == "freemail.kuzuryu.ai"
     assert payload["vpnOnly"] is True
     assert payload["release"]["commit"]
+    assert payload["components"] == {
+        "adminApi": "ready",
+        "mailCore": "runtime-ready",
+        "webmail": "beta-ready",
+        "mobile": "source-ready",
+    }
 
 
 def test_product_scope_includes_server_web_and_mobile():
@@ -28,6 +34,24 @@ def test_product_scope_includes_server_web_and_mobile():
     assert "mail-core" in payload["scope"]
     assert "webmail" in payload["scope"]
     assert "mobile-client" in payload["scope"]
+
+
+def test_product_readiness_reports_component_evidence_and_release_blockers():
+    response = client.get("/api/v1/product/readiness")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["project"] == "FreeMail"
+    assert payload["license"] == "AGPL-3.0-or-later"
+    assert payload["credentialFreePublicRepo"] is True
+    assert payload["vpnOnly"] is True
+    assert payload["releaseReady"] is False
+    assert payload["components"]["adminApi"]["status"] == "ready"
+    assert payload["components"]["mailCore"]["status"] == "runtime-ready"
+    assert payload["components"]["webmail"]["status"] == "beta-ready"
+    assert payload["components"]["mobile"]["status"] == "source-ready"
+    assert "controlled-domain DNS/mail-flow evidence" in payload["releaseBlockers"]
+    assert "real signed native mobile builds" in payload["releaseBlockers"]
 
 
 def test_deployment_is_not_public_internet():
