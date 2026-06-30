@@ -104,6 +104,7 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
         "compose-loopback-bindings",
         "repo-secret-scan",
         "license-policy-scan",
+        "open-source-readiness",
         "github-ci",
         "ci-required-steps",
         "codecov-upload",
@@ -263,6 +264,57 @@ def test_release_gate_can_skip_codecov_upload_when_ci_is_still_required(tmp_path
     assert result["passed"] is True
     assert "github-ci" in check_names
     assert "codecov-upload" not in check_names
+
+
+def test_release_gate_reports_failed_open_source_readiness(monkeypatch):
+    monkeypatch.setattr(release_gate, "_command", fake_basic_release_command)
+    monkeypatch.setattr(
+        release_gate,
+        "_check_open_source_readiness",
+        lambda: {
+            "name": "open-source-readiness",
+            "status": "fail",
+            "details": {"failedChecks": ["required-public-files"]},
+        },
+    )
+
+    result = run_release_gate(
+        ReleaseGateOptions(
+            skip_github_ci=True,
+            skip_repo_secret_scan=True,
+            skip_license_policy_scan=True,
+            skip_backup_evidence=True,
+            skip_mobile_evidence=True,
+            skip_private_beta_evidence=True,
+            skip_release_notes=True,
+            skip_runtime=True,
+        )
+    )
+
+    check = next(check for check in result["checks"] if check["name"] == "open-source-readiness")
+    assert result["passed"] is False
+    assert check["details"]["failedChecks"] == ["required-public-files"]
+
+
+def test_release_gate_can_skip_open_source_readiness(monkeypatch):
+    monkeypatch.setattr(release_gate, "_command", fake_basic_release_command)
+
+    result = run_release_gate(
+        ReleaseGateOptions(
+            skip_github_ci=True,
+            skip_repo_secret_scan=True,
+            skip_license_policy_scan=True,
+            skip_open_source_readiness=True,
+            skip_backup_evidence=True,
+            skip_mobile_evidence=True,
+            skip_private_beta_evidence=True,
+            skip_release_notes=True,
+            skip_runtime=True,
+        )
+    )
+
+    assert result["passed"] is True
+    assert "open-source-readiness" not in {check["name"] for check in result["checks"]}
 
 
 def test_release_gate_fails_without_mobile_release_evidence(tmp_path, monkeypatch):

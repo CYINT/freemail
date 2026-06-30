@@ -32,6 +32,7 @@ def main() -> int:
     parser.add_argument("--skip-codecov-upload", action="store_true")
     parser.add_argument("--skip-repo-secret-scan", action="store_true")
     parser.add_argument("--skip-license-policy-scan", action="store_true")
+    parser.add_argument("--skip-open-source-readiness", action="store_true")
     parser.add_argument("--skip-backup-evidence", action="store_true")
     parser.add_argument("--skip-mobile-evidence", action="store_true")
     parser.add_argument("--skip-private-beta-evidence", action="store_true")
@@ -75,6 +76,7 @@ def _options_from_args(args: argparse.Namespace, manifest: ReleaseGateOptions | 
         skip_codecov_upload=args.skip_codecov_upload,
         skip_repo_secret_scan=args.skip_repo_secret_scan,
         skip_license_policy_scan=args.skip_license_policy_scan,
+        skip_open_source_readiness=args.skip_open_source_readiness,
         skip_backup_evidence=args.skip_backup_evidence,
         skip_mobile_evidence=args.skip_mobile_evidence,
         skip_private_beta_evidence=args.skip_private_beta_evidence,

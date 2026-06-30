@@ -134,7 +134,7 @@ The gate verifies:
 For offline development only, individual external checks can be skipped:
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\release_gate.py --skip-github-ci --skip-ci-step-provenance --skip-codecov-upload --skip-repo-secret-scan --skip-license-policy-scan --skip-runtime --skip-backup-evidence --skip-mobile-evidence --skip-private-beta-evidence --skip-release-notes
+.\.venv\Scripts\python.exe scripts\release_gate.py --skip-github-ci --skip-ci-step-provenance --skip-codecov-upload --skip-repo-secret-scan --skip-license-policy-scan --skip-open-source-readiness --skip-runtime --skip-backup-evidence --skip-mobile-evidence --skip-private-beta-evidence --skip-release-notes
 ```
 
 Do not use skipped gates as release evidence.
@@ -358,7 +358,7 @@ Release provenance for a candidate consists of:
 - repository secret/signing-material scan completion in that workflow
 - direct runtime dependency license-policy scan completion in that workflow
 - release notes path and checksum, committed under `docs/release-notes/`
-- release-gate JSON output, including backup, mobile, private-beta, and release-notes SHA-256 checksums
+- release-gate JSON output, including open-source readiness, backup, mobile, private-beta, and release-notes SHA-256 checksums
 - mobile-release-gate JSON output, including signed-build and store-submission evidence checksums
 - private-beta gate JSON output for each controlled domain, including evidence-file SHA-256 checksums
 - mail-core apply evidence for each controlled domain, stored outside Git

@@ -55,6 +55,7 @@ class ReleaseGateOptions:
     skip_codecov_upload: bool = False
     skip_repo_secret_scan: bool = False
     skip_license_policy_scan: bool = False
+    skip_open_source_readiness: bool = False
     skip_backup_evidence: bool = False
     skip_mobile_evidence: bool = False
     skip_private_beta_evidence: bool = False
@@ -75,6 +76,8 @@ def run_release_gate(options: ReleaseGateOptions) -> dict[str, Any]:
         checks.append(_check_repo_secret_scan())
     if not options.skip_license_policy_scan:
         checks.append(_check_license_policy_scan())
+    if not options.skip_open_source_readiness:
+        checks.append(_check_open_source_readiness())
     if not options.skip_github_ci:
         checks.append(_check_github_ci(options.repo, commit))
         if not options.skip_ci_step_provenance:
@@ -286,6 +289,24 @@ def _check_repo_secret_scan() -> dict[str, Any]:
 def _check_license_policy_scan() -> dict[str, Any]:
     _command([sys.executable, "scripts/qa_license_policy.py"])
     return _check("license-policy-scan", True, {"script": "scripts/qa_license_policy.py"})
+
+
+def _check_open_source_readiness() -> dict[str, Any]:
+    from .open_source_readiness import OpenSourceReadinessOptions, check_open_source_readiness
+
+    result = check_open_source_readiness(OpenSourceReadinessOptions(root=Path.cwd()))
+    failed = [check["name"] for check in result["checks"] if check["status"] != "pass"]
+    return _check(
+        "open-source-readiness",
+        bool(result["passed"]),
+        {
+            "credentialFreePublicRepo": result["credentialFreePublicRepo"],
+            "license": result["license"],
+            "releaseReady": result["releaseReady"],
+            "releaseBlockers": result["releaseBlockers"],
+            "failedChecks": failed,
+        },
+    )
 
 
 def _check_backup_evidence(
