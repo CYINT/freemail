@@ -80,6 +80,7 @@ CREATE TABLE IF NOT EXISTS mailbox_sessions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_mailbox_sessions_expires_at ON mailbox_sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_mailbox_sessions_email_expires_at ON mailbox_sessions(email, expires_at);
 
 CREATE TABLE IF NOT EXISTS admin_sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -584,11 +585,53 @@ def update_status(connection: sqlite3.Connection, table: str, row_id: int, statu
         raise InvalidStatusError(f"{table} status must be one of: {allowed}")
     _get_row(connection, table, row_id)
     connection.execute(f"UPDATE {table} SET status = ? WHERE id = ?", [normalized_status, row_id])
+    if normalized_status == "suspended":
+        _revoke_sessions_for_suspended_target(connection, table=table, row_id=row_id)
     target_type = str(config["target_type"])
     action = f"{target_type}.{'suspend' if normalized_status == 'suspended' else 'activate'}"
     _audit(connection, actor, action, target_type, row_id)
     connection.commit()
     return _get_row(connection, table, row_id)
+
+
+def _revoke_sessions_for_suspended_target(connection: sqlite3.Connection, *, table: str, row_id: int) -> None:
+    if table == "users":
+        connection.execute("DELETE FROM admin_sessions WHERE user_id = ?", [row_id])
+        connection.execute(
+            """
+            DELETE FROM mailbox_sessions
+            WHERE email IN (
+                SELECT address
+                FROM mailboxes
+                WHERE user_id = ?
+            )
+            """,
+            [row_id],
+        )
+    elif table == "mailboxes":
+        connection.execute(
+            """
+            DELETE FROM mailbox_sessions
+            WHERE email = (
+                SELECT address
+                FROM mailboxes
+                WHERE id = ?
+            )
+            """,
+            [row_id],
+        )
+    elif table == "domains":
+        connection.execute(
+            """
+            DELETE FROM mailbox_sessions
+            WHERE email IN (
+                SELECT address
+                FROM mailboxes
+                WHERE domain_id = ?
+            )
+            """,
+            [row_id],
+        )
 
 
 def create_alias(connection: sqlite3.Connection, payload: AliasCreate, actor: str) -> sqlite3.Row:

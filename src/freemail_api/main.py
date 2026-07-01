@@ -189,7 +189,7 @@ COMPONENT_READINESS = {
         "status": "ready",
         "evidence": [
             "administrator bootstrap, bearer-session login, and authenticator-app MFA",
-            "domain, user, user-password rotation, mailbox quota, alias, DKIM, DNS, status, and filterable audit APIs",
+            "domain, user, user-password rotation, suspension-triggered session revocation, mailbox quota, alias, DKIM, DNS, status, and filterable audit APIs",
             "metadata readiness endpoint and backup/restore coverage",
         ],
         "remainingReleaseEvidence": [],

@@ -35,6 +35,29 @@ def bootstrap_headers() -> dict[str, str]:
     return {"X-FreeMail-Bootstrap-Token": BOOTSTRAP_TOKEN}
 
 
+def create_admin_mailbox_records(client: TestClient) -> dict[str, int]:
+    domain = client.post("/api/v1/admin/domains", headers=admin_headers(), json={"name": "example.com"})
+    user = client.post(
+        "/api/v1/admin/users",
+        headers=admin_headers(),
+        json={
+            "email": "admin@example.com",
+            "displayName": "Admin User",
+            "initialPassword": "correct horse battery",
+            "isAdmin": True,
+        },
+    )
+    mailbox = client.post(
+        "/api/v1/admin/mailboxes",
+        headers=admin_headers(),
+        json={"userId": user.json()["id"], "localPart": "admin", "domainId": domain.json()["id"]},
+    )
+    assert domain.status_code == 201
+    assert user.status_code == 201
+    assert mailbox.status_code == 201
+    return {"domain_id": domain.json()["id"], "user_id": user.json()["id"], "mailbox_id": mailbox.json()["id"]}
+
+
 def test_admin_api_requires_configured_token(tmp_path):
     settings = Settings(database_path=str(tmp_path / "freemail.sqlite"), release_commit="test", session_secret=None)
 
@@ -1108,8 +1131,8 @@ def test_suspended_user_blocks_existing_bearer_session(tmp_path, monkeypatch):
         response = client.get("/api/v1/mailbox/snapshot", headers={"Authorization": f"Bearer {token}"})
 
     assert session_response.status_code == 200
-    assert response.status_code == 403
-    assert response.json()["detail"] == "Mailbox is suspended"
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid mailbox session"
     assert calls == ["snapshot"]
 
 
@@ -1600,6 +1623,116 @@ def test_mailbox_session_revoke_by_id_is_scoped_to_mailbox(tmp_path, monkeypatch
     assert delete_response.status_code == 200
     assert delete_response.json() == {"revoked": False, "sessionId": user_session_id}
     assert user_snapshot.status_code == 200
+
+
+def test_suspending_mailbox_revokes_existing_mailbox_sessions(tmp_path, monkeypatch):
+    class Snapshot:
+        def as_dict(self):
+            return {"email": "admin@example.com", "folders": [], "messages": []}
+
+    monkeypatch.setattr("freemail_api.main.list_mailbox_snapshot", lambda **_kwargs: Snapshot())
+
+    with make_client(tmp_path) as client:
+        records = create_admin_mailbox_records(client)
+        session_response = client.post(
+            "/api/v1/mailbox/session",
+            json={"email": "admin@example.com", "password": "secret"},
+        )
+        suspend_response = client.patch(
+            f"/api/v1/admin/mailboxes/{records['mailbox_id']}/status",
+            headers=admin_headers(),
+            json={"status": "suspended"},
+        )
+        snapshot_response = client.get(
+            "/api/v1/mailbox/snapshot",
+            headers={"Authorization": f"Bearer {session_response.json()['token']}"},
+        )
+
+    with sqlite3.connect(tmp_path / "freemail.sqlite") as connection:
+        session_count = connection.execute("SELECT COUNT(*) FROM mailbox_sessions").fetchone()[0]
+
+    assert session_response.status_code == 200
+    assert suspend_response.status_code == 200
+    assert suspend_response.json()["status"] == "suspended"
+    assert snapshot_response.status_code == 401
+    assert session_count == 0
+
+
+def test_suspending_user_revokes_mailbox_and_admin_sessions(tmp_path, monkeypatch):
+    class Snapshot:
+        def as_dict(self):
+            return {"email": "admin@example.com", "folders": [], "messages": []}
+
+    monkeypatch.setattr("freemail_api.main.list_mailbox_snapshot", lambda **_kwargs: Snapshot())
+
+    with make_client(tmp_path) as client:
+        records = create_admin_mailbox_records(client)
+        mailbox_session = client.post(
+            "/api/v1/mailbox/session",
+            json={"email": "admin@example.com", "password": "secret"},
+        )
+        admin_session = client.post(
+            "/api/v1/admin/session",
+            json={"email": "admin@example.com", "password": "correct horse battery"},
+        )
+        suspend_response = client.patch(
+            f"/api/v1/admin/users/{records['user_id']}/status",
+            headers=admin_headers(),
+            json={"status": "suspended"},
+        )
+        mailbox_snapshot = client.get(
+            "/api/v1/mailbox/snapshot",
+            headers={"Authorization": f"Bearer {mailbox_session.json()['token']}"},
+        )
+        admin_domains = client.get(
+            "/api/v1/admin/domains",
+            headers={"Authorization": f"Bearer {admin_session.json()['token']}"},
+        )
+
+    with sqlite3.connect(tmp_path / "freemail.sqlite") as connection:
+        mailbox_session_count = connection.execute("SELECT COUNT(*) FROM mailbox_sessions").fetchone()[0]
+        admin_session_count = connection.execute("SELECT COUNT(*) FROM admin_sessions").fetchone()[0]
+
+    assert mailbox_session.status_code == 200
+    assert admin_session.status_code == 200
+    assert suspend_response.status_code == 200
+    assert mailbox_snapshot.status_code == 401
+    assert admin_domains.status_code == 401
+    assert mailbox_session_count == 0
+    assert admin_session_count == 0
+
+
+def test_suspending_domain_revokes_existing_mailbox_sessions(tmp_path, monkeypatch):
+    class Snapshot:
+        def as_dict(self):
+            return {"email": "admin@example.com", "folders": [], "messages": []}
+
+    monkeypatch.setattr("freemail_api.main.list_mailbox_snapshot", lambda **_kwargs: Snapshot())
+
+    with make_client(tmp_path) as client:
+        records = create_admin_mailbox_records(client)
+        session_response = client.post(
+            "/api/v1/mailbox/session",
+            json={"email": "admin@example.com", "password": "secret"},
+        )
+        suspend_response = client.patch(
+            f"/api/v1/admin/domains/{records['domain_id']}/status",
+            headers=admin_headers(),
+            json={"status": "suspended"},
+        )
+        snapshot_response = client.get(
+            "/api/v1/mailbox/snapshot",
+            headers={"Authorization": f"Bearer {session_response.json()['token']}"},
+        )
+
+    with sqlite3.connect(tmp_path / "freemail.sqlite") as connection:
+        session_count = connection.execute("SELECT COUNT(*) FROM mailbox_sessions").fetchone()[0]
+
+    assert session_response.status_code == 200
+    assert suspend_response.status_code == 200
+    assert suspend_response.json()["status"] == "suspended"
+    assert snapshot_response.status_code == 401
+    assert session_count == 0
 
 
 def test_mailbox_push_devices_require_bearer_session(tmp_path):
