@@ -1,8 +1,13 @@
 import json
+import os
+from pathlib import Path
 import subprocess
 import sys
 
 from freemail_api.mobile_release_status import summarize_mobile_release_evidence
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_mobile_release_status_reports_missing_evidence(tmp_path):
@@ -101,6 +106,36 @@ def test_mobile_release_status_script_exits_nonzero_until_ready(tmp_path):
     payload = json.loads(result.stdout)
     assert payload["ready"] is False
     assert payload["failedChecks"] == ["ios-store-submission", "android-store-submission"]
+
+
+def test_mobile_release_status_script_discovers_domain_specific_default_evidence(tmp_path):
+    app_config = tmp_path / "apps" / "mobile" / "app.json"
+    evidence = tmp_path / ".freemail-qa" / "mobile-release-evidence.freemail.kuzuryu.ai.json"
+    app_config.parent.mkdir(parents=True)
+    evidence.parent.mkdir(parents=True)
+    write_app_config(app_config)
+    write_json(evidence, complete_evidence())
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts" / "mobile_release_status.py"),
+            "--require-store-submission",
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        env={**os.environ, "PYTHONPATH": str(ROOT / "src")},
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["ready"] is True
+    assert Path(payload["evidence"]).parts == (
+        ".freemail-qa",
+        "mobile-release-evidence.freemail.kuzuryu.ai.json",
+    )
 
 
 def write_app_config(path):
