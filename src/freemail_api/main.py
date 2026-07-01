@@ -285,6 +285,7 @@ RELEASE_BLOCKER_ACTIONS = {
     "real signed native mobile builds": {
         "id": "record-signed-mobile-build",
         "reason": "signed iOS and Android native build evidence is incomplete",
+        "prerequisiteCommand": "gh workflow run mobile-eas-private-beta.yml --repo CYINT/freemail -f platform=<ios-or-android> -f profile=private-beta -f submit_after_build=false -f confirmation=launch-mobile-private-beta",
         "command": ".\\.venv\\Scripts\\python.exe scripts\\collect_mobile_build_evidence.py --platform <ios-or-android> --signed --distribution private-beta --build-url <https-build-evidence-url> --native-build-id <native-build-id> --artifact-type <ipa-or-aab> --artifact-bytes <bytes> --artifact-sha256 <sha256>",
     },
     "real store-submission evidence": {

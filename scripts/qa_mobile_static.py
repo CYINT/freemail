@@ -27,6 +27,7 @@ def validate_mobile(root: Path) -> list[str]:
         "src/offlineCache.ts": mobile / "src" / "offlineCache.ts",
         "src/sessionStore.ts": mobile / "src" / "sessionStore.ts",
         "iOS workflow": root / ".github" / "workflows" / "mobile-ios-native.yml",
+        "EAS private-beta workflow": root / ".github" / "workflows" / "mobile-eas-private-beta.yml",
     }
     failures = [f"missing mobile file: {name}" for name, path in files.items() if not path.is_file()]
     if failures:
@@ -257,6 +258,15 @@ def validate_mobile(root: Path) -> list[str]:
         "technology.cyint.freemail",
         "npx expo prebuild --clean --no-install --platform all",
         "Mobile iOS Native Drill",
+        "Mobile EAS Private Beta",
+        "workflow_dispatch",
+        "EXPO_TOKEN",
+        "launch-mobile-private-beta",
+        "npx eas-cli@16 build",
+        "npx eas-cli@16 submit",
+        "submit_after_build",
+        "collect_mobile_build_evidence.py",
+        "collect_mobile_store_submission.py",
         "eas.json",
         "private-beta",
         "distribution",

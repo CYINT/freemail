@@ -1,0 +1,92 @@
+name: Mobile EAS Private Beta
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: "Mobile platform to build or submit"
+        required: true
+        type: choice
+        default: "all"
+        options:
+          - all
+          - ios
+          - android
+      profile:
+        description: "EAS profile from apps/mobile/eas.json"
+        required: true
+        type: choice
+        default: "private-beta"
+        options:
+          - private-beta
+          - production
+      submit_after_build:
+        description: "Submit the latest completed build after EAS build returns"
+        required: true
+        type: boolean
+        default: false
+      confirmation:
+        description: "Type launch-mobile-private-beta to run signed EAS work"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  eas-private-beta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - name: Confirm signed mobile run
+        run: |
+          if [ "${{ inputs.confirmation }}" != "launch-mobile-private-beta" ]; then
+            echo "confirmation input did not match launch-mobile-private-beta" >&2
+            exit 1
+          fi
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "EXPO_TOKEN secret is required for signed EAS builds" >&2
+            exit 1
+          fi
+          if [ "${{ inputs.submit_after_build }}" = "true" ] && [ "${{ inputs.platform }}" = "all" ]; then
+            echo "submit_after_build requires platform ios or android so store evidence remains platform-specific" >&2
+            exit 1
+          fi
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - name: Install mobile dependencies
+        run: npm ci --prefix apps/mobile
+      - name: Mobile static QA
+        run: python scripts/qa_mobile_static.py
+      - name: Mobile public config validation
+        run: npm run --prefix apps/mobile config:check
+      - name: Launch signed EAS build
+        working-directory: apps/mobile
+        run: |
+          npx eas-cli@16 build \
+            --non-interactive \
+            --platform "${{ inputs.platform }}" \
+            --profile "${{ inputs.profile }}"
+      - name: Submit latest EAS build
+        if: ${{ inputs.submit_after_build }}
+        working-directory: apps/mobile
+        run: |
+          npx eas-cli@16 submit \
+            --non-interactive \
+            --platform "${{ inputs.platform }}" \
+            --profile "${{ inputs.profile }}" \
+            --latest
+      - name: Evidence reminder
+        run: |
+          echo "After this run completes, record credential-free build and optional store-submission evidence with:"
+          echo "python scripts/collect_mobile_build_evidence.py --platform <ios-or-android> --signed --distribution private-beta --build-url <https-build-evidence-url> --native-build-id <native-build-id> --artifact-type <ipa-or-aab> --artifact-bytes <bytes> --artifact-sha256 <sha256>"
+          echo "python scripts/collect_mobile_store_submission.py --platform <ios-or-android> --submitted --track <testflight-or-internal-testing> --submission-url <https-store-submission-url> --native-build-id <native-build-id> --submitted-at <iso-8601> --review-state <state>"

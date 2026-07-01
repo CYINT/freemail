@@ -76,6 +76,8 @@ def test_product_readiness_reports_component_evidence_and_release_blockers():
     assert payload["nextActions"][0]["releaseBlockers"] == ["decision-owner private-beta acceptance"]
     assert "--decision-owner <decision-owner>" in payload["nextActions"][0]["command"]
     assert "--all-checks-passed" in payload["nextActions"][1]["command"]
+    assert "mobile-eas-private-beta.yml" in payload["nextActions"][2]["prerequisiteCommand"]
+    assert "platform=<ios-or-android>" in payload["nextActions"][2]["prerequisiteCommand"]
     assert "--artifact-type <ipa-or-aab>" in payload["nextActions"][2]["command"]
     assert "--track <testflight-or-internal-testing>" in payload["nextActions"][3]["command"]
     assert "scripts\\release_gate.py" in payload["nextActions"][4]["command"]

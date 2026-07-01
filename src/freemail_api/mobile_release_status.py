@@ -16,11 +16,13 @@ NEXT_ACTIONS_BY_CHECK = {
     "ios-signed-build": {
         "id": "record-ios-signed-build",
         "reason": "iOS signed-build evidence is incomplete",
+        "prerequisiteCommand": "gh workflow run mobile-eas-private-beta.yml --repo CYINT/freemail -f platform=ios -f profile=private-beta -f submit_after_build=false -f confirmation=launch-mobile-private-beta",
         "command": ".\\.venv\\Scripts\\python.exe scripts\\collect_mobile_build_evidence.py --platform ios --signed --distribution private-beta --build-url <https-build-evidence-url> --native-build-id <ios-build-number> --artifact-type ipa --artifact-bytes <bytes> --artifact-sha256 <sha256>",
     },
     "android-signed-build": {
         "id": "record-android-signed-build",
         "reason": "Android signed-build evidence is incomplete",
+        "prerequisiteCommand": "gh workflow run mobile-eas-private-beta.yml --repo CYINT/freemail -f platform=android -f profile=private-beta -f submit_after_build=false -f confirmation=launch-mobile-private-beta",
         "command": ".\\.venv\\Scripts\\python.exe scripts\\collect_mobile_build_evidence.py --platform android --signed --distribution private-beta --build-url <https-build-evidence-url> --native-build-id <android-version-code> --artifact-type aab --artifact-bytes <bytes> --artifact-sha256 <sha256>",
     },
     "ios-device-validation": {

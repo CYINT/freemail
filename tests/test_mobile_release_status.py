@@ -81,8 +81,11 @@ def test_mobile_release_status_reports_failed_gate_checks_for_draft(tmp_path):
         "build-url",
     }
     assert "<https-build-evidence-url>" in result["nextActions"][0]["command"]
+    assert "mobile-eas-private-beta.yml" in result["nextActions"][0]["prerequisiteCommand"]
+    assert "-f platform=ios" in result["nextActions"][0]["prerequisiteCommand"]
     assert "--native-build-id <ios-build-number>" in result["nextActions"][0]["command"]
     assert "--artifact-type ipa" in result["nextActions"][0]["command"]
+    assert "-f platform=android" in result["nextActions"][1]["prerequisiteCommand"]
     assert "--all-checks-passed" in result["nextActions"][2]["command"]
     assert "--track testflight" in result["nextActions"][4]["command"]
     assert "--submitted-at <iso-8601>" in result["nextActions"][4]["command"]

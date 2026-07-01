@@ -79,6 +79,15 @@ npx eas build --platform android --profile private-beta
 Pop-Location
 ```
 
+The repository also includes a guarded manual GitHub Actions workflow, `.github/workflows/mobile-eas-private-beta.yml`, for private signing environments that use GitHub secrets. Configure `EXPO_TOKEN` as a repository or organization secret, then run **Mobile EAS Private Beta** with:
+
+- `platform`: `ios`, `android`, or `all` for signed build launch.
+- `profile`: `private-beta` for internal distribution, or `production` only for a store-candidate release.
+- `submit_after_build`: `false` for build-only runs; set `true` only with a single platform after the store metadata and private signing account are ready.
+- `confirmation`: `launch-mobile-private-beta`.
+
+The workflow runs static mobile QA and public Expo config validation before launching `npx eas-cli@16 build`. It does not upload evidence to Git and it does not print signing material. After the run completes, copy only credential-free build URLs, native build identifiers, artifact types, byte counts, hashes, store tracks, timestamps, and review states into the evidence collectors below.
+
 The EAS build result is not release evidence by itself. After each signed build, use `scripts\collect_mobile_build_evidence.py` to record credential-free artifact provenance, including the native build identifier from `apps/mobile/app.json`, and then validate it with `scripts\mobile_release_status.py`.
 
 ## Signing Material
@@ -117,7 +126,7 @@ Inspect the evidence packet before using it in a release candidate:
 .\.venv\Scripts\python.exe scripts\mobile_release_status.py --require-store-submission
 ```
 
-The status command is read-only. It reports the evidence file path, checksum, failed mobile-release checks, credential-free `nextActions`, and whether the packet is ready for the hard release gate. It does not run native builds, access app-store APIs, sign artifacts, or connect to real devices. The `nextActions` commands mirror the required collector flags and intentionally use placeholders for build URLs, native build IDs, hashes, byte counts, devices, testers, timestamps, and store URLs so operators can collect the missing evidence without copying secrets into the evidence packet.
+The status command is read-only. It reports the evidence file path, checksum, failed mobile-release checks, credential-free `nextActions`, and whether the packet is ready for the hard release gate. It does not run native builds, access app-store APIs, sign artifacts, or connect to real devices. Signed-build `nextActions` include a credential-free `prerequisiteCommand` for the guarded GitHub Actions EAS workflow plus a separate collector command for recording evidence. The `nextActions` collector commands mirror the required collector flags and intentionally use placeholders for build URLs, native build IDs, hashes, byte counts, devices, testers, timestamps, and store URLs so operators can collect the missing evidence without copying secrets into the evidence packet.
 
 After each signed build completes in the private signing environment, update the credential-free `builds` section through the collector:
 
