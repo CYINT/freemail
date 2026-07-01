@@ -10,6 +10,55 @@ from .mobile_release_status import mobile_release_next_actions
 from .release_gate import _check_private_beta_evidence, _check_release_notes, _check_restore_drill_evidence
 
 
+PRIVATE_BETA_ACTIONS_BY_CHECK = {
+    "controlled-domain-dns": {
+        "id": "refresh-controlled-domain-dns-evidence",
+        "reason": "controlled-domain DNS evidence is missing or not passing",
+        "command": ".\\.venv\\Scripts\\python.exe scripts\\collect_controlled_domain_evidence.py --domain <domain> --output-dir .freemail-qa\\private-beta --email <mailbox@example.com> --secrets-json <ignored-secrets-json>",
+    },
+    "controlled-mail-flow-evidence": {
+        "id": "record-controlled-mail-flow-evidence",
+        "reason": "controlled-domain mail-flow evidence is missing or not passing",
+        "command": ".\\.venv\\Scripts\\python.exe scripts\\collect_controlled_domain_evidence.py --domain <domain> --output-dir .freemail-qa\\private-beta --email <mailbox@example.com> --secrets-json <ignored-secrets-json>",
+    },
+    "queue-evidence": {
+        "id": "record-queue-evidence",
+        "reason": "mail queue evidence is missing or not clear",
+        "command": ".\\.venv\\Scripts\\python.exe scripts\\collect_controlled_domain_evidence.py --domain <domain> --output-dir .freemail-qa\\private-beta --email <mailbox@example.com> --secrets-json <ignored-secrets-json>",
+    },
+    "mail-core-apply-evidence": {
+        "id": "record-mail-core-apply-evidence",
+        "reason": "mail-core apply evidence is missing or not passing",
+        "command": ".\\.venv\\Scripts\\python.exe scripts\\collect_stalwart_apply_evidence.py --domain <domain> --secrets-json <ignored-secrets-json> --output .freemail-qa\\private-beta\\mail-core-apply.<domain>.json",
+    },
+    "deliverability-abuse-evidence": {
+        "id": "record-deliverability-abuse-evidence",
+        "reason": "deliverability and abuse review evidence is missing or not passing",
+        "command": ".\\.venv\\Scripts\\python.exe scripts\\collect_deliverability_evidence.py --domain <domain> --mail-flow-evidence .freemail-qa\\private-beta\\mail-flow.<domain>.json --queue-evidence .freemail-qa\\private-beta\\queue.<domain>.json --spf-aligned --dmarc-aligned --bounce-or-retry-reviewed --abuse-complaints 0 --output .freemail-qa\\private-beta\\deliverability.<domain>.json",
+    },
+    "metadata-backup-evidence": {
+        "id": "record-metadata-backup-evidence",
+        "reason": "metadata backup evidence is missing",
+        "command": ".\\.venv\\Scripts\\python.exe scripts\\collect_backup_evidence.py --output-dir .freemail-qa\\backups --force",
+    },
+    "mail-store-backup-evidence": {
+        "id": "record-mail-store-backup-evidence",
+        "reason": "mail-store backup evidence is missing",
+        "command": ".\\.venv\\Scripts\\python.exe scripts\\collect_backup_evidence.py --output-dir .freemail-qa\\backups --force",
+    },
+    "restore-drill-evidence": {
+        "id": "record-restore-drill-evidence",
+        "reason": "restore-drill evidence is missing or not passing",
+        "command": ".\\.venv\\Scripts\\python.exe scripts\\collect_restore_drill_evidence.py --metadata-backup .freemail-qa\\backups\\metadata.json --mail-store-backup .freemail-qa\\backups\\stalwart-mail-store.tar.gz --output .freemail-qa\\backups\\restore-drill-evidence.json --force",
+    },
+    "private-beta-acceptance": {
+        "id": "record-private-beta-acceptance",
+        "reason": "decision-owner private-beta acceptance evidence is incomplete",
+        "command": ".\\.venv\\Scripts\\python.exe scripts\\collect_private_beta_acceptance.py --domain <domain> --output .freemail-qa\\private-beta\\private-beta-acceptance.<domain>.json --decision-owner <decision-owner> --accepted --accepted-at <iso-8601>",
+    },
+}
+
+
 @dataclass(frozen=True)
 class ReleasePacketStatusOptions:
     metadata_backup: Path | None = None
@@ -163,9 +212,86 @@ def _restore_drill_check(path: Path | None) -> dict[str, Any]:
 
 
 def _private_beta_check(path: Path | None) -> dict[str, Any]:
+    if path is None:
+        return _check(
+            "private-beta-evidence",
+            False,
+            {
+                "error": "private-beta gate output path is required",
+                "nextActions": [_create_private_beta_template_action()],
+            },
+        )
     if path is not None and not path.is_file():
-        return _check("private-beta-evidence", False, {"error": "private-beta gate output file is missing"})
-    return _check_private_beta_evidence(path)
+        return _check(
+            "private-beta-evidence",
+            False,
+            {
+                "error": "private-beta gate output file is missing",
+                "nextActions": [_create_private_beta_template_action(), _run_private_beta_gate_action()],
+            },
+        )
+    check = _check_private_beta_evidence(path)
+    details = check.get("details")
+    if isinstance(details, dict):
+        details["nextActions"] = _private_beta_next_actions(details)
+    return check
+
+
+def _private_beta_next_actions(details: dict[str, Any]) -> list[dict[str, Any]]:
+    actions: list[dict[str, Any]] = []
+    missing_checks = details.get("missingChecks")
+    failed_checks = details.get("failedChecks")
+    failed_requirements = details.get("failedRequirements")
+    failed_requirements_by_check = failed_requirements if isinstance(failed_requirements, dict) else {}
+    for check_name in _private_beta_action_check_names(missing_checks, failed_checks, failed_requirements_by_check):
+        action = PRIVATE_BETA_ACTIONS_BY_CHECK.get(check_name)
+        if action is None:
+            continue
+        actions.append(
+            {
+                **action,
+                "checks": [check_name],
+                "failedRequirements": list(failed_requirements_by_check.get(check_name, [])),
+            }
+        )
+    if actions:
+        actions.append(_run_private_beta_gate_action())
+    return actions
+
+
+def _private_beta_action_check_names(
+    missing_checks: Any,
+    failed_checks: Any,
+    failed_requirements_by_check: dict[str, Any],
+) -> list[str]:
+    names = []
+    for value in [missing_checks, failed_checks, list(failed_requirements_by_check)]:
+        if not isinstance(value, list):
+            continue
+        for name in value:
+            if isinstance(name, str) and name not in names:
+                names.append(name)
+    return names
+
+
+def _create_private_beta_template_action() -> dict[str, Any]:
+    return {
+        "id": "create-private-beta-evidence-templates",
+        "reason": "private-beta evidence packet is missing",
+        "checks": ["private-beta-evidence"],
+        "failedRequirements": [],
+        "command": ".\\.venv\\Scripts\\python.exe scripts\\create_private_beta_evidence_templates.py --domain <domain> --output-dir .freemail-qa\\private-beta",
+    }
+
+
+def _run_private_beta_gate_action() -> dict[str, Any]:
+    return {
+        "id": "run-private-beta-gate",
+        "reason": "refresh the private-beta gate output after collecting evidence",
+        "checks": ["private-beta-evidence"],
+        "failedRequirements": [],
+        "command": ".\\.venv\\Scripts\\python.exe scripts\\private_beta_gate.py --manifest .freemail-qa\\private-beta\\private-beta-evidence-manifest.<domain>.json",
+    }
 
 
 def _release_notes_check(path: Path | None, release_version: str | None) -> dict[str, Any]:

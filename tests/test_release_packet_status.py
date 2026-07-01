@@ -40,6 +40,11 @@ def test_release_packet_status_reports_missing_artifacts(tmp_path):
         "private-beta-evidence",
         "release-notes",
     ]
+    private_beta_check = next(check for check in result["checks"] if check["name"] == "private-beta-evidence")
+    assert [action["id"] for action in private_beta_check["details"]["nextActions"]] == [
+        "create-private-beta-evidence-templates",
+        "run-private-beta-gate",
+    ]
     assert result["runtimeChecksExcluded"] is True
 
 
@@ -267,6 +272,11 @@ def test_release_packet_status_reports_private_beta_failed_requirements(tmp_path
             "knownLimitations-store-submission",
         ]
     }
+    assert [action["id"] for action in private_beta_check["details"]["nextActions"]] == [
+        "record-private-beta-acceptance",
+        "run-private-beta-gate",
+    ]
+    assert "<decision-owner>" in private_beta_check["details"]["nextActions"][0]["command"]
 
 
 def test_release_packet_status_infers_legacy_private_beta_acceptance_failures(tmp_path):
@@ -316,6 +326,10 @@ def test_release_packet_status_infers_legacy_private_beta_acceptance_failures(tm
     assert result["failedChecks"] == ["private-beta-evidence"]
     assert private_beta_check["details"]["failedChecks"] == ["private-beta-acceptance"]
     assert private_beta_check["details"]["failedRequirements"] == {"private-beta-acceptance": ["accepted"]}
+    assert [action["id"] for action in private_beta_check["details"]["nextActions"]] == [
+        "record-private-beta-acceptance",
+        "run-private-beta-gate",
+    ]
 
 
 def test_release_packet_status_allows_explicit_pre_store_mobile_packet(tmp_path):
@@ -387,6 +401,8 @@ def test_release_packet_status_accepts_complete_local_packet(tmp_path):
     artifacts = {artifact["flag"]: artifact for artifact in result["artifacts"]}
     assert result["ready"] is True
     assert result["failedChecks"] == []
+    private_beta_check = next(check for check in result["checks"] if check["name"] == "private-beta-evidence")
+    assert private_beta_check["details"]["nextActions"] == []
     assert artifacts["--metadata-backup"]["sha256"] == hashlib.sha256(b"{}").hexdigest()
     assert artifacts["--mail-store-backup"]["sha256"] == hashlib.sha256(b"archive").hexdigest()
     assert artifacts["--restore-drill-evidence"]["sha256"] == hashlib.sha256(
