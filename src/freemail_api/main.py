@@ -225,7 +225,7 @@ COMPONENT_READINESS = {
     "mobile": {
         "status": "source-ready",
         "evidence": [
-            "Expo/React Native client with VPN API target, mailbox sessions, targeted and bulk session revocation, paginated and thread-aware message workflows, conversation lookup, header inspection, EML import/export/share, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder and empty-folder controls, extracted and saved contacts, sender allow/block rules with current-folder block enforcement, recipient allow/block rules with pre-SMTP outbound enforcement, attachments, offline metadata cache, SecureStore-backed development push identity, and push-device flows",
+            "Expo/React Native client with VPN API target, icon tab shell, mailbox sessions, targeted and bulk session revocation, paginated and thread-aware message workflows, conversation lookup, header inspection, EML import/export/share, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder and empty-folder controls, extracted and saved contacts, sender allow/block rules with current-folder block enforcement, recipient allow/block rules with pre-SMTP outbound enforcement, attachments, offline metadata cache, SecureStore-backed development push identity, and push-device flows",
             "bulk read/star/archive/spam/delete/move client controls over the shared mailbox API",
             "mobile preference controls for default compose signatures",
             "compose/send path uses the shared mailbox API contract with Sent Items persistence status",

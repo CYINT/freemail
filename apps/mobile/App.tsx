@@ -1,4 +1,5 @@
 import { StatusBar } from "expo-status-bar";
+import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
@@ -106,6 +107,15 @@ type MailboxPagination = {
   hasMore: boolean;
 };
 
+type MobileTab = "mail" | "people" | "security" | "compose";
+
+const mobileTabs: { id: MobileTab; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { id: "mail", label: "Mail", icon: "mail-outline" },
+  { id: "people", label: "People", icon: "people-outline" },
+  { id: "security", label: "Security", icon: "shield-checkmark-outline" },
+  { id: "compose", label: "Compose", icon: "create-outline" },
+];
+
 export default function App() {
   const [apiBaseUrl, setApiBaseUrl] = useState(defaultApiBaseUrl);
   const [email, setEmail] = useState("");
@@ -151,6 +161,7 @@ export default function App() {
   const [composeAttachments, setComposeAttachments] = useState<SelectedComposeAttachment[]>([]);
   const [status, setStatus] = useState("VPN-only FreeMail mobile preview");
   const [loading, setLoading] = useState(false);
+  const [activeMobileTab, setActiveMobileTab] = useState<MobileTab>("mail");
 
   useEffect(() => {
     loadStoredMailboxSession().then((stored) => {
@@ -1229,7 +1240,28 @@ export default function App() {
             </Pressable>
           </View>
         ) : (
+          <>
+          <View style={styles.mobileTabBar} accessibilityLabel="Mobile shell navigation">
+            {mobileTabs.map((tab) => {
+              const selected = activeMobileTab === tab.id;
+              return (
+                <Pressable
+                  key={tab.id}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={`${tab.label} tab`}
+                  style={[styles.mobileTab, selected ? styles.activeMobileTab : null]}
+                  onPress={() => setActiveMobileTab(tab.id)}
+                >
+                  <Ionicons name={tab.icon} size={18} color={selected ? "#ffffff" : "#445066"} />
+                  <Text style={[styles.mobileTabText, selected ? styles.activeMobileTabText : null]}>{tab.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
           <ScrollView style={styles.workspace} contentContainerStyle={styles.workspaceContent}>
+            {activeMobileTab === "mail" ? (
+              <>
             <View style={styles.panel}>
               <View style={styles.rowHeader}>
                 <Text style={styles.sectionTitle}>{folder}</Text>
@@ -1413,7 +1445,11 @@ export default function App() {
                 </View>
               ))}
             </View>
+              </>
+            ) : null}
 
+            {activeMobileTab === "people" ? (
+              <>
             <View style={styles.panel}>
               <Text style={styles.sectionTitle}>Contacts</Text>
               <View style={styles.inlineControls}>
@@ -1568,7 +1604,11 @@ export default function App() {
                 </View>
               ))}
             </View>
+              </>
+            ) : null}
 
+            {activeMobileTab === "security" ? (
+              <>
             <View style={styles.panel}>
               <Text style={styles.sectionTitle}>Push devices</Text>
               <Text style={styles.meta}>
@@ -1675,7 +1715,10 @@ export default function App() {
                 <Text style={styles.dangerButtonText}>Sign out everywhere</Text>
               </Pressable>
             </View>
+              </>
+            ) : null}
 
+            {activeMobileTab === "compose" ? (
             <View style={styles.panel}>
               <Text style={styles.sectionTitle}>Compose</Text>
               <TextInput value={composeTo} onChangeText={setComposeTo} style={styles.input} autoCapitalize="none" placeholder="To" />
@@ -1704,7 +1747,9 @@ export default function App() {
                 <Text style={styles.primaryButtonText}>Send</Text>
               </Pressable>
             </View>
+            ) : null}
           </ScrollView>
+          </>
         )}
 
         <View style={styles.statusBar}>
@@ -1872,6 +1917,34 @@ const styles = StyleSheet.create({
   panel: { backgroundColor: "#ffffff", borderRadius: 8, padding: 12, gap: 10 },
   workspace: { flex: 1 },
   workspaceContent: { gap: 12, paddingBottom: 12 },
+  mobileTabBar: {
+    backgroundColor: "#e8edf5",
+    borderRadius: 10,
+    flexDirection: "row",
+    gap: 4,
+    padding: 4,
+  },
+  mobileTab: {
+    alignItems: "center",
+    borderRadius: 8,
+    flex: 1,
+    gap: 3,
+    justifyContent: "center",
+    minHeight: 52,
+    paddingHorizontal: 4,
+    paddingVertical: 6,
+  },
+  activeMobileTab: {
+    backgroundColor: "#176b5f",
+  },
+  mobileTabText: {
+    color: "#445066",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  activeMobileTabText: {
+    color: "#ffffff",
+  },
   listPanel: { backgroundColor: "#ffffff", borderRadius: 8, padding: 12, minHeight: 220 },
   readerPanel: { backgroundColor: "#ffffff", borderRadius: 8, padding: 12, minHeight: 140, gap: 10 },
   rowHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
