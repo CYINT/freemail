@@ -518,6 +518,7 @@ def _check_runtime(
                 },
             )
         )
+        checks.append(_check_security_headers(health_url))
     if deployment_url:
         deployment = _fetch_json(deployment_url)
         checks.append(
@@ -610,6 +611,35 @@ def _check_runtime(
     return checks
 
 
+def _check_security_headers(url: str) -> dict[str, Any]:
+    headers = _fetch_headers(url)
+    expected = {
+        "content-security-policy": ["default-src 'self'", "frame-ancestors 'none'", "object-src 'none'"],
+        "cross-origin-opener-policy": ["same-origin"],
+        "permissions-policy": ["camera=()", "microphone=()", "geolocation=()"],
+        "referrer-policy": ["no-referrer"],
+        "x-content-type-options": ["nosniff"],
+        "x-frame-options": ["DENY"],
+    }
+    missing: dict[str, list[str]] = {}
+    observed: dict[str, str | None] = {}
+    for header, required_fragments in expected.items():
+        value = headers.get(header)
+        observed[header] = value
+        missing_fragments = [fragment for fragment in required_fragments if fragment.lower() not in str(value or "").lower()]
+        if missing_fragments:
+            missing[header] = missing_fragments
+    return _check(
+        "runtime-security-headers",
+        not missing,
+        {
+            "url": url,
+            "observed": observed,
+            "missing": missing,
+        },
+    )
+
+
 def _checks_passed(checks: object) -> bool:
     return isinstance(checks, list) and bool(checks) and all(
         isinstance(check, dict) and check.get("status") == "pass" for check in checks
@@ -623,6 +653,11 @@ def _fetch_json(url: str) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ReleaseGateError(f"{url} did not return a JSON object")
     return data
+
+
+def _fetch_headers(url: str) -> dict[str, str]:
+    with urlopen(url, timeout=10) as response:
+        return {str(name).lower(): str(value) for name, value in response.headers.items()}
 
 
 def _check(name: str, passed: bool, details: dict[str, Any]) -> dict[str, Any]:

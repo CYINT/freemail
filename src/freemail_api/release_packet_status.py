@@ -57,7 +57,7 @@ def summarize_release_packet(options: ReleasePacketStatusOptions) -> dict[str, A
         "runtimeChecksExcluded": True,
         "notes": [
             "Read-only packet status only; it does not replace scripts/release_gate.py.",
-            "Git, GitHub Actions, Docker Compose, runtime health, and live VPN boundary checks are intentionally excluded.",
+            "Git, GitHub Actions, Docker Compose, runtime health, runtime security headers, and live VPN boundary checks are intentionally excluded.",
         ],
     }
 

@@ -493,7 +493,7 @@ Before running the hard release gate, inspect the local release packet inventory
 .\.venv\Scripts\python.exe scripts\release_packet_status.py
 ```
 
-Packet status is read-only. By default it uses `.freemail-qa\release\release-evidence-manifest.json` when that ignored manifest exists, always checks the committed `docs\release-notes\v0.1.0-private-beta.md`, and validates restore-drill, mobile release, private-beta, and release-notes evidence locally. It does not replace the hard release gate's GitHub Actions, Docker Compose, VPN runtime, product-readiness, metadata-readiness, or mail-core-readiness checks.
+Packet status is read-only. By default it uses `.freemail-qa\release\release-evidence-manifest.json` when that ignored manifest exists, always checks the committed `docs\release-notes\v0.1.0-private-beta.md`, and validates restore-drill, mobile release, private-beta, and release-notes evidence locally. It does not replace the hard release gate's GitHub Actions, Docker Compose, VPN runtime, runtime security-header, product-readiness, metadata-readiness, or mail-core-readiness checks.
 
 Explicit artifact flags can override manifest entries when evidence is stored in a different location:
 
@@ -534,7 +534,7 @@ The release gate also accepts explicit artifact flags, which override manifest v
   --release-version v0.1.0-private-beta
 ```
 
-The release gate checks clean Git state, remote SHA, GitHub Actions CI, required CI step provenance, Codecov upload completion in that exact CI run, repository secret scan, license-policy scan, open-source readiness, Compose config, loopback-only Compose port bindings for API, web, and mail-core profiles, backup and restore-drill evidence, mobile signed-build/store-submission evidence, controlled-domain private-beta evidence, mail-core apply evidence, release-notes evidence, VPN-only health with the exact candidate commit, deployment metadata, product-readiness component evidence, metadata-store readiness, and mail-core protocol readiness.
+The release gate checks clean Git state, remote SHA, GitHub Actions CI, required CI step provenance, Codecov upload completion in that exact CI run, repository secret scan, license-policy scan, open-source readiness, Compose config, loopback-only Compose port bindings for API, web, and mail-core profiles, backup and restore-drill evidence, mobile signed-build/store-submission evidence, controlled-domain private-beta evidence, mail-core apply evidence, release-notes evidence, VPN-only health with the exact candidate commit, runtime security headers, deployment metadata, product-readiness component evidence, metadata-store readiness, and mail-core protocol readiness.
 
 Offline development can skip individual external or slow checks with explicit `--skip-*` flags, including `--skip-github-ci`, `--skip-ci-step-provenance`, `--skip-codecov-upload`, `--skip-repo-secret-scan`, `--skip-license-policy-scan`, `--skip-open-source-readiness`, `--skip-runtime`, `--skip-backup-evidence`, `--skip-mobile-evidence`, `--skip-private-beta-evidence`, and `--skip-release-notes`. Do not use skipped gates as release evidence.
 

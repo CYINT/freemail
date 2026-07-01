@@ -68,7 +68,7 @@ Explicit artifact flags override manifest values when an artifact has been reloc
   --release-version v0.1.0-private-beta
 ```
 
-The packet status command is read-only. By default it discovers `.freemail-qa\release\release-evidence-manifest.json` when present and checks the committed `docs\release-notes\v0.1.0-private-beta.md`; pass `--manifest` when using a different manifest path. It reports missing, empty, and invalid artifacts, runs the local restore-drill, mobile, private-beta, and release-notes evidence checks, and records SHA-256 checksums for present artifacts. Passing packet status does not replace the full release gate because it intentionally excludes Git, GitHub Actions, Docker Compose, runtime health, deployment-boundary, product-readiness, metadata-readiness, and mail-core-readiness checks.
+The packet status command is read-only. By default it discovers `.freemail-qa\release\release-evidence-manifest.json` when present and checks the committed `docs\release-notes\v0.1.0-private-beta.md`; pass `--manifest` when using a different manifest path. It reports missing, empty, and invalid artifacts, runs the local restore-drill, mobile, private-beta, and release-notes evidence checks, and records SHA-256 checksums for present artifacts. Passing packet status does not replace the full release gate because it intentionally excludes Git, GitHub Actions, Docker Compose, runtime health, runtime security-header, deployment-boundary, product-readiness, metadata-readiness, and mail-core-readiness checks.
 
 Mobile release evidence can also be inspected directly before adding it to the release packet:
 
@@ -126,6 +126,7 @@ The gate verifies:
 - private-beta gate output passes for at least one controlled domain and includes DNS, mail-flow, queue, mail-core apply, deliverability/abuse, backup, restore-drill, and decision-owner acceptance checks
 - release notes exist, are non-empty, include the candidate version, include verification, known-limitations, and VPN-boundary language, contain no placeholder markers, and have a SHA-256 checksum recorded in the gate output
 - `https://freemail.kuzuryu.ai/health` reports VPN-only health and the exact candidate commit
+- `https://freemail.kuzuryu.ai/health` includes the required CSP, opener, permissions, referrer, content-type, and frame-denial security headers
 - `https://freemail.kuzuryu.ai/api/v1/deployment` reports `vpn-only` exposure and `publicInternet: false`
 - `https://freemail.kuzuryu.ai/api/v1/metadata/readiness` reports the expected SQLite metadata schema revision and required table/column checks
 - `https://freemail.kuzuryu.ai/api/v1/mail-core/readiness` reports SMTP, submission, IMAP, and JMAP readiness

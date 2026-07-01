@@ -68,6 +68,7 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
 
     monkeypatch.setattr(release_gate, "_command", fake_command)
     monkeypatch.setattr(release_gate, "_fetch_json", fake_fetch)
+    monkeypatch.setattr(release_gate, "_fetch_headers", lambda _url: valid_security_headers())
 
     result = run_release_gate(
         ReleaseGateOptions(
@@ -117,6 +118,7 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
         "private-beta-evidence",
         "release-notes",
         "runtime-health",
+        "runtime-security-headers",
         "deployment-boundary",
         "product-readiness",
         "metadata-readiness",
@@ -448,12 +450,27 @@ def test_assert_release_gate_raises_for_failed_checks(tmp_path, monkeypatch):
 
 def test_runtime_health_requires_exact_candidate_commit(monkeypatch):
     monkeypatch.setattr(release_gate, "_fetch_json", lambda _url: {"status": "ok", "vpnOnly": True, "release": {"commit": "unknown"}})
+    monkeypatch.setattr(release_gate, "_fetch_headers", lambda _url: valid_security_headers())
 
     checks = release_gate._check_runtime("https://freemail.kuzuryu.ai/health", None, None, "abc123")
 
     assert checks[0]["name"] == "runtime-health"
     assert checks[0]["status"] == "fail"
     assert checks[0]["details"]["releaseCommit"] == "unknown"
+
+
+def test_runtime_security_headers_require_csp(monkeypatch):
+    headers = valid_security_headers()
+    headers.pop("content-security-policy")
+    monkeypatch.setattr(release_gate, "_fetch_json", lambda _url: {"status": "ok", "vpnOnly": True, "release": {"commit": "abc123"}})
+    monkeypatch.setattr(release_gate, "_fetch_headers", lambda _url: headers)
+
+    checks = release_gate._check_runtime("https://freemail.kuzuryu.ai/health", None, None, "abc123")
+    checks_by_name = {check["name"]: check for check in checks}
+
+    assert checks_by_name["runtime-health"]["status"] == "pass"
+    assert checks_by_name["runtime-security-headers"]["status"] == "fail"
+    assert "content-security-policy" in checks_by_name["runtime-security-headers"]["details"]["missing"]
 
 
 def test_runtime_deployment_boundary_requires_vpn_only(monkeypatch):
@@ -720,6 +737,22 @@ def valid_product_readiness():
             "decision-owner private-beta acceptance",
             "real signed native mobile builds",
         ],
+    }
+
+
+def valid_security_headers():
+    return {
+        "content-security-policy": (
+            "default-src 'self'; base-uri 'self'; "
+            "connect-src 'self' http://127.0.0.1:18090 https://freemail.kuzuryu.ai; "
+            "form-action 'self'; frame-ancestors 'none'; img-src 'self' data:; object-src 'none'; "
+            "script-src 'self'; style-src 'self'; upgrade-insecure-requests"
+        ),
+        "cross-origin-opener-policy": "same-origin",
+        "permissions-policy": "camera=(), geolocation=(), microphone=(), payment=(), usb=()",
+        "referrer-policy": "no-referrer",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
     }
 
 

@@ -21,6 +21,7 @@ def test_private_beta_gate_runtime_only_checks_vpn_boundary(monkeypatch):
         return {"status": "ready", "tcpReachable": True, "protocolReady": True}
 
     monkeypatch.setattr("freemail_api.release_gate._fetch_json", fake_fetch)
+    monkeypatch.setattr("freemail_api.release_gate._fetch_headers", lambda _url: valid_security_headers())
 
     result = run_private_beta_gate(
         PrivateBetaGateOptions(runtime_commit="abc123", skip_dns=True, skip_evidence=True)
@@ -29,6 +30,7 @@ def test_private_beta_gate_runtime_only_checks_vpn_boundary(monkeypatch):
     assert result["passed"] is True
     assert [check["name"] for check in result["checks"]] == [
         "runtime-health",
+        "runtime-security-headers",
         "deployment-boundary",
         "metadata-readiness",
         "mail-core-readiness",
@@ -51,6 +53,7 @@ def test_private_beta_gate_runtime_rejects_stale_commit(monkeypatch):
         return {"status": "ready", "tcpReachable": True, "protocolReady": True}
 
     monkeypatch.setattr("freemail_api.release_gate._fetch_json", fake_fetch)
+    monkeypatch.setattr("freemail_api.release_gate._fetch_headers", lambda _url: valid_security_headers())
 
     result = run_private_beta_gate(
         PrivateBetaGateOptions(runtime_commit="abc123", skip_dns=True, skip_evidence=True)
@@ -68,6 +71,17 @@ def test_private_beta_gate_requires_domain_dns_inputs_when_dns_enabled():
     assert result["passed"] is False
     assert result["checks"][0]["name"] == "controlled-domain-dns"
     assert "required" in result["checks"][0]["details"]["error"]
+
+
+def valid_security_headers():
+    return {
+        "content-security-policy": "default-src 'self'; frame-ancestors 'none'; object-src 'none'",
+        "cross-origin-opener-policy": "same-origin",
+        "permissions-policy": "camera=(), geolocation=(), microphone=()",
+        "referrer-policy": "no-referrer",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+    }
 
 
 def test_private_beta_gate_accepts_matching_observed_dns(tmp_path):
