@@ -266,9 +266,48 @@ COMPONENT_READINESS = {
             "real signed native mobile builds",
             "real store-submission evidence",
             "private-beta device validation",
+            "app-store release execution",
         ],
     },
 }
+
+RELEASE_BLOCKER_ACTIONS = {
+    "decision-owner private-beta acceptance": {
+        "id": "record-private-beta-acceptance",
+        "reason": "decision-owner private-beta acceptance evidence is incomplete",
+        "command": ".\\.venv\\Scripts\\python.exe scripts\\collect_private_beta_acceptance.py --domain <domain> --output .freemail-qa\\private-beta\\private-beta-acceptance.<domain>.json --decision-owner <decision-owner> --accepted --accepted-at <iso-8601>",
+    },
+    "private-beta device validation": {
+        "id": "record-mobile-device-validation",
+        "reason": "iOS and Android private-beta device validation evidence is incomplete",
+        "command": ".\\.venv\\Scripts\\python.exe scripts\\collect_mobile_device_validation.py --platform <ios-or-android> --tested --tested-at <iso-8601> --tester <tester> --device-model <device> --os-version <os-version> --app-version <app-version> --evidence-url <https-device-evidence-url> --all-checks-passed",
+    },
+    "real signed native mobile builds": {
+        "id": "record-signed-mobile-build",
+        "reason": "signed iOS and Android native build evidence is incomplete",
+        "command": ".\\.venv\\Scripts\\python.exe scripts\\collect_mobile_build_evidence.py --platform <ios-or-android> --signed --distribution private-beta --build-url <https-build-evidence-url> --native-build-id <native-build-id> --artifact-type <ipa-or-aab> --artifact-bytes <bytes> --artifact-sha256 <sha256>",
+    },
+    "real store-submission evidence": {
+        "id": "record-mobile-store-submission",
+        "reason": "iOS and Android store-submission evidence is incomplete",
+        "command": ".\\.venv\\Scripts\\python.exe scripts\\collect_mobile_store_submission.py --platform <ios-or-android> --submitted --track <testflight-or-internal-testing> --submission-url <https-store-submission-url> --native-build-id <native-build-id> --submitted-at <iso-8601> --review-state <state>",
+    },
+    "app-store release execution": {
+        "id": "complete-app-store-release-execution",
+        "reason": "app-store release execution and final release-gate evidence are not complete",
+        "command": ".\\.venv\\Scripts\\python.exe scripts\\release_gate.py --manifest .freemail-qa\\release\\release-evidence-manifest.json --require-mobile-store-submission",
+    },
+}
+
+
+def release_blocker_next_actions(release_blockers: list[str]) -> list[dict[str, object]]:
+    actions = []
+    blocker_set = set(release_blockers)
+    for blocker, action in RELEASE_BLOCKER_ACTIONS.items():
+        if blocker not in blocker_set:
+            continue
+        actions.append({**action, "releaseBlockers": [blocker]})
+    return actions
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -493,6 +532,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "releaseReady": not release_blockers,
             "components": COMPONENT_READINESS,
             "releaseBlockers": release_blockers,
+            "nextActions": release_blocker_next_actions(release_blockers),
         }
 
     @app.get("/api/v1/deployment")

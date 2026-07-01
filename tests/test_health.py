@@ -65,6 +65,20 @@ def test_product_readiness_reports_component_evidence_and_release_blockers():
     assert payload["components"]["mobile"]["status"] == "source-ready"
     assert "decision-owner private-beta acceptance" in payload["releaseBlockers"]
     assert "real signed native mobile builds" in payload["releaseBlockers"]
+    action_ids = [action["id"] for action in payload["nextActions"]]
+    assert action_ids == [
+        "record-private-beta-acceptance",
+        "record-mobile-device-validation",
+        "record-signed-mobile-build",
+        "record-mobile-store-submission",
+        "complete-app-store-release-execution",
+    ]
+    assert payload["nextActions"][0]["releaseBlockers"] == ["decision-owner private-beta acceptance"]
+    assert "--decision-owner <decision-owner>" in payload["nextActions"][0]["command"]
+    assert "--all-checks-passed" in payload["nextActions"][1]["command"]
+    assert "--artifact-type <ipa-or-aab>" in payload["nextActions"][2]["command"]
+    assert "--track <testflight-or-internal-testing>" in payload["nextActions"][3]["command"]
+    assert "scripts\\release_gate.py" in payload["nextActions"][4]["command"]
 
 
 def test_deployment_is_not_public_internet():

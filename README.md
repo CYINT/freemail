@@ -72,7 +72,7 @@ Run repository hygiene scans before publishing changes:
 
 `scripts\open_source_readiness.py` verifies public-repository hygiene: AGPL license files, contributor/security documents, third-party notices, CI publication gates, ignored secret/signing-material boundaries, dependency-license policy, and VPN/private-beta disclosure. It intentionally reports product-release blockers separately from open-source publication readiness.
 
-`GET /api/v1/product/readiness` reports credential-free component readiness for the admin API, mail-core integration, webmail client, and mobile client. It lists evidence for each component and the remaining release blockers without exposing secrets or operational artifacts.
+`GET /api/v1/product/readiness` reports credential-free component readiness for the admin API, mail-core integration, webmail client, and mobile client. It lists evidence for each component, the remaining release blockers, and placeholder-only `nextActions` for collecting the missing release evidence without exposing secrets or operational artifacts.
 
 ## Admin API
 
