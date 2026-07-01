@@ -320,6 +320,9 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         "Bearer",
         "restoreMailboxSession",
         "persistMailboxSession",
+        "window.sessionStorage.setItem",
+        "window.sessionStorage.getItem",
+        "window.sessionStorage.removeItem",
         "forgetMailboxSession",
         "loadMailboxSessions",
         "revokeMailboxSessionById",
@@ -352,13 +355,17 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
             failures.append(f"missing live mailbox client marker: {marker}")
     if "passwordhash" in html_text(parser).lower() or "passwordHash" in js_text:
         failures.append("web admin client must submit initialPassword, not passwordHash")
-    for forbidden in ["sessionStorage", "document.cookie"]:
+    for forbidden in ["document.cookie"]:
         if forbidden in js_text:
             failures.append(f"mailbox client must not store credentials with {forbidden}")
     if re.search(r"localStorage\.(setItem|getItem)\([^)]*password", js_text, flags=re.IGNORECASE):
         failures.append("mailbox client must not store mailbox passwords in localStorage")
     if re.search(r"password[^;\n]{0,120}localStorage\.(setItem|getItem)", js_text, flags=re.IGNORECASE):
         failures.append("mailbox client must not store mailbox passwords in localStorage")
+    if re.search(r"sessionStorage\.(setItem|getItem)\([^)]*password", js_text, flags=re.IGNORECASE):
+        failures.append("mailbox client must not store mailbox passwords in sessionStorage")
+    if re.search(r"password[^;\n]{0,120}sessionStorage\.(setItem|getItem)", js_text, flags=re.IGNORECASE):
+        failures.append("mailbox client must not store mailbox passwords in sessionStorage")
     return failures
 
 

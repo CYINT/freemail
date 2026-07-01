@@ -23,7 +23,7 @@
           <label>API <input id="api-base-url" name="apiBaseUrl" type="url" value="http://127.0.0.1:18090" required></label>
           <button type="submit">Load mailbox</button>
           <button id="mailbox-logout" type="button">Sign out</button>
-          <p class="form-status" id="mailbox-status" role="status">Mailbox passwords stay server-side in encrypted sessions.</p>
+          <p class="form-status" id="mailbox-status" role="status">Mailbox passwords stay server-side; browser sessions are tab-scoped.</p>
         </form>
         <nav class="folder-nav" id="folder-nav" aria-label="Folders">
           <a class="active" href="#INBOX" data-folder="INBOX"><span>Inbox</span><span>0</span></a>
@@ -229,7 +229,7 @@
             <button type="submit">Save admin session</button>
             <button id="admin-logout" type="button">Sign out admin</button>
             <button id="admin-sessions-revoke-all" type="button">Sign out everywhere</button>
-            <p class="form-status" id="admin-status" role="status">Admin tokens are operator-provided and never bundled with FreeMail.</p>
+            <p class="form-status" id="admin-status" role="status">Admin tokens are operator-provided, never bundled with FreeMail, and tab-scoped in the browser.</p>
           </form>
 
           <div class="admin-grid">

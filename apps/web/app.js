@@ -2198,7 +2198,8 @@ function safeDownloadName(value) {
 
 function restoreMailboxSession() {
   try {
-    const stored = JSON.parse(window.localStorage.getItem(mailboxSessionStorageKey) || "null");
+    window.localStorage.removeItem(mailboxSessionStorageKey);
+    const stored = JSON.parse(window.sessionStorage.getItem(mailboxSessionStorageKey) || "null");
     if (!stored?.token || !stored?.apiBaseUrl) {
       return;
     }
@@ -2227,7 +2228,8 @@ function restoreMailboxSession() {
 }
 
 function persistMailboxSession(session) {
-  window.localStorage.setItem(
+  window.localStorage.removeItem(mailboxSessionStorageKey);
+  window.sessionStorage.setItem(
     mailboxSessionStorageKey,
     JSON.stringify({
       email: session.email,
@@ -2240,6 +2242,7 @@ function persistMailboxSession(session) {
 
 function forgetMailboxSession() {
   window.localStorage.removeItem(mailboxSessionStorageKey);
+  window.sessionStorage.removeItem(mailboxSessionStorageKey);
   mailboxSession = { email: "", token: "", apiBaseUrl: "", folder: "INBOX" };
   mailboxPreferences = { displayName: "", signature: "" };
   selectedMessageDetail = null;
@@ -2294,7 +2297,7 @@ async function saveAdminSession({ apiBaseUrl, adminEmail, adminPassword, adminTo
     }
   }
   persistAdminSession(adminSession);
-  setAdminStatus(hasAdminCredential() ? "Admin session saved in this browser profile." : "Admin settings saved.", "ready");
+  setAdminStatus(hasAdminCredential() ? "Admin session saved for this browser tab." : "Admin settings saved.", "ready");
   if (adminSession.adminBearerToken) {
     await loadAdminSessions({ quiet: true });
   }
@@ -2912,7 +2915,8 @@ function tableCell(value) {
 
 function restoreAdminSession() {
   try {
-    const stored = JSON.parse(window.localStorage.getItem(adminSessionStorageKey) || "null");
+    window.localStorage.removeItem(adminSessionStorageKey);
+    const stored = JSON.parse(window.sessionStorage.getItem(adminSessionStorageKey) || "null");
     if (!stored?.apiBaseUrl) {
       return;
     }
@@ -2941,7 +2945,8 @@ function restoreAdminSession() {
 }
 
 function persistAdminSession(session) {
-  window.localStorage.setItem(
+  window.localStorage.removeItem(adminSessionStorageKey);
+  window.sessionStorage.setItem(
     adminSessionStorageKey,
     JSON.stringify({
       apiBaseUrl: session.apiBaseUrl,
@@ -2955,6 +2960,7 @@ function persistAdminSession(session) {
 
 function forgetAdminSession() {
   window.localStorage.removeItem(adminSessionStorageKey);
+  window.sessionStorage.removeItem(adminSessionStorageKey);
   adminSession = { apiBaseUrl: "", adminToken: "", adminBearerToken: "", adminEmail: "", bootstrapToken: "" };
 }
 

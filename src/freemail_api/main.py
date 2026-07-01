@@ -215,7 +215,7 @@ COMPONENT_READINESS = {
             "persistent mailbox preferences with default compose signatures and saved address-book contacts",
             "server-side Drafts persistence and compose reopen support for saved drafts",
             "server-side Sent Items persistence for accepted outbound messages",
-            "token-gated admin console for bootstrap, MFA setup, users, password rotation, domains, mailboxes, aliases, DKIM, DNS guidance, status actions, sync status, and audit logs",
+            "tab-scoped browser bearer-session storage and token-gated admin console for bootstrap, MFA setup, users, password rotation, domains, mailboxes, aliases, DKIM, DNS guidance, status actions, sync status, and audit logs",
             "browser and static QA in CI",
         ],
         "remainingReleaseEvidence": [
