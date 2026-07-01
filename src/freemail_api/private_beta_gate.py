@@ -327,13 +327,9 @@ def _check_acceptance(path: Path | None) -> dict[str, Any]:
     payload = _load_json(path)
     boundary = str(payload.get("accessBoundary", ""))
     limitations = payload.get("knownLimitations", [])
+    failed_requirements = _acceptance_failed_requirements(payload, boundary, limitations)
     passed = (
-        payload.get("accepted") is True
-        and _is_timezone_aware_iso8601(payload.get("acceptedAt"))
-        and bool(str(payload.get("decisionOwner", "")).strip())
-        and "vpn" in boundary.lower()
-        and isinstance(limitations, list)
-        and bool(limitations)
+        not failed_requirements
     )
     return _check(
         "private-beta-acceptance",
@@ -346,9 +342,38 @@ def _check_acceptance(path: Path | None) -> dict[str, Any]:
                 "decisionOwner": payload.get("decisionOwner"),
                 "accessBoundary": payload.get("accessBoundary"),
                 "knownLimitations": len(limitations) if isinstance(limitations, list) else 0,
+                "failedRequirements": failed_requirements,
             },
         ),
     )
+
+
+def _acceptance_failed_requirements(
+    payload: dict[str, Any],
+    boundary: str,
+    limitations: Any,
+) -> list[str]:
+    failed: list[str] = []
+    if payload.get("accepted") is not True:
+        failed.append("accepted")
+    if not _is_timezone_aware_iso8601(payload.get("acceptedAt")):
+        failed.append("acceptedAt")
+    if not str(payload.get("decisionOwner", "")).strip():
+        failed.append("decisionOwner")
+    if "vpn" not in boundary.lower():
+        failed.append("accessBoundary-vpn")
+    if not isinstance(limitations, list) or not limitations:
+        failed.append("knownLimitations")
+        return failed
+    normalized_limitations = " ".join(str(limitation).lower() for limitation in limitations)
+    required_terms = {
+        "knownLimitations-private-beta": "private beta",
+        "knownLimitations-controlled-domain": "controlled-domain",
+        "knownLimitations-mobile": "mobile",
+        "knownLimitations-store-submission": "store-submission",
+    }
+    failed.extend(name for name, term in required_terms.items() if term not in normalized_limitations)
+    return failed
 
 
 def _check_file(name: str, path: Path | None, flag: str) -> dict[str, Any]:

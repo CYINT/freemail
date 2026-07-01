@@ -21,7 +21,6 @@ def test_collect_private_beta_acceptance_writes_gate_payload(tmp_path):
             decision_owner="CEO",
             accepted=True,
             accepted_at=datetime(2026, 6, 30, 0, 0, tzinfo=UTC),
-            known_limitations=("Private beta only",),
         )
     )
 
@@ -30,8 +29,27 @@ def test_collect_private_beta_acceptance_writes_gate_payload(tmp_path):
     assert payload["acceptedAt"] == "2026-06-30T00:00:00Z"
     assert payload["decisionOwner"] == "CEO"
     assert payload["domain"] == "example.com"
-    assert payload["knownLimitations"] == ["Private beta only"]
+    assert payload["knownLimitations"] == [
+        "Private beta only; do not expose FreeMail to the public internet.",
+        "Controlled-domain DNS, mail-flow, queue, mail-core apply, deliverability, backup, and restore evidence must be current.",
+        "Signed mobile builds and store-submission evidence remain required before app-store release.",
+    ]
     assert json.loads(output.read_text(encoding="utf-8")) == payload
+
+
+def test_collect_private_beta_acceptance_rejects_vague_limitations(tmp_path):
+    payload = collect_private_beta_acceptance(
+        PrivateBetaAcceptanceOptions(
+            domain="example.com",
+            output=tmp_path / "acceptance.json",
+            decision_owner="CEO",
+            accepted=True,
+            accepted_at=datetime(2026, 6, 30, tzinfo=UTC),
+            known_limitations=("Private beta only",),
+        )
+    )
+
+    assert payload["passed"] is False
 
 
 def test_collect_private_beta_acceptance_stays_failing_without_explicit_acceptance(tmp_path):
@@ -93,7 +111,11 @@ def test_collect_private_beta_acceptance_script_exits_success_when_accepted(tmp_
             "--accepted-at",
             "2026-06-30T00:00:00Z",
             "--known-limitation",
-            "Private beta only",
+            "Private beta only; do not expose FreeMail to the public internet.",
+            "--known-limitation",
+            "Controlled-domain DNS, mail-flow, queue, mail-core apply, deliverability, backup, and restore evidence must be current.",
+            "--known-limitation",
+            "Signed mobile builds and store-submission evidence remain required before app-store release.",
         ],
         capture_output=True,
         text=True,

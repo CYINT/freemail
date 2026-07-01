@@ -54,12 +54,23 @@ def collect_private_beta_acceptance(options: PrivateBetaAcceptanceOptions) -> di
 
 
 def _accepted(payload: dict[str, Any]) -> bool:
+    limitations = payload.get("knownLimitations")
     return (
         payload.get("accepted") is True
         and bool(str(payload.get("decisionOwner", "")).strip())
         and "vpn" in str(payload.get("accessBoundary", "")).lower()
-        and isinstance(payload.get("knownLimitations"), list)
-        and bool(payload.get("knownLimitations"))
+        and isinstance(limitations, list)
+        and _required_limitations_acknowledged(limitations)
+    )
+
+
+def _required_limitations_acknowledged(limitations: list[Any]) -> bool:
+    normalized = " ".join(str(limitation).lower() for limitation in limitations)
+    return (
+        "private beta" in normalized
+        and "controlled-domain" in normalized
+        and "mobile" in normalized
+        and "store-submission" in normalized
     )
 
 

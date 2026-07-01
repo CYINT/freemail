@@ -236,7 +236,11 @@ def test_private_beta_gate_script_accepts_manifest_packet(tmp_path):
                 "acceptedAt": "2026-06-30T00:00:00Z",
                 "decisionOwner": "CEO",
                 "accessBoundary": "Dragonscale/VPN clients only",
-                "knownLimitations": ["private beta only"],
+                "knownLimitations": [
+                    "Private beta only; do not expose FreeMail to the public internet.",
+                    "Controlled-domain DNS, mail-flow, queue, mail-core apply, deliverability, backup, and restore evidence must be current.",
+                    "Signed mobile builds and store-submission evidence remain required before app-store release.",
+                ],
             }
         ),
         encoding="utf-8",

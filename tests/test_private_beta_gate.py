@@ -418,7 +418,11 @@ def test_private_beta_gate_rejects_acceptance_without_accepted_at(tmp_path):
                 "accepted": True,
                 "decisionOwner": "CEO",
                 "accessBoundary": "Dragonscale/VPN clients only",
-                "knownLimitations": ["private beta only"],
+                "knownLimitations": [
+                    "Private beta only; do not expose FreeMail to the public internet.",
+                    "Controlled-domain DNS, mail-flow, queue, mail-core apply, deliverability, backup, and restore evidence must be current.",
+                    "Signed mobile builds and store-submission evidence remain required before app-store release.",
+                ],
             }
         ),
         encoding="utf-8",
@@ -428,6 +432,7 @@ def test_private_beta_gate_rejects_acceptance_without_accepted_at(tmp_path):
 
     assert check["status"] == "fail"
     assert check["details"]["acceptedAt"] is None
+    assert "acceptedAt" in check["details"]["failedRequirements"]
 
 
 def test_private_beta_gate_rejects_malformed_acceptance_timestamp(tmp_path):
@@ -439,7 +444,11 @@ def test_private_beta_gate_rejects_malformed_acceptance_timestamp(tmp_path):
                 "acceptedAt": "after review",
                 "decisionOwner": "CEO",
                 "accessBoundary": "Dragonscale/VPN clients only",
-                "knownLimitations": ["private beta only"],
+                "knownLimitations": [
+                    "Private beta only; do not expose FreeMail to the public internet.",
+                    "Controlled-domain DNS, mail-flow, queue, mail-core apply, deliverability, backup, and restore evidence must be current.",
+                    "Signed mobile builds and store-submission evidence remain required before app-store release.",
+                ],
             }
         ),
         encoding="utf-8",
@@ -470,6 +479,31 @@ def test_private_beta_gate_rejects_timezone_free_acceptance_timestamp(tmp_path):
 
     assert check["status"] == "fail"
     assert check["details"]["acceptedAt"] == "2026-06-30T00:00:00"
+
+
+def test_private_beta_gate_rejects_acceptance_without_required_limitations(tmp_path):
+    acceptance = tmp_path / "acceptance.json"
+    acceptance.write_text(
+        json.dumps(
+            {
+                "accepted": True,
+                "acceptedAt": "2026-06-30T00:00:00Z",
+                "decisionOwner": "CEO",
+                "accessBoundary": "Dragonscale/VPN clients only",
+                "knownLimitations": ["private beta only"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    check = private_beta_gate._check_acceptance(acceptance)
+
+    assert check["status"] == "fail"
+    assert check["details"]["failedRequirements"] == [
+        "knownLimitations-controlled-domain",
+        "knownLimitations-mobile",
+        "knownLimitations-store-submission",
+    ]
 
 
 def test_private_beta_gate_rejects_mail_flow_without_checked_at(tmp_path):
@@ -684,7 +718,14 @@ def test_private_beta_gate_accepts_complete_beta_evidence(tmp_path):
                 "acceptedAt": "2026-06-30T00:00:00Z",
                 "decisionOwner": "CEO",
                 "accessBoundary": "Dragonscale/VPN clients only",
-                "knownLimitations": ["private beta only"],
+                "knownLimitations": [
+                    "Private beta only; do not expose FreeMail to the public internet.",
+                    (
+                        "Controlled-domain DNS, mail-flow, queue, mail-core apply, deliverability, "
+                        "backup, and restore evidence must be current."
+                    ),
+                    "Signed mobile builds and store-submission evidence remain required before app-store release.",
+                ],
             }
         ),
         encoding="utf-8",
