@@ -41,6 +41,8 @@ def test_mobile_release_gate_accepts_signed_build_evidence(tmp_path):
 
     assert result["passed"] is True
     assert result["evidenceDetails"]["sha256"] == hashlib.sha256(evidence.read_bytes()).hexdigest()
+    app_metadata = next(check for check in result["checks"] if check["name"] == "app-metadata")
+    assert app_metadata["details"]["failedRequirements"] == []
 
 
 def test_mobile_release_gate_accepts_store_submission_evidence_when_required(tmp_path):
@@ -424,6 +426,53 @@ def test_mobile_release_gate_rejects_build_with_wrong_native_build_id(tmp_path):
     ios_check = next(check for check in result["checks"] if check["name"] == "ios-signed-build")
     assert ios_check["status"] == "fail"
     assert ios_check["details"]["expectedNativeBuildId"] == "1"
+
+
+def test_mobile_release_gate_reports_stale_native_build_metadata(tmp_path):
+    app_config = tmp_path / "app.json"
+    evidence = tmp_path / "mobile-release.json"
+    write_json(
+        app_config,
+        {
+            "expo": {
+                "name": "FreeMail",
+                "version": "0.1.0-dev",
+                "scheme": "freemail",
+                "ios": {
+                    "bundleIdentifier": "technology.cyint.freemail",
+                    "buildNumber": "2",
+                    "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
+                },
+                "android": {
+                    "package": "technology.cyint.freemail",
+                    "versionCode": 3,
+                    "intentFilters": [
+                        {
+                            "action": "VIEW",
+                            "autoVerify": True,
+                            "data": [{"scheme": "https", "host": "freemail.kuzuryu.ai"}],
+                            "category": ["BROWSABLE", "DEFAULT"],
+                        }
+                    ],
+                },
+                "extra": {"apiBaseUrl": "https://freemail.kuzuryu.ai"},
+            }
+        },
+    )
+    write_json(evidence, valid_evidence())
+
+    result = run_mobile_release_gate(MobileReleaseGateOptions(evidence=evidence, app_config=app_config))
+
+    app_metadata = next(check for check in result["checks"] if check["name"] == "app-metadata")
+    assert result["passed"] is False
+    assert app_metadata["status"] == "fail"
+    assert app_metadata["details"]["failedRequirements"] == [
+        "evidence-native-builds-ios",
+        "evidence-native-builds-android",
+    ]
+    assert app_metadata["details"]["iosBuildNumber"] == "2"
+    assert app_metadata["details"]["androidVersionCode"] == "3"
+    assert app_metadata["details"]["evidenceNativeBuilds"] == {"ios": "1", "android": "1"}
 
 
 def test_mobile_release_gate_rejects_insecure_store_submission_url(tmp_path):

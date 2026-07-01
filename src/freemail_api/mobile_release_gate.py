@@ -102,25 +102,27 @@ def _check_app_metadata(app_config: dict[str, Any], evidence: dict[str, Any]) ->
     native_builds = evidence.get("nativeBuilds", {}) if isinstance(evidence.get("nativeBuilds"), dict) else {}
     ios_build_number = str(app_config.get("ios", {}).get("buildNumber", "")).strip()
     android_version_code = str(app_config.get("android", {}).get("versionCode", "")).strip()
-    passed = (
-        app_config.get("name") == "FreeMail"
-        and app_config.get("scheme") == EXPECTED_URL_SCHEME
-        and app_config.get("ios", {}).get("bundleIdentifier") == EXPECTED_IOS_BUNDLE_ID
-        and bool(ios_build_number)
-        and EXPECTED_ASSOCIATED_DOMAIN in app_config.get("ios", {}).get("associatedDomains", [])
-        and app_config.get("android", {}).get("package") == EXPECTED_ANDROID_PACKAGE
-        and bool(android_version_code)
-        and _has_android_invite_intent_filter(app_config)
-        and app_config.get("extra", {}).get("apiBaseUrl") == EXPECTED_API_BASE_URL
-        and app.get("name") == app_config.get("name")
-        and app.get("version") == app_config.get("version")
-        and app.get("apiBaseUrl") == EXPECTED_API_BASE_URL
-        and str(native_builds.get("ios", "")).strip() == ios_build_number
-        and str(native_builds.get("android", "")).strip() == android_version_code
-    )
+    requirements = {
+        "app-config-name": app_config.get("name") == "FreeMail",
+        "app-config-scheme": app_config.get("scheme") == EXPECTED_URL_SCHEME,
+        "app-config-ios-bundle": app_config.get("ios", {}).get("bundleIdentifier") == EXPECTED_IOS_BUNDLE_ID,
+        "app-config-ios-build-number": bool(ios_build_number),
+        "app-config-ios-associated-domain": EXPECTED_ASSOCIATED_DOMAIN
+        in app_config.get("ios", {}).get("associatedDomains", []),
+        "app-config-android-package": app_config.get("android", {}).get("package") == EXPECTED_ANDROID_PACKAGE,
+        "app-config-android-version-code": bool(android_version_code),
+        "app-config-android-invite-intent-filter": _has_android_invite_intent_filter(app_config),
+        "app-config-api-base-url": app_config.get("extra", {}).get("apiBaseUrl") == EXPECTED_API_BASE_URL,
+        "evidence-app-name": app.get("name") == app_config.get("name"),
+        "evidence-app-version": app.get("version") == app_config.get("version"),
+        "evidence-api-base-url": app.get("apiBaseUrl") == EXPECTED_API_BASE_URL,
+        "evidence-native-builds-ios": str(native_builds.get("ios", "")).strip() == ios_build_number,
+        "evidence-native-builds-android": str(native_builds.get("android", "")).strip() == android_version_code,
+    }
+    failed_requirements = [name for name, passed in requirements.items() if not passed]
     return _check(
         "app-metadata",
-        passed,
+        not failed_requirements,
         {
             "name": app.get("name"),
             "version": app.get("version"),
@@ -133,6 +135,7 @@ def _check_app_metadata(app_config: dict[str, Any], evidence: dict[str, Any]) ->
             "androidVersionCode": android_version_code,
             "androidInviteIntentFilter": _has_android_invite_intent_filter(app_config),
             "evidenceNativeBuilds": native_builds,
+            "failedRequirements": failed_requirements,
         },
     )
 

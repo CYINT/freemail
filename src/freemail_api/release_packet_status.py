@@ -106,9 +106,19 @@ def _mobile_release_check(
         {
             "requireStoreSubmission": require_store_submission,
             "failedChecks": [check["name"] for check in result["checks"] if check["status"] != "pass"],
+            "failedRequirements": _mobile_failed_requirements(result["checks"]),
             "evidenceDetails": result["evidenceDetails"],
         },
     )
+
+
+def _mobile_failed_requirements(checks: list[dict[str, Any]]) -> dict[str, list[str]]:
+    return {
+        check["name"]: list(failed_requirements)
+        for check in checks
+        for failed_requirements in [check.get("details", {}).get("failedRequirements")]
+        if check["status"] != "pass" and isinstance(failed_requirements, list) and failed_requirements
+    }
 
 
 def _restore_drill_check(path: Path | None) -> dict[str, Any]:
