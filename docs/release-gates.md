@@ -77,7 +77,7 @@ Mobile release evidence can also be inspected directly before adding it to the r
   --require-store-submission
 ```
 
-This mobile status command is read-only and reports missing or failing signed-build and store-submission checks without running native build tools or contacting store APIs. By default, mobile evidence helpers use `.freemail-qa\mobile-release-evidence.freemail.kuzuryu.ai.json`, falling back to an existing `.freemail-qa\mobile-release-evidence.json` only for backward compatibility. The top-level packet status command expects `--require-mobile-store-submission` whenever mobile evidence is present; `--allow-pre-store-mobile-packet` is reserved for explicit pre-store dry runs and must not be used as final release evidence.
+This mobile status command is read-only and reports missing or failing signed-build and store-submission checks without running native build tools or contacting store APIs. Failed mobile checks include a `failedRequirements` list for missing or stale app metadata, signed-build fields, real-device validation fields, and store-submission fields. By default, mobile evidence helpers use `.freemail-qa\mobile-release-evidence.freemail.kuzuryu.ai.json`, falling back to an existing `.freemail-qa\mobile-release-evidence.json` only for backward compatibility. The top-level packet status command expects `--require-mobile-store-submission` whenever mobile evidence is present; `--allow-pre-store-mobile-packet` is reserved for explicit pre-store dry runs and must not be used as final release evidence.
 
 Stamp the runtime with the candidate commit before collecting release evidence:
 

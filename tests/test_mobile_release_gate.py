@@ -133,6 +133,108 @@ def test_mobile_release_gate_requires_store_submission_evidence_when_enabled(tmp
     assert result["checks"][-1]["status"] == "fail"
 
 
+def test_mobile_release_gate_reports_actionable_failed_requirements_for_draft_evidence(tmp_path):
+    app_config = tmp_path / "app.json"
+    evidence = tmp_path / "mobile-release.json"
+    write_json(
+        app_config,
+        {
+            "expo": {
+                "name": "FreeMail",
+                "version": "0.1.0-dev",
+                "scheme": "freemail",
+                "ios": {
+                    "bundleIdentifier": "technology.cyint.freemail",
+                    "buildNumber": "1",
+                    "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
+                },
+                "android": {
+                    "package": "technology.cyint.freemail",
+                    "versionCode": 1,
+                    "intentFilters": [
+                        {
+                            "action": "VIEW",
+                            "autoVerify": True,
+                            "data": [{"scheme": "https", "host": "freemail.kuzuryu.ai"}],
+                            "category": ["BROWSABLE", "DEFAULT"],
+                        }
+                    ],
+                },
+                "extra": {"apiBaseUrl": "https://freemail.kuzuryu.ai"},
+            }
+        },
+    )
+    write_json(
+        evidence,
+        {
+            "app": {"name": "FreeMail", "version": "0.1.0-dev", "apiBaseUrl": "https://freemail.kuzuryu.ai"},
+            "nativeBuilds": {"ios": "1", "android": "1"},
+            "builds": {
+                "ios": {
+                    "identifier": "technology.cyint.freemail",
+                    "nativeBuildId": "1",
+                    "signed": False,
+                    "artifact": {"type": "ipa"},
+                },
+                "android": {
+                    "identifier": "technology.cyint.freemail",
+                    "nativeBuildId": "1",
+                    "signed": False,
+                    "artifact": {"type": "aab"},
+                },
+            },
+            "deviceValidation": {
+                "ios": {"platform": "ios", "tested": False, "checks": []},
+                "android": {"platform": "android", "tested": False, "checks": []},
+            },
+            "storeSubmissions": {"ios": {}, "android": {}},
+            "privateBetaBoundary": {
+                "hostname": "freemail.kuzuryu.ai",
+                "vpnOnly": True,
+                "publicInternet": False,
+                "requiredBoundary": "Dragonscale/VPN clients only",
+            },
+        },
+    )
+
+    result = run_mobile_release_gate(
+        MobileReleaseGateOptions(evidence=evidence, app_config=app_config, require_store_submission=True)
+    )
+    checks = {check["name"]: check for check in result["checks"]}
+
+    assert result["passed"] is False
+    assert checks["ios-signed-build"]["details"]["failedRequirements"] == [
+        "signed",
+        "distribution",
+        "artifact-sha256",
+        "artifact-bytes",
+        "build-url",
+    ]
+    assert checks["android-device-validation"]["details"]["failedRequirements"] == [
+        "tested",
+        "tested-at",
+        "tester",
+        "device-model",
+        "os-version",
+        "app-version",
+        "hostname",
+        "network-boundary",
+        "evidence-url",
+        "required-checks",
+    ]
+    assert checks["ios-store-submission"]["details"]["failedRequirements"] == [
+        "store",
+        "identifier",
+        "native-build-id",
+        "signed-build-native-build-id",
+        "track",
+        "submitted",
+        "submission-url",
+        "submitted-at",
+        "review-state",
+    ]
+
+
 def test_mobile_release_gate_rejects_secret_bearing_evidence(tmp_path):
     app_config = tmp_path / "app.json"
     evidence = tmp_path / "mobile-release.json"

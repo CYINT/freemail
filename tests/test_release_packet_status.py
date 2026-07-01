@@ -117,7 +117,7 @@ def test_release_packet_status_reports_mobile_draft_failures(tmp_path):
     assert result["missingArtifacts"] == []
     assert result["failedChecks"] == ["mobile-release-evidence", "mobile-store-submission-requirement"]
     assert mobile_check["details"]["failedChecks"] == ["ios-signed-build"]
-    assert mobile_check["details"]["failedRequirements"] == {}
+    assert mobile_check["details"]["failedRequirements"] == {"ios-signed-build": ["signed"]}
     store_requirement = next(check for check in result["checks"] if check["name"] == "mobile-store-submission-requirement")
     assert store_requirement["status"] == "fail"
 
@@ -163,6 +163,50 @@ def test_release_packet_status_reports_mobile_metadata_failed_requirements(tmp_p
             "evidence-native-builds-android",
         ]
     }
+
+
+def test_release_packet_status_reports_mobile_child_failed_requirements(tmp_path):
+    metadata = tmp_path / "metadata.json"
+    mail_store = tmp_path / "mail-store.tar.gz"
+    restore = tmp_path / "restore.json"
+    mobile_evidence = tmp_path / "mobile-release-evidence.json"
+    app_config = tmp_path / "app.json"
+    private_beta = tmp_path / "private-beta.json"
+    release_notes = tmp_path / "release-notes.md"
+    write_json(metadata, {"ok": True})
+    mail_store.write_bytes(b"mail-store")
+    write_json(restore, valid_restore_drill_evidence())
+    mobile_payload = valid_mobile_release_evidence()
+    mobile_payload["builds"]["ios"]["signed"] = False
+    mobile_payload["deviceValidation"]["android"]["checks"] = [
+        {"name": "vpn-dns-resolution", "status": "pass"}
+    ]
+    mobile_payload["storeSubmissions"]["ios"]["submitted"] = False
+    write_json(mobile_evidence, mobile_payload)
+    write_json(app_config, valid_mobile_app_config())
+    write_json(private_beta, valid_private_beta_evidence())
+    write_release_notes(release_notes)
+
+    result = summarize_release_packet(
+        ReleasePacketStatusOptions(
+            metadata_backup=metadata,
+            mail_store_backup=mail_store,
+            restore_drill_evidence=restore,
+            mobile_release_evidence=mobile_evidence,
+            mobile_app_config=app_config,
+            private_beta_evidence=private_beta,
+            release_notes=release_notes,
+            release_version="v0.1.0-private-beta",
+            require_mobile_store_submission=True,
+        )
+    )
+
+    mobile_check = next(check for check in result["checks"] if check["name"] == "mobile-release-evidence")
+    assert mobile_check["details"]["failedRequirements"]["ios-signed-build"] == ["signed"]
+    assert mobile_check["details"]["failedRequirements"]["android-device-validation"] == [
+        "required-checks"
+    ]
+    assert mobile_check["details"]["failedRequirements"]["ios-store-submission"] == ["submitted"]
 
 
 def test_release_packet_status_reports_private_beta_failed_requirements(tmp_path):

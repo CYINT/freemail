@@ -172,19 +172,20 @@ def _check_platform_build(evidence: dict[str, Any], *, platform: str) -> dict[st
     expected_native_build_id = _expected_native_build_id(evidence, platform)
     expected_artifact_types = {"ipa"} if platform == "ios" else {"aab", "apk"}
     artifact = build.get("artifact", {})
-    passed = (
-        build.get("signed") is True
-        and build.get("identifier") == expected_identifier
-        and str(build.get("nativeBuildId", "")).strip() == expected_native_build_id
-        and build.get("distribution") in {"internal", "private-beta", "store-review", "production"}
-        and artifact.get("type") in expected_artifact_types
-        and _is_sha256(artifact.get("sha256"))
-        and int(artifact.get("bytes", 0) or 0) > 0
-        and _is_https_url(build.get("buildUrl"))
-    )
+    requirements = {
+        "identifier": build.get("identifier") == expected_identifier,
+        "native-build-id": str(build.get("nativeBuildId", "")).strip() == expected_native_build_id,
+        "signed": build.get("signed") is True,
+        "distribution": build.get("distribution") in {"internal", "private-beta", "store-review", "production"},
+        "artifact-type": artifact.get("type") in expected_artifact_types,
+        "artifact-sha256": _is_sha256(artifact.get("sha256")),
+        "artifact-bytes": int(artifact.get("bytes", 0) or 0) > 0,
+        "build-url": _is_https_url(build.get("buildUrl")),
+    }
+    failed_requirements = _failed_requirements(requirements)
     return _check(
         f"{platform}-signed-build",
-        passed,
+        not failed_requirements,
         {
             "identifier": build.get("identifier"),
             "nativeBuildId": build.get("nativeBuildId"),
@@ -195,6 +196,7 @@ def _check_platform_build(evidence: dict[str, Any], *, platform: str) -> dict[st
             "artifactBytes": artifact.get("bytes"),
             "artifactSha256": artifact.get("sha256"),
             "buildUrl": build.get("buildUrl"),
+            "failedRequirements": failed_requirements,
         },
     )
 
@@ -238,24 +240,26 @@ def _check_device_validation(evidence: dict[str, Any], app_config: dict[str, Any
         "offline-cache",
     }
     app = evidence.get("app", {})
-    passed = (
-        validation.get("platform") == platform
-        and validation.get("tested") is True
-        and _is_timezone_aware_iso8601(validation.get("testedAt"))
-        and bool(str(validation.get("tester", "")).strip())
-        and bool(str(validation.get("deviceModel", "")).strip())
-        and bool(str(validation.get("osVersion", "")).strip())
-        and validation.get("appVersion") == app.get("version") == app_config.get("version")
-        and str(validation.get("hostname", "")).lower() == "freemail.kuzuryu.ai"
-        and "vpn" in str(validation.get("networkBoundary", "")).lower()
-        and _is_https_url(validation.get("evidenceUrl"))
-        and isinstance(checks, list)
-        and not required_checks.difference(check_names)
-        and not failed_checks
-    )
+    missing_checks = sorted(required_checks.difference(check_names))
+    requirements = {
+        "platform": validation.get("platform") == platform,
+        "tested": validation.get("tested") is True,
+        "tested-at": _is_timezone_aware_iso8601(validation.get("testedAt")),
+        "tester": bool(str(validation.get("tester", "")).strip()),
+        "device-model": bool(str(validation.get("deviceModel", "")).strip()),
+        "os-version": bool(str(validation.get("osVersion", "")).strip()),
+        "app-version": validation.get("appVersion") == app.get("version") == app_config.get("version"),
+        "hostname": str(validation.get("hostname", "")).lower() == "freemail.kuzuryu.ai",
+        "network-boundary": "vpn" in str(validation.get("networkBoundary", "")).lower(),
+        "evidence-url": _is_https_url(validation.get("evidenceUrl")),
+        "checks-list": isinstance(checks, list),
+        "required-checks": not missing_checks,
+        "passing-checks": not failed_checks,
+    }
+    failed_requirements = _failed_requirements(requirements)
     return _check(
         f"{platform}-device-validation",
-        passed,
+        not failed_requirements,
         {
             "platform": validation.get("platform"),
             "tested": validation.get("tested"),
@@ -267,8 +271,9 @@ def _check_device_validation(evidence: dict[str, Any], app_config: dict[str, Any
             "hostname": validation.get("hostname"),
             "networkBoundary": validation.get("networkBoundary"),
             "evidenceUrl": validation.get("evidenceUrl"),
-            "missingChecks": sorted(required_checks.difference(check_names)),
+            "missingChecks": missing_checks,
             "failedChecks": failed_checks,
+            "failedRequirements": failed_requirements,
         },
     )
 
@@ -280,20 +285,22 @@ def _check_store_submission(evidence: dict[str, Any], *, platform: str) -> dict[
     expected_identifier = EXPECTED_IOS_BUNDLE_ID if platform == "ios" else EXPECTED_ANDROID_PACKAGE
     expected_native_build_id = _expected_native_build_id(evidence, platform)
     allowed_tracks = {"internal", "testflight", "private-beta", "closed-testing", "internal-testing", "store-review"}
-    passed = (
-        submission.get("store") == expected_store
-        and submission.get("identifier") == expected_identifier
-        and str(submission.get("nativeBuildId", "")).strip() == expected_native_build_id
-        and str(submission.get("nativeBuildId", "")).strip() == str(build.get("nativeBuildId", "")).strip()
-        and submission.get("track") in allowed_tracks
-        and submission.get("submitted") is True
-        and _is_https_url(submission.get("submissionUrl"))
-        and _is_timezone_aware_iso8601(submission.get("submittedAt"))
-        and bool(str(submission.get("reviewState", "")).strip())
-    )
+    requirements = {
+        "store": submission.get("store") == expected_store,
+        "identifier": submission.get("identifier") == expected_identifier,
+        "native-build-id": str(submission.get("nativeBuildId", "")).strip() == expected_native_build_id,
+        "signed-build-native-build-id": str(submission.get("nativeBuildId", "")).strip()
+        == str(build.get("nativeBuildId", "")).strip(),
+        "track": submission.get("track") in allowed_tracks,
+        "submitted": submission.get("submitted") is True,
+        "submission-url": _is_https_url(submission.get("submissionUrl")),
+        "submitted-at": _is_timezone_aware_iso8601(submission.get("submittedAt")),
+        "review-state": bool(str(submission.get("reviewState", "")).strip()),
+    }
+    failed_requirements = _failed_requirements(requirements)
     return _check(
         f"{platform}-store-submission",
-        passed,
+        not failed_requirements,
         {
             "store": submission.get("store"),
             "identifier": submission.get("identifier"),
@@ -305,6 +312,7 @@ def _check_store_submission(evidence: dict[str, Any], *, platform: str) -> dict[
             "submissionUrl": submission.get("submissionUrl"),
             "submittedAt": submission.get("submittedAt"),
             "reviewState": submission.get("reviewState"),
+            "failedRequirements": failed_requirements,
         },
     )
 
@@ -313,6 +321,10 @@ def _expected_native_build_id(evidence: dict[str, Any], platform: str) -> str:
     native_builds = evidence.get("nativeBuilds") if isinstance(evidence.get("nativeBuilds"), dict) else {}
     value = native_builds.get(platform) if isinstance(native_builds, dict) else None
     return str(value or "").strip()
+
+
+def _failed_requirements(requirements: dict[str, bool]) -> list[str]:
+    return [name for name, passed in requirements.items() if not passed]
 
 
 def _load_json(path: Path) -> dict[str, Any]:
