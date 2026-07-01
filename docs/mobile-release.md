@@ -96,6 +96,8 @@ Before launching EAS, verify that GitHub Actions can see the workflow and the re
 
 This check is read-only and credential-free. It lists missing secret names such as `EXPO_TOKEN`, but it never reads or prints secret values.
 
+Every completed Mobile EAS Private Beta workflow run uploads a credential-free `workflow-summary.json` artifact named `freemail-mobile-eas-workflow-summary-<run-id>-<attempt>`. The summary records repository, workflow, run ID, commit, platform, profile, submit-after-build mode, and the collector command templates. It is an operator handoff artifact only; signed-build evidence still requires the real EAS build URL, native build ID, artifact type, byte count, and SHA-256 hash.
+
 The EAS build result is not release evidence by itself. After each signed build, use `scripts\collect_mobile_build_evidence.py` to record credential-free artifact provenance, including the native build identifier from `apps/mobile/app.json`, and then validate it with `scripts\mobile_release_status.py`.
 
 ## Signing Material

@@ -85,6 +85,32 @@ jobs:
             --platform "${{ inputs.platform }}" \
             --profile "${{ inputs.profile }}" \
             --latest
+      - name: Prepare credential-free workflow summary
+        if: ${{ always() }}
+        run: |
+          mkdir -p .freemail-qa/mobile-eas
+          cat > .freemail-qa/mobile-eas/workflow-summary.json <<JSON
+          {
+            "credentialFree": true,
+            "repository": "${{ github.repository }}",
+            "workflow": "${{ github.workflow }}",
+            "runId": "${{ github.run_id }}",
+            "runAttempt": "${{ github.run_attempt }}",
+            "commit": "${{ github.sha }}",
+            "platform": "${{ inputs.platform }}",
+            "profile": "${{ inputs.profile }}",
+            "submitAfterBuild": ${{ inputs.submit_after_build }},
+            "buildEvidenceCommand": "python scripts/collect_mobile_build_evidence.py --platform <ios-or-android> --signed --distribution private-beta --build-url <https-build-evidence-url> --native-build-id <native-build-id> --artifact-type <ipa-or-aab> --artifact-bytes <bytes> --artifact-sha256 <sha256>",
+            "storeSubmissionEvidenceCommand": "python scripts/collect_mobile_store_submission.py --platform <ios-or-android> --submitted --track <testflight-or-internal-testing> --submission-url <https-store-submission-url> --native-build-id <native-build-id> --submitted-at <iso-8601> --review-state <state>"
+          }
+          JSON
+      - name: Upload credential-free workflow summary
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: freemail-mobile-eas-workflow-summary-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .freemail-qa/mobile-eas/workflow-summary.json
+          if-no-files-found: error
       - name: Evidence reminder
         run: |
           echo "After this run completes, record credential-free build and optional store-submission evidence with:"
