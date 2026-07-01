@@ -131,6 +131,24 @@ def _check_admin_console(browser, expect, base_url: str, output_dir: Path) -> li
     def api_response(route):
         request = route.request
         parsed = urlparse(request.url)
+        if request.method == "POST" and parsed.path == "/api/v1/admin/session":
+            return _fulfill_json(route, {"email": "admin@example.com", "token": "admin-bearer-token", "expiresAt": 1782864000})
+        if request.method == "GET" and parsed.path == "/api/v1/admin/sessions":
+            return _fulfill_json(
+                route,
+                {
+                    "email": "admin@example.com",
+                    "sessions": [
+                        {
+                            "id": 7,
+                            "email": "admin@example.com",
+                            "expiresAt": 1782864000,
+                            "createdAt": "2026-06-30T00:00:00Z",
+                            "current": True,
+                        }
+                    ],
+                },
+            )
         if request.method == "GET" and parsed.path == "/api/v1/admin/domains":
             return _fulfill_json(route, [{"id": 1, "name": "example.com", "status": "active"}])
         if request.method == "GET" and parsed.path == "/api/v1/admin/users":
@@ -197,10 +215,16 @@ def _check_admin_console(browser, expect, base_url: str, output_dir: Path) -> li
         page.route("**/api/v1/admin/**", api_response)
         page.goto(base_url, wait_until="networkidle")
         page.locator("#admin-api-base-url").fill(base_url.rstrip("/"))
+        page.locator("#admin-email").fill("admin@example.com")
+        page.locator("#admin-password").fill("correct horse battery")
         page.locator("#admin-token").fill("test-admin-token")
         page.locator("#bootstrap-token").fill("test-bootstrap-token")
         page.locator("#admin-auth button[type='submit']").click()
         expect(page.locator("#admin-status")).to_contain_text("Admin session saved")
+        expect(page.get_by_role("heading", name="Admin sessions for admin@example.com (1)")).to_be_visible()
+        expect(page.get_by_label("Admin console").get_by_role("button", name="Sign out", exact=True)).to_be_visible()
+        page.locator("#admin-sessions-refresh").click()
+        expect(page.get_by_role("heading", name="Admin sessions for admin@example.com (1)")).to_be_visible()
         page.locator("#admin-refresh-action").click()
         expect(page.get_by_role("heading", name="Domains (1)")).to_be_visible()
         expect(page.get_by_role("heading", name="Audit log (1 of 1)")).to_be_visible()

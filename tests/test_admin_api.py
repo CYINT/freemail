@@ -319,6 +319,145 @@ def test_admin_session_revoke_blocks_bearer_admin_api(tmp_path):
     assert response.json()["detail"] == "Invalid admin session"
 
 
+def test_admin_sessions_list_marks_current_session(tmp_path):
+    settings = Settings(
+        database_path=str(tmp_path / "freemail.sqlite"),
+        bootstrap_token=BOOTSTRAP_TOKEN,
+        release_commit="test",
+    )
+    with TestClient(create_app(settings)) as client:
+        client.post(
+            "/api/v1/bootstrap/admin",
+            headers=bootstrap_headers(),
+            json={
+                "domainName": "example.com",
+                "email": "admin@example.com",
+                "displayName": "Admin User",
+                "initialPassword": "correct horse battery",
+                "mailboxLocalPart": "admin",
+            },
+        )
+        first_session = client.post(
+            "/api/v1/admin/session",
+            json={"email": "admin@example.com", "password": "correct horse battery"},
+        )
+        second_session = client.post(
+            "/api/v1/admin/session",
+            json={"email": "admin@example.com", "password": "correct horse battery"},
+        )
+        response = client.get(
+            "/api/v1/admin/sessions",
+            headers={"Authorization": f"Bearer {second_session.json()['token']}"},
+        )
+
+    assert first_session.status_code == 200
+    assert second_session.status_code == 200
+    assert response.status_code == 200
+    body = response.json()
+    assert body["email"] == "admin@example.com"
+    assert len(body["sessions"]) == 2
+    assert sum(1 for session in body["sessions"] if session["current"]) == 1
+    assert all("token" not in session for session in body["sessions"])
+
+
+def test_admin_sessions_delete_revokes_all_admin_sessions_for_current_user(tmp_path):
+    settings = Settings(
+        database_path=str(tmp_path / "freemail.sqlite"),
+        bootstrap_token=BOOTSTRAP_TOKEN,
+        release_commit="test",
+    )
+    with TestClient(create_app(settings)) as client:
+        client.post(
+            "/api/v1/bootstrap/admin",
+            headers=bootstrap_headers(),
+            json={
+                "domainName": "example.com",
+                "email": "admin@example.com",
+                "displayName": "Admin User",
+                "initialPassword": "correct horse battery",
+                "mailboxLocalPart": "admin",
+            },
+        )
+        first_session = client.post(
+            "/api/v1/admin/session",
+            json={"email": "admin@example.com", "password": "correct horse battery"},
+        )
+        second_session = client.post(
+            "/api/v1/admin/session",
+            json={"email": "admin@example.com", "password": "correct horse battery"},
+        )
+        delete_response = client.delete(
+            "/api/v1/admin/sessions",
+            headers={"Authorization": f"Bearer {first_session.json()['token']}"},
+        )
+        first_domains = client.get(
+            "/api/v1/admin/domains",
+            headers={"Authorization": f"Bearer {first_session.json()['token']}"},
+        )
+        second_domains = client.get(
+            "/api/v1/admin/domains",
+            headers={"Authorization": f"Bearer {second_session.json()['token']}"},
+        )
+
+    assert delete_response.status_code == 200
+    assert delete_response.json()["revoked"] == 2
+    assert first_domains.status_code == 401
+    assert second_domains.status_code == 401
+
+
+def test_admin_session_revoke_by_id_is_scoped_to_current_user(tmp_path):
+    with make_client(tmp_path) as client:
+        first_records = create_admin_mailbox_records(client)
+        second_user = client.post(
+            "/api/v1/admin/users",
+            headers=admin_headers(),
+            json={
+                "email": "second@example.com",
+                "displayName": "Second Admin",
+                "initialPassword": "correct horse battery",
+                "isAdmin": True,
+                "adminRole": "admin",
+            },
+        )
+        first_session = client.post(
+            "/api/v1/admin/session",
+            json={"email": "admin@example.com", "password": "correct horse battery"},
+        )
+        second_session = client.post(
+            "/api/v1/admin/session",
+            json={"email": "second@example.com", "password": "correct horse battery"},
+        )
+        second_sessions = client.get(
+            "/api/v1/admin/sessions",
+            headers={"Authorization": f"Bearer {second_session.json()['token']}"},
+        )
+        second_session_id = second_sessions.json()["sessions"][0]["id"]
+        scoped_delete = client.delete(
+            f"/api/v1/admin/sessions/{second_session_id}",
+            headers={"Authorization": f"Bearer {first_session.json()['token']}"},
+        )
+        second_domains_after_scoped_delete = client.get(
+            "/api/v1/admin/domains",
+            headers={"Authorization": f"Bearer {second_session.json()['token']}"},
+        )
+        own_delete = client.delete(
+            f"/api/v1/admin/sessions/{second_session_id}",
+            headers={"Authorization": f"Bearer {second_session.json()['token']}"},
+        )
+        second_domains_after_own_delete = client.get(
+            "/api/v1/admin/domains",
+            headers={"Authorization": f"Bearer {second_session.json()['token']}"},
+        )
+
+    assert first_records["user_id"] != second_user.json()["id"]
+    assert scoped_delete.status_code == 200
+    assert scoped_delete.json() == {"revoked": False, "sessionId": second_session_id}
+    assert second_domains_after_scoped_delete.status_code == 200
+    assert own_delete.status_code == 200
+    assert own_delete.json() == {"revoked": True, "sessionId": second_session_id}
+    assert second_domains_after_own_delete.status_code == 401
+
+
 def test_admin_totp_mfa_setup_enforces_login_code_and_can_disable(tmp_path):
     settings = Settings(
         database_path=str(tmp_path / "freemail.sqlite"),

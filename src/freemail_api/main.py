@@ -55,6 +55,9 @@ from .schemas import (
     AdminSessionCreate,
     AdminSessionDeleteRecord,
     AdminSessionRecord,
+    AdminSessionRevokeRecord,
+    AdminSessionsDeleteRecord,
+    AdminSessionsRecord,
     AdminStatusUpdate,
     AdminTotpSetupRecord,
     AdminTotpStatusRecord,
@@ -189,7 +192,7 @@ COMPONENT_READINESS = {
         "status": "ready",
         "evidence": [
             "administrator bootstrap, bearer-session login, and authenticator-app MFA",
-            "domain, user, user-password rotation, suspension-triggered session revocation, mailbox quota, alias, DKIM, DNS, status, and filterable audit APIs",
+            "domain, user, user-password rotation, suspension-triggered session revocation, admin session inspection/revocation, mailbox quota, alias, DKIM, DNS, status, and filterable audit APIs",
             "metadata readiness endpoint and backup/restore coverage",
         ],
         "remainingReleaseEvidence": [],
@@ -508,6 +511,53 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if token:
             revoke_admin_session(connection, token)
         return {"revoked": True}
+
+    @app.get("/api/v1/admin/sessions", response_model=AdminSessionsRecord)
+    def admin_sessions_list(
+        authorization: str | None = Header(default=None),
+        principal: AdminPrincipal = Depends(require_admin),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        token = bearer_token(authorization)
+        token_hash = hash_session_token(token) if token else ""
+        rows = database.list_admin_sessions_for_user(
+            connection,
+            user_id=principal.user_id,
+            now=_current_time(),
+        )
+        return {
+            "email": principal.email,
+            "sessions": [
+                {
+                    "id": int(row["id"]),
+                    "email": str(row["email"]),
+                    "expires_at": int(row["expires_at"]),
+                    "created_at": str(row["created_at"]),
+                    "current": str(row["token_hash"]) == token_hash,
+                }
+                for row in rows
+            ],
+        }
+
+    @app.delete("/api/v1/admin/sessions", response_model=AdminSessionsDeleteRecord)
+    def admin_sessions_delete(
+        principal: AdminPrincipal = Depends(require_admin),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, int]:
+        return {"revoked": database.revoke_admin_sessions_for_user(connection, user_id=principal.user_id)}
+
+    @app.delete("/api/v1/admin/sessions/{session_id}", response_model=AdminSessionRevokeRecord)
+    def admin_session_revoke(
+        session_id: int = Path(ge=1),
+        principal: AdminPrincipal = Depends(require_admin),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        revoked = database.revoke_admin_session_for_user(
+            connection,
+            user_id=principal.user_id,
+            session_id=session_id,
+        )
+        return {"revoked": revoked, "session_id": session_id}
 
     @app.post("/api/v1/admin/mfa/totp/setup", response_model=AdminTotpSetupRecord)
     def admin_totp_setup(

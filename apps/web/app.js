@@ -79,6 +79,8 @@ const bootstrapTokenInput = document.querySelector("#bootstrap-token");
 const adminStatus = document.querySelector("#admin-status");
 const adminLogoutAction = document.querySelector("#admin-logout");
 const adminSyncPlanAction = document.querySelector("#admin-sync-plan-action");
+const adminSessionsRefresh = document.querySelector("#admin-sessions-refresh");
+const adminSessionsRevokeAll = document.querySelector("#admin-sessions-revoke-all");
 const adminRefreshAction = document.querySelector("#admin-refresh-action");
 const bootstrapAdminForm = document.querySelector("#bootstrap-admin-form");
 const adminDomainForm = document.querySelector("#admin-domain-form");
@@ -402,6 +404,14 @@ adminLogoutAction?.addEventListener("click", async () => {
 
 adminSyncPlanAction?.addEventListener("click", async () => {
   await loadMailCoreSyncPlanStatus();
+});
+
+adminSessionsRefresh?.addEventListener("click", async () => {
+  await loadAdminSessions();
+});
+
+adminSessionsRevokeAll?.addEventListener("click", async () => {
+  await revokeAllAdminSessions();
 });
 
 adminRefreshAction?.addEventListener("click", async () => {
@@ -2285,6 +2295,9 @@ async function saveAdminSession({ apiBaseUrl, adminEmail, adminPassword, adminTo
   }
   persistAdminSession(adminSession);
   setAdminStatus(hasAdminCredential() ? "Admin session saved in this browser profile." : "Admin settings saved.", "ready");
+  if (adminSession.adminBearerToken) {
+    await loadAdminSessions({ quiet: true });
+  }
 }
 
 async function setupAdminTotp() {
@@ -2374,6 +2387,91 @@ async function revokeAdminSession() {
     }
   }
   setAdminStatus("Admin signed out.", "idle");
+}
+
+async function loadAdminSessions({ quiet = false } = {}) {
+  if (!adminSession.apiBaseUrl || !adminSession.adminBearerToken) {
+    setAdminStatus("Sign in with admin email and password before loading admin sessions.", "error");
+    return;
+  }
+  if (!quiet) {
+    setAdminStatus("Loading admin sessions...", "loading");
+  }
+  try {
+    const response = await fetch(new URL("/api/v1/admin/sessions", adminSession.apiBaseUrl), {
+      headers: adminHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const result = await response.json();
+    renderAdminSessions(result);
+    if (!quiet) {
+      setAdminStatus("Admin sessions loaded.", "ready");
+    }
+  } catch (error) {
+    setAdminStatus(`Admin sessions failed: ${readableError(error)}`, "error");
+  }
+}
+
+async function revokeAllAdminSessions() {
+  if (!adminSession.apiBaseUrl || !adminSession.adminBearerToken) {
+    setAdminStatus("Sign in with admin email and password before revoking admin sessions.", "error");
+    return;
+  }
+  const apiBaseUrl = adminSession.apiBaseUrl;
+  const headers = adminHeaders();
+  setAdminStatus("Signing out all admin sessions...", "loading");
+  try {
+    const response = await fetch(new URL("/api/v1/admin/sessions", apiBaseUrl), {
+      method: "DELETE",
+      headers,
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const result = await response.json();
+    forgetAdminSession();
+    renderAdminResult("Admin sessions revoked", result);
+    setAdminStatus("All admin sessions signed out.", "idle");
+  } catch (error) {
+    setAdminStatus(`Admin session revoke failed: ${readableError(error)}`, "error");
+  }
+}
+
+async function revokeAdminSessionById(session) {
+  if (!adminSession.apiBaseUrl || !adminSession.adminBearerToken) {
+    setAdminStatus("Sign in with admin email and password before revoking admin sessions.", "error");
+    return;
+  }
+  const apiBaseUrl = adminSession.apiBaseUrl;
+  const headers = adminHeaders();
+  setAdminStatus("Revoking admin session...", "loading");
+  try {
+    const response = await fetch(new URL(`/api/v1/admin/sessions/${session.id}`, apiBaseUrl), {
+      method: "DELETE",
+      headers,
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const result = await response.json();
+    if (!result.revoked) {
+      setAdminStatus("Admin session was already signed out.", "idle");
+      await loadAdminSessions({ quiet: true });
+      return;
+    }
+    if (session.current) {
+      forgetAdminSession();
+      renderAdminResult("Admin session revoked", result);
+      setAdminStatus("Current admin session signed out.", "idle");
+      return;
+    }
+    await loadAdminSessions({ quiet: true });
+    setAdminStatus("Admin session revoked.", "ready");
+  } catch (error) {
+    setAdminStatus(`Admin session revoke failed: ${readableError(error)}`, "error");
+  }
 }
 
 async function bootstrapAdministrator(payload) {
@@ -2506,6 +2604,31 @@ function renderAdminOverview({ domains, users, mailboxes, aliases, dkimKeys, aud
       statusActiveValue: "active",
     }),
     adminAuditLogPanel(auditLog),
+  );
+}
+
+function renderAdminSessions(payload) {
+  const sessions = payload.sessions || [];
+  if (!adminResults) {
+    return;
+  }
+  const tableRows = sessions.map((session) => ({
+    id: session.id,
+    email: session.email,
+    expiresAt: formatSessionExpiry(session.expiresAt),
+    createdAt: session.createdAt,
+    current: session.current ? "yes" : "no",
+  }));
+  adminResults.replaceChildren(
+    adminTable(`Admin sessions for ${payload.email || adminSession.adminEmail}`, tableRows, [
+      "id",
+      "email",
+      "expiresAt",
+      "createdAt",
+      "current",
+    ], {
+      extraActions: [adminSessionRevokeAction(sessions)],
+    }),
   );
 }
 
@@ -2698,6 +2821,13 @@ function adminActionButton(label, onClick) {
 
 function domainDnsAction(row) {
   return adminActionButton("DNS", () => loadDomainDnsGuidance(row.id));
+}
+
+function adminSessionRevokeAction(sessions) {
+  return (row) => {
+    const session = sessions.find((candidate) => Number(candidate.id) === Number(row.id)) || row;
+    return adminActionButton(row.current === "yes" ? "Sign out" : "Revoke", () => revokeAdminSessionById(session));
+  };
 }
 
 async function updateAdminStatus(basePath, recordId, statusValue) {

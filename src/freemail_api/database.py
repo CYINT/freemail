@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS admin_sessions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires_at ON admin_sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_admin_sessions_user_expires_at ON admin_sessions(user_id, expires_at);
 
 CREATE TABLE IF NOT EXISTS admin_totp_secrets (
     user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -774,9 +775,44 @@ def get_admin_session(connection: sqlite3.Connection, token_hash: str, now: int)
     ).fetchone()
 
 
+def list_admin_sessions_for_user(
+    connection: sqlite3.Connection,
+    *,
+    user_id: int,
+    now: int,
+) -> list[sqlite3.Row]:
+    delete_expired_admin_sessions(connection, now)
+    return list(
+        connection.execute(
+            """
+            SELECT id, user_id, email, expires_at, created_at, token_hash
+            FROM admin_sessions
+            WHERE user_id = ? AND expires_at > ?
+            ORDER BY created_at DESC, id DESC
+            """,
+            [user_id, now],
+        )
+    )
+
+
 def revoke_admin_session(connection: sqlite3.Connection, token_hash: str) -> None:
     connection.execute("DELETE FROM admin_sessions WHERE token_hash = ?", [token_hash])
     connection.commit()
+
+
+def revoke_admin_sessions_for_user(connection: sqlite3.Connection, *, user_id: int) -> int:
+    cursor = connection.execute("DELETE FROM admin_sessions WHERE user_id = ?", [user_id])
+    connection.commit()
+    return int(cursor.rowcount)
+
+
+def revoke_admin_session_for_user(connection: sqlite3.Connection, *, user_id: int, session_id: int) -> bool:
+    cursor = connection.execute(
+        "DELETE FROM admin_sessions WHERE user_id = ? AND id = ?",
+        [user_id, session_id],
+    )
+    connection.commit()
+    return int(cursor.rowcount) > 0
 
 
 def delete_expired_admin_sessions(connection: sqlite3.Connection, now: int) -> None:

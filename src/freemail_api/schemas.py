@@ -87,6 +87,28 @@ class AdminSessionDeleteRecord(ApiModel):
     revoked: bool
 
 
+class AdminSessionSummary(ApiModel):
+    id: int
+    email: EmailStr
+    expires_at: int
+    created_at: str
+    current: bool
+
+
+class AdminSessionsRecord(ApiModel):
+    email: EmailStr
+    sessions: list[AdminSessionSummary]
+
+
+class AdminSessionsDeleteRecord(ApiModel):
+    revoked: int
+
+
+class AdminSessionRevokeRecord(ApiModel):
+    revoked: bool
+    session_id: int
+
+
 class AdminTotpSetupRecord(ApiModel):
     secret: str
     otpauth_uri: str

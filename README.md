@@ -24,8 +24,8 @@ The FreeMail program includes:
 
 This repository is at the implementation baseline. It contains:
 
-- A FastAPI admin/runtime API with persistent SQLite-backed domain, user, user-password rotation, mailbox, mailbox-quota, alias, mailbox sender-rule, and filterable audit-log surfaces.
-- A static webmail preview shell with inbox, paginated search and folder loading, thread-aware conversation lookup, saved and extracted contacts, sender allow/block rules, message reader, header inspection, read/unread and star controls, EML import/export, bulk message actions, persistent preferences/signatures, account session management, compose, draft saving and editing, folder navigation and empty-folder controls, token-gated admin setup, and responsive layout QA.
+- A FastAPI admin/runtime API with persistent SQLite-backed domain, user, user-password rotation, admin session, mailbox, mailbox-quota, alias, mailbox sender-rule, and filterable audit-log surfaces.
+- A static webmail preview shell with inbox, paginated search and folder loading, thread-aware conversation lookup, saved and extracted contacts, sender allow/block rules, message reader, header inspection, read/unread and star controls, EML import/export, bulk message actions, persistent preferences/signatures, account session management, compose, draft saving and editing, folder navigation and empty-folder controls, token-gated admin setup with bearer-session inspection and revocation, and responsive layout QA.
 - An Expo/React Native mobile client scaffold with secure session storage, account session management, paginated and thread-aware mailbox workflows, conversation lookup, saved and extracted contacts, sender allow/block rules, persistent preferences/signatures, draft saving and editing, message header inspection, read/unread and star controls, EML import/export/share, bulk archive/spam/delete/read/star actions, folder emptying, and static QA.
 - A Docker Compose stack with VPN-only loopback bindings by default.
 - A Stalwart mail-core candidate profile for the first architecture spike.
@@ -76,12 +76,15 @@ Run repository hygiene scans before publishing changes:
 
 ## Admin API
 
-Admin endpoints accept either a bearer token from `POST /api/v1/admin/session` or the legacy `X-FreeMail-Admin-Token` operator token. Static admin-token access remains disabled until `FREEMAIL_ADMIN_API_TOKEN` is set; do not commit a real token. The webmail preview includes an operator admin console for bootstrap, admin email/password sign-in, authenticator-app MFA setup, static-token fallback, domain, user, user-password rotation, mailbox, mailbox quota, alias, DKIM, DNS-guidance, suspension/reactivation, and audit-log workflows. Bootstrap and user creation accept one-time `initialPassword` values and hash them server-side with Argon2id before storage. Suspending a user, mailbox, or domain actively revokes affected mailbox bearer sessions; suspending a user also revokes that user's admin bearer sessions.
+Admin endpoints accept either a bearer token from `POST /api/v1/admin/session` or the legacy `X-FreeMail-Admin-Token` operator token. Static admin-token access remains disabled until `FREEMAIL_ADMIN_API_TOKEN` is set; do not commit a real token. The webmail preview includes an operator admin console for bootstrap, admin email/password sign-in, authenticator-app MFA setup, static-token fallback, admin bearer-session inspection and revocation, domain, user, user-password rotation, mailbox, mailbox quota, alias, DKIM, DNS-guidance, suspension/reactivation, and audit-log workflows. Bootstrap and user creation accept one-time `initialPassword` values and hash them server-side with Argon2id before storage. Suspending a user, mailbox, or domain actively revokes affected mailbox bearer sessions; suspending a user also revokes that user's admin bearer sessions.
 
 Initial endpoints:
 
 - `POST /api/v1/admin/session`
 - `DELETE /api/v1/admin/session`
+- `GET /api/v1/admin/sessions`
+- `DELETE /api/v1/admin/sessions`
+- `DELETE /api/v1/admin/sessions/{sessionId}`
 - `POST /api/v1/admin/mfa/totp/setup`
 - `POST /api/v1/admin/mfa/totp/verify`
 - `DELETE /api/v1/admin/mfa/totp`
@@ -113,7 +116,7 @@ The current metadata store is SQLite at `FREEMAIL_DB_PATH`, defaulting to `data/
 
 The bootstrap endpoint requires `X-FreeMail-Bootstrap-Token`, refuses to run unless `FREEMAIL_BOOTSTRAP_TOKEN` is configured, and refuses to create a second administrator after the first admin exists.
 
-Admin password login verifies active administrator users against the stored Argon2id hash, creates a hashed bearer session, and stores no password material in the session table. Administrators can set up authenticator-app MFA after sign-in. TOTP setup secrets are returned once for enrollment, stored encrypted with `FREEMAIL_SESSION_SECRET`, and only become required after `POST /api/v1/admin/mfa/totp/verify` accepts a valid code. Once enabled, `POST /api/v1/admin/session` requires `totpCode` in addition to email and password. Suspending an administrator deletes that user's admin sessions and any mailbox sessions for mailboxes owned by the user.
+Admin password login verifies active administrator users against the stored Argon2id hash, creates a hashed bearer session, and stores no password material in the session table. Administrators can list their own active bearer sessions, see which session is current, revoke one selected session, or sign out all of their admin sessions. Static `X-FreeMail-Admin-Token` access is intentionally not represented as a revocable bearer session. Administrators can set up authenticator-app MFA after sign-in. TOTP setup secrets are returned once for enrollment, stored encrypted with `FREEMAIL_SESSION_SECRET`, and only become required after `POST /api/v1/admin/mfa/totp/verify` accepts a valid code. Once enabled, `POST /api/v1/admin/session` requires `totpCode` in addition to email and password. Suspending an administrator deletes that user's admin sessions and any mailbox sessions for mailboxes owned by the user.
 
 `PATCH /api/v1/admin/users/{userId}/password` rotates the FreeMail identity password hash for the selected user, revokes existing admin sessions for that user, and writes an audit-log event without returning password material. It does not rotate the separate Stalwart/mail-core account secret in `secrets\mail-core-users.json`; operators must update that ignored secret and apply the Stalwart plan when changing mailbox protocol credentials.
 
