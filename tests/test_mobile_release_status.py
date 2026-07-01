@@ -81,6 +81,11 @@ def test_mobile_release_status_reports_failed_gate_checks_for_draft(tmp_path):
         "build-url",
     }
     assert "<https-build-evidence-url>" in result["nextActions"][0]["command"]
+    assert "--native-build-id <ios-build-number>" in result["nextActions"][0]["command"]
+    assert "--artifact-type ipa" in result["nextActions"][0]["command"]
+    assert "--all-checks-passed" in result["nextActions"][2]["command"]
+    assert "--track testflight" in result["nextActions"][4]["command"]
+    assert "--submitted-at <iso-8601>" in result["nextActions"][4]["command"]
     assert result["evidenceDetails"]["sha256"]
 
 
@@ -127,6 +132,8 @@ def test_mobile_release_status_script_exits_nonzero_until_ready(tmp_path):
         "record-ios-store-submission",
         "record-android-store-submission",
     ]
+    assert "--native-build-id <ios-build-number>" in payload["nextActions"][0]["command"]
+    assert "--track internal-testing" in payload["nextActions"][1]["command"]
 
 
 def test_mobile_release_status_script_discovers_domain_specific_default_evidence(tmp_path):

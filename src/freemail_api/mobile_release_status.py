@@ -16,32 +16,32 @@ NEXT_ACTIONS_BY_CHECK = {
     "ios-signed-build": {
         "id": "record-ios-signed-build",
         "reason": "iOS signed-build evidence is incomplete",
-        "command": ".\\.venv\\Scripts\\python.exe scripts\\collect_mobile_build_evidence.py --platform ios --signed --build-url <https-build-evidence-url> --artifact-sha256 <sha256> --artifact-bytes <bytes>",
+        "command": ".\\.venv\\Scripts\\python.exe scripts\\collect_mobile_build_evidence.py --platform ios --signed --distribution private-beta --build-url <https-build-evidence-url> --native-build-id <ios-build-number> --artifact-type ipa --artifact-bytes <bytes> --artifact-sha256 <sha256>",
     },
     "android-signed-build": {
         "id": "record-android-signed-build",
         "reason": "Android signed-build evidence is incomplete",
-        "command": ".\\.venv\\Scripts\\python.exe scripts\\collect_mobile_build_evidence.py --platform android --signed --build-url <https-build-evidence-url> --artifact-sha256 <sha256> --artifact-bytes <bytes>",
+        "command": ".\\.venv\\Scripts\\python.exe scripts\\collect_mobile_build_evidence.py --platform android --signed --distribution private-beta --build-url <https-build-evidence-url> --native-build-id <android-version-code> --artifact-type aab --artifact-bytes <bytes> --artifact-sha256 <sha256>",
     },
     "ios-device-validation": {
         "id": "record-ios-device-validation",
         "reason": "iOS real-device validation evidence is incomplete",
-        "command": ".\\.venv\\Scripts\\python.exe scripts\\collect_mobile_device_validation.py --platform ios --tested --tester <tester> --device-model <device> --os-version <ios-version> --app-version <app-version> --evidence-url <https-device-evidence-url>",
+        "command": ".\\.venv\\Scripts\\python.exe scripts\\collect_mobile_device_validation.py --platform ios --tested --tested-at <iso-8601> --tester <tester> --device-model <device> --os-version <ios-version> --app-version <app-version> --evidence-url <https-device-evidence-url> --all-checks-passed",
     },
     "android-device-validation": {
         "id": "record-android-device-validation",
         "reason": "Android real-device validation evidence is incomplete",
-        "command": ".\\.venv\\Scripts\\python.exe scripts\\collect_mobile_device_validation.py --platform android --tested --tester <tester> --device-model <device> --os-version <android-version> --app-version <app-version> --evidence-url <https-device-evidence-url>",
+        "command": ".\\.venv\\Scripts\\python.exe scripts\\collect_mobile_device_validation.py --platform android --tested --tested-at <iso-8601> --tester <tester> --device-model <device> --os-version <android-version> --app-version <app-version> --evidence-url <https-device-evidence-url> --all-checks-passed",
     },
     "ios-store-submission": {
         "id": "record-ios-store-submission",
         "reason": "iOS TestFlight or App Store Connect submission evidence is incomplete",
-        "command": ".\\.venv\\Scripts\\python.exe scripts\\collect_mobile_store_submission.py --platform ios --submitted --submission-url <https-store-submission-url> --review-state <state>",
+        "command": ".\\.venv\\Scripts\\python.exe scripts\\collect_mobile_store_submission.py --platform ios --submitted --track testflight --submission-url <https-store-submission-url> --native-build-id <ios-build-number> --submitted-at <iso-8601> --review-state <state>",
     },
     "android-store-submission": {
         "id": "record-android-store-submission",
         "reason": "Android Play Console submission evidence is incomplete",
-        "command": ".\\.venv\\Scripts\\python.exe scripts\\collect_mobile_store_submission.py --platform android --submitted --submission-url <https-store-submission-url> --review-state <state>",
+        "command": ".\\.venv\\Scripts\\python.exe scripts\\collect_mobile_store_submission.py --platform android --submitted --track internal-testing --submission-url <https-store-submission-url> --native-build-id <android-version-code> --submitted-at <iso-8601> --review-state <state>",
     },
     "mobile-release-evidence": {
         "id": "create-mobile-release-evidence-template",
