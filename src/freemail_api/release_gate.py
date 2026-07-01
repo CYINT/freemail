@@ -434,6 +434,7 @@ def _check_private_beta_evidence(path: Path | None) -> dict[str, Any]:
             ]
             if isinstance(checks, list)
             else ["checks"],
+            "failedRequirements": _private_beta_failed_requirements(checks),
         }
     )
     passed = (
@@ -444,6 +445,20 @@ def _check_private_beta_evidence(path: Path | None) -> dict[str, Any]:
         and not details["failedChecks"]
     )
     return _check("private-beta-evidence", passed, details)
+
+
+def _private_beta_failed_requirements(checks: Any) -> dict[str, list[str]]:
+    if not isinstance(checks, list):
+        return {}
+    return {
+        check["name"]: list(failed_requirements)
+        for check in checks
+        if isinstance(check, dict)
+        and isinstance(check.get("name"), str)
+        and check.get("status") != "pass"
+        for failed_requirements in [check.get("details", {}).get("failedRequirements")]
+        if isinstance(failed_requirements, list) and failed_requirements
+    }
 
 
 def _check_release_notes(path: Path | None, release_version: str | None) -> dict[str, Any]:

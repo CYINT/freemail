@@ -165,6 +165,61 @@ def test_release_packet_status_reports_mobile_metadata_failed_requirements(tmp_p
     }
 
 
+def test_release_packet_status_reports_private_beta_failed_requirements(tmp_path):
+    metadata = tmp_path / "metadata.json"
+    mail_store = tmp_path / "mail-store.tar.gz"
+    mobile_evidence = tmp_path / "mobile-release-evidence.json"
+    restore_drill = tmp_path / "restore-drill-evidence.json"
+    mobile_app_config = tmp_path / "app.json"
+    private_beta_evidence = tmp_path / "private-beta-gate.json"
+    release_notes = tmp_path / "release-notes.md"
+    metadata.write_text("{}", encoding="utf-8")
+    mail_store.write_bytes(b"archive")
+    write_json(restore_drill, valid_restore_drill_evidence())
+    write_json(mobile_app_config, valid_mobile_app_config())
+    write_json(mobile_evidence, valid_mobile_release_evidence())
+    private_beta_payload = valid_private_beta_evidence()
+    private_beta_payload["checks"][-1] = {
+        "name": "private-beta-acceptance",
+        "status": "fail",
+        "details": {
+            "failedRequirements": [
+                "knownLimitations-controlled-domain",
+                "knownLimitations-mobile",
+                "knownLimitations-store-submission",
+            ]
+        },
+    }
+    write_json(private_beta_evidence, private_beta_payload)
+    write_release_notes(release_notes)
+
+    result = summarize_release_packet(
+        ReleasePacketStatusOptions(
+            metadata_backup=metadata,
+            mail_store_backup=mail_store,
+            restore_drill_evidence=restore_drill,
+            mobile_release_evidence=mobile_evidence,
+            mobile_app_config=mobile_app_config,
+            private_beta_evidence=private_beta_evidence,
+            release_notes=release_notes,
+            release_version="v0.1.0-private-beta",
+            require_mobile_store_submission=True,
+        )
+    )
+
+    private_beta_check = next(check for check in result["checks"] if check["name"] == "private-beta-evidence")
+    assert result["ready"] is False
+    assert result["failedChecks"] == ["private-beta-evidence"]
+    assert private_beta_check["details"]["failedChecks"] == ["private-beta-acceptance"]
+    assert private_beta_check["details"]["failedRequirements"] == {
+        "private-beta-acceptance": [
+            "knownLimitations-controlled-domain",
+            "knownLimitations-mobile",
+            "knownLimitations-store-submission",
+        ]
+    }
+
+
 def test_release_packet_status_allows_explicit_pre_store_mobile_packet(tmp_path):
     metadata = tmp_path / "metadata.json"
     mail_store = tmp_path / "mail-store.tar.gz"
