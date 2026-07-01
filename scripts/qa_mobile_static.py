@@ -21,6 +21,7 @@ def validate_mobile(root: Path) -> list[str]:
         "README.md": mobile / "README.md",
         "package.json": mobile / "package.json",
         "app.json": mobile / "app.json",
+        "eas.json": mobile / "eas.json",
         "App.tsx": mobile / "App.tsx",
         "src/api.ts": mobile / "src" / "api.ts",
         "src/offlineCache.ts": mobile / "src" / "offlineCache.ts",
@@ -33,6 +34,7 @@ def validate_mobile(root: Path) -> list[str]:
 
     package = json.loads(files["package.json"].read_text(encoding="utf-8"))
     app_config = json.loads(files["app.json"].read_text(encoding="utf-8"))
+    eas_config = json.loads(files["eas.json"].read_text(encoding="utf-8"))
     combined = "\n".join(path.read_text(encoding="utf-8") for path in files.values())
 
     if package.get("license") != "AGPL-3.0-or-later":
@@ -53,6 +55,7 @@ def validate_mobile(root: Path) -> list[str]:
         failures.append("mobile iOS bundle identifier must be technology.cyint.freemail")
     if expo_config.get("android", {}).get("package") != "technology.cyint.freemail":
         failures.append("mobile Android package must be technology.cyint.freemail")
+    failures.extend(validate_eas_config(eas_config))
 
     for marker in [
         "/api/v1/mailbox/session",
@@ -223,6 +226,12 @@ def validate_mobile(root: Path) -> list[str]:
         "technology.cyint.freemail",
         "npx expo prebuild --clean --no-install --platform all",
         "Mobile iOS Native Drill",
+        "eas.json",
+        "private-beta",
+        "distribution",
+        "internal",
+        "app-bundle",
+        "EXPO_PUBLIC_FREEMAIL_API_BASE_URL",
         "macos-15",
         "scripts/qa_mobile_native_prebuild.py --link-node-modules --platform ios",
         "scripts/mobile_release_gate.py",
@@ -257,6 +266,54 @@ def validate_mobile(root: Path) -> list[str]:
         if marker in offline_cache:
             failures.append(f"mobile offline cache must not persist credential marker: {marker}")
     return failures
+
+
+def validate_eas_config(eas_config: dict[str, object]) -> list[str]:
+    failures = []
+    cli = as_mapping(eas_config.get("cli"))
+    if cli.get("appVersionSource") != "local":
+        failures.append("mobile EAS config must use local app version source")
+    if not str(cli.get("version") or "").startswith(">="):
+        failures.append("mobile EAS config must pin a minimum EAS CLI version")
+
+    build = as_mapping(eas_config.get("build"))
+    for profile_name in ["development", "private-beta", "production"]:
+        profile = as_mapping(build.get(profile_name))
+        env = as_mapping(profile.get("env"))
+        if env.get("EXPO_PUBLIC_FREEMAIL_API_BASE_URL") != "https://freemail.kuzuryu.ai":
+            failures.append(f"mobile EAS {profile_name} profile must target the VPN hostname")
+    private_beta = as_mapping(build.get("private-beta"))
+    if private_beta.get("distribution") != "internal":
+        failures.append("mobile EAS private-beta profile must use internal distribution")
+    if as_mapping(private_beta.get("android")).get("buildType") != "app-bundle":
+        failures.append("mobile EAS private-beta Android build must produce an app bundle")
+    if as_mapping(private_beta.get("ios")).get("simulator") is not False:
+        failures.append("mobile EAS private-beta iOS build must target physical devices")
+
+    submit = as_mapping(eas_config.get("submit"))
+    for profile_name in ["private-beta", "production"]:
+        if profile_name not in submit:
+            failures.append(f"mobile EAS submit profile missing: {profile_name}")
+
+    serialized = json.dumps(eas_config).lower()
+    for forbidden in [
+        "apikey",
+        "api_key",
+        "certificate",
+        "keystore",
+        "password",
+        "privatekey",
+        "private_key",
+        "provisioning",
+        "token",
+    ]:
+        if forbidden in serialized:
+            failures.append(f"mobile EAS config must not contain signing or secret material: {forbidden}")
+    return failures
+
+
+def as_mapping(value: object) -> dict[str, object]:
+    return value if isinstance(value, dict) else {}
 
 
 if __name__ == "__main__":

@@ -31,6 +31,8 @@ Pop-Location
 `npm run config:check` runs `expo config --type public` and validates the app metadata that native builds consume. It does not require app-store credentials.
 `npm run native:prebuild:check` copies the mobile app into a temporary directory, runs an Android Expo native prebuild, verifies generated identifiers, and removes the temporary native projects when the drill passes.
 
+The committed `apps/mobile/eas.json` is credential-free release metadata. It defines `development`, `private-beta`, and `production` build and submit profiles, keeps all profiles pointed at `https://freemail.kuzuryu.ai`, uses `internal` distribution for private beta, produces Android `app-bundle` artifacts, and leaves signing credentials to the private EAS or CI environment. Static mobile QA validates these invariants.
+
 ## Native Build Drill
 
 Use a clean release branch or temporary worktree for native project generation:
@@ -53,6 +55,17 @@ Run the full iOS native drill locally only on a macOS release runner:
 ```powershell
 .\.venv\Scripts\python.exe scripts\qa_mobile_native_prebuild.py --platform ios
 ```
+
+When using EAS in the private signing environment, run builds from the mobile app directory and keep EAS credentials in the EAS account or CI secret store:
+
+```powershell
+Push-Location apps\mobile
+npx eas build --platform ios --profile private-beta
+npx eas build --platform android --profile private-beta
+Pop-Location
+```
+
+The EAS build result is not release evidence by itself. After each signed build, use `scripts\collect_mobile_build_evidence.py` to record credential-free artifact provenance and then validate it with `scripts\mobile_release_status.py`.
 
 ## Signing Material
 

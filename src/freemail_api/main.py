@@ -229,7 +229,7 @@ COMPONENT_READINESS = {
             "bulk read/star/archive/spam/delete/move client controls over the shared mailbox API",
             "mobile preference controls for default compose signatures",
             "compose/send path uses the shared mailbox API contract with Sent Items persistence status",
-            "mobile static QA, config validation, native prebuild drill, typecheck, and dependency audit in CI",
+            "credential-free EAS build/submit profiles plus mobile static QA, config validation, native prebuild drill, typecheck, and dependency audit in CI",
         ],
         "remainingReleaseEvidence": [
             "real signed native mobile builds",

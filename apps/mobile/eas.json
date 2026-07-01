@@ -1,0 +1,47 @@
+{
+  "$schema": "https://raw.githubusercontent.com/expo/eas-cli/main/packages/eas-json/schema/eas.schema.json",
+  "cli": {
+    "appVersionSource": "local",
+    "version": ">= 16.0.0"
+  },
+  "build": {
+    "development": {
+      "channel": "development",
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_FREEMAIL_API_BASE_URL": "https://freemail.kuzuryu.ai"
+      }
+    },
+    "private-beta": {
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "channel": "private-beta",
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_FREEMAIL_API_BASE_URL": "https://freemail.kuzuryu.ai"
+      },
+      "ios": {
+        "simulator": false
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "autoIncrement": true,
+      "channel": "production",
+      "env": {
+        "EXPO_PUBLIC_FREEMAIL_API_BASE_URL": "https://freemail.kuzuryu.ai"
+      },
+      "ios": {
+        "simulator": false
+      }
+    }
+  },
+  "submit": {
+    "private-beta": {},
+    "production": {}
+  }
+}

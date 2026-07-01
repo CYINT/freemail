@@ -66,8 +66,11 @@ def prepare_dependencies(source: Path, destination: Path, link_node_modules: boo
     source_node_modules = source / "node_modules"
     destination_node_modules = destination / "node_modules"
     if link_node_modules and source_node_modules.is_dir():
-        destination_node_modules.symlink_to(source_node_modules, target_is_directory=True)
-        return
+        try:
+            destination_node_modules.symlink_to(source_node_modules, target_is_directory=True)
+            return
+        except OSError as exc:
+            print(f"node_modules symlink unavailable ({exc}); falling back to npm ci", file=sys.stderr)
     run(["npm", "ci"], cwd=destination)
 
 

@@ -19,4 +19,7 @@ secrets/
 *.key
 *.crt
 *.p12
+*.mobileprovision
+*.keystore
+*.jks
 *.log
