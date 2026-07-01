@@ -479,6 +479,42 @@ def test_release_gate_reports_private_beta_failed_requirements(tmp_path, monkeyp
     }
 
 
+def test_release_gate_infers_legacy_private_beta_acceptance_failures(tmp_path, monkeypatch):
+    private_beta_evidence = tmp_path / "private-beta-gate.json"
+    payload = valid_private_beta_evidence()
+    payload["checks"][-1] = {
+        "name": "private-beta-acceptance",
+        "status": "fail",
+        "details": {
+            "accepted": False,
+            "acceptedAt": "2026-06-30T00:00:00Z",
+            "decisionOwner": "CEO",
+            "accessBoundary": "Dragonscale/VPN clients only",
+            "knownLimitations": 3,
+        },
+    }
+    write_json(private_beta_evidence, payload)
+    monkeypatch.setattr(release_gate, "_command", fake_basic_release_command)
+
+    result = run_release_gate(
+        ReleaseGateOptions(
+            private_beta_evidence=private_beta_evidence,
+            skip_github_ci=True,
+            skip_repo_secret_scan=True,
+            skip_license_policy_scan=True,
+            skip_backup_evidence=True,
+            skip_mobile_evidence=True,
+            skip_release_notes=True,
+            skip_runtime=True,
+        )
+    )
+
+    check = next(check for check in result["checks"] if check["name"] == "private-beta-evidence")
+    assert result["passed"] is False
+    assert check["details"]["failedChecks"] == ["private-beta-acceptance"]
+    assert check["details"]["failedRequirements"] == {"private-beta-acceptance": ["accepted"]}
+
+
 def test_assert_release_gate_raises_for_failed_checks(tmp_path, monkeypatch):
     def fake_command(command):
         if command == ["git", "status", "--short"]:

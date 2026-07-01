@@ -451,14 +451,37 @@ def _private_beta_failed_requirements(checks: Any) -> dict[str, list[str]]:
     if not isinstance(checks, list):
         return {}
     return {
-        check["name"]: list(failed_requirements)
+        check["name"]: failed_requirements
         for check in checks
-        if isinstance(check, dict)
-        and isinstance(check.get("name"), str)
-        and check.get("status") != "pass"
-        for failed_requirements in [check.get("details", {}).get("failedRequirements")]
-        if isinstance(failed_requirements, list) and failed_requirements
+        if isinstance(check, dict) and isinstance(check.get("name"), str) and check.get("status") != "pass"
+        for failed_requirements in [_failed_requirements_for_private_beta_check(check)]
+        if failed_requirements
     }
+
+
+def _failed_requirements_for_private_beta_check(check: dict[str, Any]) -> list[str]:
+    details = check.get("details")
+    failed_requirements = details.get("failedRequirements") if isinstance(details, dict) else None
+    if isinstance(failed_requirements, list) and failed_requirements:
+        return list(failed_requirements)
+    if check.get("name") == "private-beta-acceptance" and isinstance(details, dict):
+        return _legacy_acceptance_failed_requirements(details)
+    return []
+
+
+def _legacy_acceptance_failed_requirements(details: dict[str, Any]) -> list[str]:
+    failed: list[str] = []
+    if details.get("accepted") is not True:
+        failed.append("accepted")
+    if not str(details.get("acceptedAt", "")).strip():
+        failed.append("acceptedAt")
+    if not str(details.get("decisionOwner", "")).strip():
+        failed.append("decisionOwner")
+    if "vpn" not in str(details.get("accessBoundary", "")).lower():
+        failed.append("accessBoundary-vpn")
+    if not isinstance(details.get("knownLimitations"), int) or details.get("knownLimitations", 0) <= 0:
+        failed.append("knownLimitations")
+    return failed
 
 
 def _check_release_notes(path: Path | None, release_version: str | None) -> dict[str, Any]:
