@@ -112,6 +112,8 @@ def test_static_web_validation_flags_credential_storage():
         "fetch('/api/v1/mailbox/message/bulk'); "
         "fetch('/api/v1/admin/mailboxes/${mailboxId}/quota'); admin-mailbox-quota-form; quotaBytes; "
         "fetch('/api/v1/admin/users/${userId}/password'); admin-user-password-form; newPassword; "
+        "fetch('/api/v1/admin/invitations'); admin-invitation-form; invitation-signup; invitation-signup-form; "
+        "fetch('/api/v1/invitations/${encodeURIComponent(activeInvitationToken)}/accept'); "
         "fetch('/api/v1/admin/mfa/totp/setup'); fetch('/api/v1/admin/mfa/totp/verify'); "
         "fetch('/api/v1/admin/mfa/totp'); admin-mfa-form; adminTotpCode; "
         "fetch('/api/v1/admin/audit-log/page'); /api/v1/admin/audit-log/export; admin-audit-log-filter; Export CSV; "

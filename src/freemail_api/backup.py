@@ -10,6 +10,7 @@ BACKUP_SCHEMA_VERSION = 1
 BACKUP_TABLES = (
     "domains",
     "users",
+    "user_invitations",
     "mailboxes",
     "aliases",
     "dkim_keys",
@@ -77,6 +78,8 @@ def _export_table(connection: sqlite3.Connection, table: str) -> list[dict[str, 
 def _order_column(table: str) -> str:
     if table == "admin_totp_secrets":
         return "user_id"
+    if table == "user_invitations":
+        return "email, id"
     if table == "mailbox_contacts":
         return "mailbox_email, contact_email"
     if table == "mailbox_sender_rules":
@@ -100,6 +103,7 @@ def _validated_tables(payload: Mapping[str, Any]) -> dict[str, list[dict[str, An
         raw_rows = raw_tables.get(table)
         if raw_rows is None and table in {
             "admin_totp_secrets",
+            "user_invitations",
             "mailbox_contacts",
             "mailbox_sender_rules",
             "mailbox_recipient_rules",

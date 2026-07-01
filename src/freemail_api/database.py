@@ -5,7 +5,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
-from .schemas import AliasCreate, DkimKeyCreate, DomainCreate, MailboxCreate, StoredUserCreate
+from .schemas import AliasCreate, DkimKeyCreate, DomainCreate, MailboxCreate, StoredUserCreate, StoredUserInvitationCreate
 
 
 SCHEMA = """
@@ -28,6 +28,21 @@ CREATE TABLE IF NOT EXISTS users (
     status TEXT NOT NULL DEFAULT 'invited',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS user_invitations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    is_admin INTEGER NOT NULL DEFAULT 0,
+    admin_role TEXT NOT NULL DEFAULT 'member',
+    expires_at INTEGER NOT NULL,
+    accepted_at TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_invitations_token_hash ON user_invitations(token_hash);
+CREATE INDEX IF NOT EXISTS idx_user_invitations_email ON user_invitations(email, accepted_at);
 
 CREATE TABLE IF NOT EXISTS mailboxes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -222,6 +237,17 @@ METADATA_SCHEMA_REVISION = "sqlite-schema-v1"
 REQUIRED_TABLE_COLUMNS = {
     "domains": {"id", "name", "status", "created_at"},
     "users": {"id", "email", "display_name", "password_hash", "is_admin", "admin_role", "status", "created_at"},
+    "user_invitations": {
+        "id",
+        "email",
+        "display_name",
+        "token_hash",
+        "is_admin",
+        "admin_role",
+        "expires_at",
+        "accepted_at",
+        "created_at",
+    },
     "mailboxes": {"id", "user_id", "local_part", "domain_id", "address", "quota_bytes", "status", "created_at"},
     "aliases": {"id", "source", "destination", "status", "created_at"},
     "audit_log": {"id", "actor", "action", "target_type", "target_id", "created_at"},
@@ -342,6 +368,7 @@ def list_rows(connection: sqlite3.Connection, table: str) -> list[sqlite3.Row]:
     allowed_tables = {
         "domains",
         "users",
+        "user_invitations",
         "mailboxes",
         "aliases",
         "audit_log",
@@ -418,6 +445,10 @@ def get_active_admin_user_by_email(connection: sqlite3.Connection, email: str) -
     ).fetchone()
 
 
+def get_user_by_email(connection: sqlite3.Connection, email: str) -> sqlite3.Row | None:
+    return connection.execute("SELECT * FROM users WHERE email = ?", [email.lower()]).fetchone()
+
+
 def bootstrap_admin(
     connection: sqlite3.Connection,
     *,
@@ -474,6 +505,83 @@ def create_user(connection: sqlite3.Connection, payload: StoredUserCreate, actor
     _audit(connection, actor, "user.invite", "user", row_id)
     connection.commit()
     return _get_row(connection, "users", row_id)
+
+
+def create_user_invitation(
+    connection: sqlite3.Connection,
+    payload: StoredUserInvitationCreate,
+    actor: str,
+) -> sqlite3.Row:
+    if get_user_by_email(connection, str(payload.email)):
+        raise DuplicateRecordError(f"user already exists: {payload.email}")
+    row_id = _execute_insert(
+        connection,
+        """
+        INSERT INTO user_invitations (email, display_name, token_hash, is_admin, admin_role, expires_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        [
+            payload.email.lower(),
+            payload.display_name,
+            payload.token_hash,
+            int(payload.is_admin),
+            payload.admin_role,
+            payload.expires_at,
+        ],
+    )
+    _audit(connection, actor, "user_invitation.create", "user_invitation", row_id)
+    connection.commit()
+    return _get_row(connection, "user_invitations", row_id)
+
+
+def list_user_invitations(connection: sqlite3.Connection) -> list[sqlite3.Row]:
+    return list(connection.execute("SELECT * FROM user_invitations ORDER BY id"))
+
+
+def get_user_invitation_by_token_hash(connection: sqlite3.Connection, token_hash: str) -> sqlite3.Row:
+    row = connection.execute(
+        "SELECT * FROM user_invitations WHERE token_hash = ?",
+        [token_hash],
+    ).fetchone()
+    if row is None:
+        raise MissingRecordError("user invitation was not found")
+    return row
+
+
+def accept_user_invitation(
+    connection: sqlite3.Connection,
+    *,
+    token_hash: str,
+    password_hash: str,
+    display_name: str | None,
+    now: int,
+) -> sqlite3.Row:
+    invitation = get_user_invitation_by_token_hash(connection, token_hash)
+    invitation_id = int(invitation["id"])
+    if invitation["accepted_at"] is not None:
+        raise InvalidStatusError("user invitation has already been accepted")
+    if int(invitation["expires_at"]) < now:
+        raise InvalidStatusError("user invitation has expired")
+    if get_user_by_email(connection, str(invitation["email"])):
+        raise DuplicateRecordError(f"user already exists: {invitation['email']}")
+    user = create_user(
+        connection,
+        StoredUserCreate(
+            email=invitation["email"],
+            display_name=display_name or invitation["display_name"],
+            password_hash=password_hash,
+            is_admin=bool(invitation["is_admin"]),
+            admin_role=invitation["admin_role"],
+        ),
+        actor=f"invitation:{invitation_id}",
+    )
+    connection.execute(
+        "UPDATE user_invitations SET accepted_at = CURRENT_TIMESTAMP WHERE id = ?",
+        [invitation_id],
+    )
+    _audit(connection, f"invitation:{invitation_id}", "user_invitation.accept", "user", int(user["id"]))
+    connection.commit()
+    return user
 
 
 def update_user_password(
@@ -1303,6 +1411,8 @@ def _execute_insert(connection: sqlite3.Connection, statement: str, values: Iter
 def _metadata_order_column(table: str) -> str:
     if table == "admin_totp_secrets":
         return "user_id"
+    if table == "user_invitations":
+        return "email, id"
     if table == "mailbox_contacts":
         return "mailbox_email, contact_email"
     if table == "mailbox_sender_rules":
@@ -1324,6 +1434,24 @@ def _migrate_schema(connection: sqlite3.Connection) -> None:
     if "quota_bytes" not in mailbox_columns:
         connection.execute("ALTER TABLE mailboxes ADD COLUMN quota_bytes INTEGER")
         connection.commit()
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS user_invitations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL,
+            display_name TEXT NOT NULL,
+            token_hash TEXT NOT NULL UNIQUE,
+            is_admin INTEGER NOT NULL DEFAULT 0,
+            admin_role TEXT NOT NULL DEFAULT 'member',
+            expires_at INTEGER NOT NULL,
+            accepted_at TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_user_invitations_token_hash ON user_invitations(token_hash)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_user_invitations_email ON user_invitations(email, accepted_at)")
+    connection.commit()
     connection.execute(
         """
         CREATE TABLE IF NOT EXISTS admin_sessions (

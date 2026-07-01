@@ -412,6 +412,7 @@ h2 {
 }
 
 .search input,
+.invitation-signup input,
 .compose-panel input,
 .compose-panel textarea,
 .preferences-panel input,
@@ -427,6 +428,40 @@ h2 {
 
 .search button {
   flex: 0 0 auto;
+}
+
+.invitation-signup {
+  display: grid;
+  grid-template-columns: minmax(14rem, 1fr) minmax(18rem, 1.4fr);
+  align-items: end;
+  gap: 1rem;
+  border-bottom: 1px solid #d8e0e8;
+  background: #eef6f8;
+  padding: 1rem;
+}
+
+.invitation-signup[hidden] {
+  display: none;
+}
+
+.invitation-signup h2,
+.invitation-signup p {
+  margin: 0;
+}
+
+.invitation-signup form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  align-items: end;
+  gap: 0.65rem;
+}
+
+.invitation-signup label {
+  display: grid;
+  gap: 0.25rem;
+  color: #3a4856;
+  font-size: 0.78rem;
+  font-weight: 800;
 }
 
 .mail-layout {
@@ -916,6 +951,11 @@ h2 {
     width: min(100%, 24rem);
   }
 
+  .invitation-signup,
+  .invitation-signup form {
+    grid-template-columns: 1fr 1fr;
+  }
+
   .admin-auth,
   .admin-grid {
     grid-template-columns: 1fr 1fr;
@@ -950,6 +990,11 @@ h2 {
   .search div {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .invitation-signup,
+  .invitation-signup form {
+    grid-template-columns: 1fr;
   }
 
   .reader {

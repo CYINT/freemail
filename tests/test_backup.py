@@ -7,7 +7,14 @@ import pytest
 
 from freemail_api import database
 from freemail_api.backup import BackupError, export_metadata_backup, restore_metadata_backup
-from freemail_api.schemas import AliasCreate, DkimKeyCreate, DomainCreate, MailboxCreate, StoredUserCreate
+from freemail_api.schemas import (
+    AliasCreate,
+    DkimKeyCreate,
+    DomainCreate,
+    MailboxCreate,
+    StoredUserCreate,
+    StoredUserInvitationCreate,
+)
 
 
 def test_metadata_backup_round_trip_preserves_core_metadata_and_key_material(tmp_path):
@@ -58,6 +65,16 @@ def test_metadata_backup_round_trip_preserves_core_metadata_and_key_material(tmp
             encrypted_secret="encrypted-totp-secret",
             actor="test",
         )
+        database.create_user_invitation(
+            connection,
+            StoredUserInvitationCreate(
+                email="pending@example.com",
+                display_name="Pending User",
+                token_hash="a" * 64,
+                expires_at=2_000_000_000,
+            ),
+            actor="test",
+        )
         database.enable_admin_totp(connection, user_id=1, actor="test")
         database.upsert_saved_mailbox_contact(
             connection,
@@ -97,6 +114,8 @@ def test_metadata_backup_round_trip_preserves_core_metadata_and_key_material(tmp
     assert backup["tables"]["dkim_keys"][0]["private_key_pem"] == "private-key-pem"
     assert backup["tables"]["admin_totp_secrets"][0]["encrypted_secret"] == "encrypted-totp-secret"
     assert backup["tables"]["admin_totp_secrets"][0]["enabled"] == 1
+    assert backup["tables"]["user_invitations"][0]["email"] == "pending@example.com"
+    assert backup["tables"]["user_invitations"][0]["token_hash"] == "a" * 64
     assert backup["tables"]["mailboxes"][0]["quota_bytes"] == 10_737_418_240
     assert backup["tables"]["mailbox_preferences"][0]["signature"] == "Regards,\nAdmin"
     assert backup["tables"]["mailbox_contacts"][0]["contact_email"] == "saved@example.net"
@@ -111,6 +130,9 @@ def test_metadata_backup_round_trip_preserves_core_metadata_and_key_material(tmp
     with database.connect(str(target_path)) as connection:
         assert [dict(row) for row in database.list_rows(connection, "domains")] == backup["tables"]["domains"]
         assert [dict(row) for row in database.list_rows(connection, "users")] == backup["tables"]["users"]
+        assert [dict(row) for row in database.list_rows(connection, "user_invitations")] == backup["tables"][
+            "user_invitations"
+        ]
         assert [dict(row) for row in database.list_rows(connection, "mailboxes")] == backup["tables"]["mailboxes"]
         assert [dict(row) for row in database.list_rows(connection, "aliases")] == backup["tables"]["aliases"]
         assert [dict(row) for row in database.list_rows(connection, "dkim_keys")] == backup["tables"]["dkim_keys"]
@@ -265,6 +287,25 @@ def test_metadata_restore_accepts_schema_one_backup_without_saved_contacts(tmp_p
         contacts = database.list_rows(connection, "mailbox_contacts")
 
     assert contacts == []
+
+
+def test_metadata_restore_accepts_schema_one_backup_without_user_invitations(tmp_path):
+    source_path = tmp_path / "source.sqlite"
+    target_path = tmp_path / "target.sqlite"
+    database.initialize(str(source_path))
+    database.initialize(str(target_path))
+
+    with database.connect(str(source_path)) as connection:
+        _seed_metadata(connection)
+        backup = export_metadata_backup(connection)
+
+    del backup["tables"]["user_invitations"]
+
+    with database.connect(str(target_path)) as connection:
+        restore_metadata_backup(connection, backup)
+        invitations = database.list_rows(connection, "user_invitations")
+
+    assert invitations == []
 
 
 def test_metadata_restore_accepts_schema_one_backup_without_sender_rules(tmp_path):

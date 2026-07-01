@@ -24,7 +24,7 @@ The FreeMail program includes:
 
 This repository is at the implementation baseline. It contains:
 
-- A FastAPI admin/runtime API with persistent SQLite-backed domain, user, user-password rotation, admin session, mailbox, mailbox-quota, alias, mailbox sender-rule, and filterable/exportable audit-log surfaces.
+- A FastAPI admin/runtime API with persistent SQLite-backed domain, user, invitation-link signup, user-password rotation, admin session, mailbox, mailbox-quota, alias, mailbox sender-rule, and filterable/exportable audit-log surfaces.
 - A static webmail preview shell with inbox, paginated search and folder loading, thread-aware conversation lookup, saved and extracted contacts, sender allow/block rules, message reader, header inspection, read/unread and star controls, EML import/export, bulk message actions, persistent preferences/signatures, account session management, compose, draft saving and editing, folder navigation and empty-folder controls, token-gated admin setup with bearer-session inspection and revocation, and responsive layout QA.
 - An Expo/React Native mobile client scaffold with secure session storage, icon tab shell navigation, account session management, paginated and thread-aware mailbox workflows, conversation lookup, saved and extracted contacts, sender allow/block rules, persistent preferences/signatures, draft saving and editing, message header inspection, read/unread and star controls, EML import/export/share, bulk archive/spam/delete/read/star actions, folder emptying, credential-free EAS build profiles, and static QA.
 - A Docker Compose stack with VPN-only loopback bindings by default.
@@ -76,7 +76,7 @@ Run repository hygiene scans before publishing changes:
 
 ## Admin API
 
-Admin endpoints accept either a bearer token from `POST /api/v1/admin/session` or the legacy `X-FreeMail-Admin-Token` operator token. Static admin-token access remains disabled until `FREEMAIL_ADMIN_API_TOKEN` is set; do not commit a real token. The webmail preview includes an operator admin console for bootstrap, admin email/password sign-in, authenticator-app MFA setup, static-token fallback, admin bearer-session inspection and revocation, domain, user, user-password rotation, mailbox, mailbox quota, alias, DKIM, DNS-guidance, suspension/reactivation, and audit-log filter, pagination, and CSV export workflows. Bootstrap and user creation accept one-time `initialPassword` values and hash them server-side with Argon2id before storage. Suspending a user, mailbox, or domain actively revokes affected mailbox bearer sessions; suspending a user also revokes that user's admin bearer sessions.
+Admin endpoints accept either a bearer token from `POST /api/v1/admin/session` or the legacy `X-FreeMail-Admin-Token` operator token. Static admin-token access remains disabled until `FREEMAIL_ADMIN_API_TOKEN` is set; do not commit a real token. The webmail preview includes an operator admin console for bootstrap, admin email/password sign-in, authenticator-app MFA setup, static-token fallback, admin bearer-session inspection and revocation, domain, user, invitation-link creation, user-password rotation, mailbox, mailbox quota, alias, DKIM, DNS-guidance, suspension/reactivation, and audit-log filter, pagination, and CSV export workflows. Bootstrap and legacy user creation accept one-time `initialPassword` values and hash them server-side with Argon2id before storage. Invitation links store only token hashes and let users land on prefilled signup with their own password. Suspending a user, mailbox, or domain actively revokes affected mailbox bearer sessions; suspending a user also revokes that user's admin bearer sessions.
 
 Initial endpoints:
 
@@ -94,6 +94,10 @@ Initial endpoints:
 - `PATCH /api/v1/admin/domains/{domainId}/status`
 - `POST /api/v1/admin/users`
 - `GET /api/v1/admin/users`
+- `POST /api/v1/admin/invitations`
+- `GET /api/v1/admin/invitations`
+- `GET /api/v1/invitations/{token}`
+- `POST /api/v1/invitations/{token}/accept`
 - `PATCH /api/v1/admin/users/{userId}/status`
 - `PATCH /api/v1/admin/users/{userId}/password`
 - `POST /api/v1/admin/mailboxes`

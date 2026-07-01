@@ -85,6 +85,7 @@ const adminRefreshAction = document.querySelector("#admin-refresh-action");
 const bootstrapAdminForm = document.querySelector("#bootstrap-admin-form");
 const adminDomainForm = document.querySelector("#admin-domain-form");
 const adminUserForm = document.querySelector("#admin-user-form");
+const adminInvitationForm = document.querySelector("#admin-invitation-form");
 const adminMfaForm = document.querySelector("#admin-mfa-form");
 const adminMfaSetupAction = document.querySelector("#admin-mfa-setup-action");
 const adminMfaDisableAction = document.querySelector("#admin-mfa-disable-action");
@@ -94,6 +95,9 @@ const adminMailboxQuotaForm = document.querySelector("#admin-mailbox-quota-form"
 const adminAliasForm = document.querySelector("#admin-alias-form");
 const adminDkimForm = document.querySelector("#admin-dkim-form");
 const adminResults = document.querySelector("#admin-results");
+const invitationSignup = document.querySelector("#invitation-signup");
+const invitationSignupForm = document.querySelector("#invitation-signup-form");
+const invitationSummary = document.querySelector("#invitation-summary");
 
 const mailboxSessionStorageKey = "freemail.mailboxSession";
 const adminSessionStorageKey = "freemail.adminSession";
@@ -123,6 +127,7 @@ let mailboxPagination = {
   nextOffset: null,
   hasMore: false,
 };
+let activeInvitationToken = "";
 let mailboxPreferences = {
   displayName: "",
   signature: "",
@@ -138,6 +143,7 @@ let adminAuditLogQuery = {
 
 restoreMailboxSession();
 restoreAdminSession();
+loadInvitationFromUrl();
 
 loginForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -450,6 +456,32 @@ adminUserForm?.addEventListener("submit", async (event) => {
     },
     "User invited.",
   );
+});
+
+adminInvitationForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = new FormData(adminInvitationForm);
+  const expiresHours = Math.max(1, Number(form.get("expiresHours") || 168));
+  await createAdminRecord(
+    "/api/v1/admin/invitations",
+    {
+      email: String(form.get("email") || "").trim(),
+      displayName: String(form.get("displayName") || "").trim(),
+      expiresInSeconds: Math.min(expiresHours, 720) * 3600,
+      isAdmin: form.get("isAdmin") === "on",
+      adminRole: String(form.get("adminRole") || "member"),
+    },
+    "Invitation link created.",
+  );
+});
+
+invitationSignupForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = new FormData(invitationSignupForm);
+  await acceptInvitation({
+    password: String(form.get("password") || ""),
+    displayName: String(form.get("displayName") || "").trim(),
+  });
 });
 
 adminMfaSetupAction?.addEventListener("click", async () => {
@@ -2526,6 +2558,76 @@ async function createAdminRecord(path, payload, successMessage, method = "POST")
   } catch (error) {
     setAdminStatus(`Admin change failed: ${readableError(error)}`, "error");
   }
+}
+
+async function loadInvitationFromUrl() {
+  if (!invitationSignup || !invitationSignupForm) {
+    return;
+  }
+  const params = new URLSearchParams(window.location.search);
+  const token = String(params.get("invite") || "").trim();
+  if (!token) {
+    return;
+  }
+  activeInvitationToken = token;
+  invitationSignup.hidden = false;
+  const apiBase = currentApiBaseUrl();
+  try {
+    const response = await fetch(new URL(`/api/v1/invitations/${encodeURIComponent(token)}`, apiBase));
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const invitation = await response.json();
+    invitationSignupForm.elements.email.value = invitation.email || "";
+    invitationSignupForm.elements.displayName.value = invitation.displayName || "";
+    if (invitationSummary) {
+      invitationSummary.textContent = `Invitation for ${invitation.email}`;
+    }
+  } catch (error) {
+    if (invitationSummary) {
+      invitationSummary.textContent = `Invitation unavailable: ${readableError(error)}`;
+    }
+  }
+}
+
+async function acceptInvitation(payload) {
+  if (!activeInvitationToken) {
+    setStatus("Open a valid invitation link before creating an account.", "error");
+    return;
+  }
+  setStatus("Creating invited account...", "loading");
+  try {
+    const response = await fetch(
+      new URL(`/api/v1/invitations/${encodeURIComponent(activeInvitationToken)}/accept`, currentApiBaseUrl()),
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    );
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const result = await response.json();
+    const email = result.user?.email || invitationSignupForm?.elements.email.value || "";
+    if (loginForm?.elements.email && email) {
+      loginForm.elements.email.value = email;
+    }
+    setStatus("Account created. Sign in with the password you just set.", "ready");
+    if (invitationSummary) {
+      invitationSummary.textContent = "Invitation accepted.";
+    }
+  } catch (error) {
+    setStatus(`Invitation signup failed: ${readableError(error)}`, "error");
+  }
+}
+
+function currentApiBaseUrl() {
+  return (
+    adminSession.apiBaseUrl ||
+    mailboxSession.apiBaseUrl ||
+    String(document.querySelector("#api-base-url")?.value || "http://127.0.0.1:18090").trim().replace(/\/+$/, "")
+  );
 }
 
 async function loadAdminOverview({ quiet = false } = {}) {

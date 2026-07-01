@@ -6,6 +6,7 @@ from hashlib import sha256
 import io
 import base64
 import imaplib
+import secrets
 import smtplib
 import sqlite3
 import time
@@ -112,6 +113,7 @@ from .schemas import (
     MailboxPushDeviceRecord,
     MailboxPushNotificationCreate,
     MailboxPushNotificationRecord,
+    PublicUserInvitationRecord,
     MailboxReadStateCreate,
     MailboxReadStateRecord,
     MailboxRecord,
@@ -139,7 +141,13 @@ from .schemas import (
     SavedMailboxContactRecord,
     SavedMailboxContactsRecord,
     StoredUserCreate,
+    StoredUserInvitationCreate,
     UserCreate,
+    UserInvitationAccept,
+    UserInvitationAcceptRecord,
+    UserInvitationCreate,
+    UserInvitationCreated,
+    UserInvitationRecord,
     UserPasswordUpdate,
     UserRecord,
 )
@@ -215,7 +223,7 @@ COMPONENT_READINESS = {
         "status": "ready",
         "evidence": [
             "administrator bootstrap, bearer-session login, and authenticator-app MFA",
-            "domain, user, user-password rotation, suspension-triggered session revocation, admin session inspection/revocation, mailbox quota, alias, DKIM, DNS, status, and filterable/exportable audit APIs",
+            "domain, user, invitation-link signup, user-password rotation, suspension-triggered session revocation, admin session inspection/revocation, mailbox quota, alias, DKIM, DNS, status, and filterable/exportable audit APIs",
             "metadata readiness endpoint and backup/restore coverage",
         ],
         "remainingReleaseEvidence": [],
@@ -238,7 +246,7 @@ COMPONENT_READINESS = {
             "persistent mailbox preferences with default compose signatures and saved address-book contacts",
             "server-side Drafts persistence and compose reopen support for saved drafts",
             "server-side Sent Items persistence for accepted outbound messages",
-            "tab-scoped browser bearer-session storage, HTTP security headers, and token-gated admin console for bootstrap, MFA setup, users, password rotation, domains, mailboxes, aliases, DKIM, DNS guidance, status actions, sync status, and audit-log filtering, pagination, and CSV export",
+            "tab-scoped browser bearer-session storage, HTTP security headers, invite-link signup, and token-gated admin console for bootstrap, MFA setup, users, invitation links, password rotation, domains, mailboxes, aliases, DKIM, DNS guidance, status actions, sync status, and audit-log filtering, pagination, and CSV export",
             "browser and static QA in CI",
         ],
         "remainingReleaseEvidence": [
@@ -1898,6 +1906,77 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         return _row_to_dict(_create_or_raise(lambda: database.create_user(connection, stored_payload, principal.actor)))
 
+    @app.get("/api/v1/admin/invitations", response_model=list[UserInvitationRecord])
+    def list_user_invitations(
+        principal: AdminPrincipal = Depends(require_admin),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> list[dict[str, object]]:
+        require_permission(principal, "admin.read")
+        return [_invitation_record(row) for row in database.list_user_invitations(connection)]
+
+    @app.post("/api/v1/admin/invitations", response_model=UserInvitationCreated, status_code=status.HTTP_201_CREATED)
+    def create_user_invitation(
+        payload: UserInvitationCreate,
+        principal: AdminPrincipal = Depends(require_admin),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        require_permission(principal, "admin.users")
+        if payload.is_admin:
+            require_permission(principal, "admin.grant")
+        token = secrets.token_urlsafe(32)
+        admin_role = _normalized_admin_role(payload.is_admin, payload.admin_role)
+        invitation = _create_or_raise(
+            lambda: database.create_user_invitation(
+                connection,
+                StoredUserInvitationCreate(
+                    email=payload.email,
+                    display_name=payload.display_name,
+                    token_hash=_invitation_token_hash(token),
+                    is_admin=payload.is_admin,
+                    admin_role=admin_role,
+                    expires_at=int(time.time()) + payload.expires_in_seconds,
+                ),
+                principal.actor,
+            )
+        )
+        return {
+            **_invitation_record(invitation),
+            "token": token,
+            "inviteUrl": _invitation_url(active_settings.hostname, token),
+        }
+
+    @app.get("/api/v1/invitations/{token}", response_model=PublicUserInvitationRecord)
+    def get_user_invitation(
+        token: str = Path(min_length=16, max_length=256),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        invitation = _public_invitation_or_raise(connection, token)
+        return {
+            "email": invitation["email"],
+            "displayName": invitation["display_name"],
+            "isAdmin": bool(invitation["is_admin"]),
+            "adminRole": invitation["admin_role"],
+            "expiresAt": invitation["expires_at"],
+        }
+
+    @app.post("/api/v1/invitations/{token}/accept", response_model=UserInvitationAcceptRecord)
+    def accept_user_invitation(
+        payload: UserInvitationAccept,
+        token: str = Path(min_length=16, max_length=256),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        _public_invitation_or_raise(connection, token)
+        user = _create_or_raise(
+            lambda: database.accept_user_invitation(
+                connection,
+                token_hash=_invitation_token_hash(token),
+                password_hash=hash_initial_password(payload.password),
+                display_name=payload.display_name,
+                now=int(time.time()),
+            )
+        )
+        return {"user": _row_to_dict(user)}
+
     @app.patch("/api/v1/admin/users/{user_id}/status", response_model=UserRecord)
     def update_user_status(
         user_id: int,
@@ -2186,6 +2265,38 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, object]:
 
 def _rows_to_dicts(rows: list[sqlite3.Row]) -> list[dict[str, object]]:
     return [_row_to_dict(row) for row in rows]
+
+
+def _invitation_record(row: sqlite3.Row) -> dict[str, object]:
+    record = _row_to_dict(row)
+    record["isAdmin"] = bool(record.pop("is_admin"))
+    record["adminRole"] = record.pop("admin_role")
+    record["displayName"] = record.pop("display_name")
+    record["expiresAt"] = record.pop("expires_at")
+    record["acceptedAt"] = record.pop("accepted_at")
+    record["createdAt"] = record.pop("created_at")
+    record.pop("token_hash", None)
+    return record
+
+
+def _public_invitation_or_raise(connection: sqlite3.Connection, token: str) -> sqlite3.Row:
+    try:
+        invitation = database.get_user_invitation_by_token_hash(connection, _invitation_token_hash(token))
+    except database.MissingRecordError as error:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invitation not found") from error
+    if invitation["accepted_at"] is not None:
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Invitation has already been accepted")
+    if int(invitation["expires_at"]) < int(time.time()):
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Invitation has expired")
+    return invitation
+
+
+def _invitation_token_hash(token: str) -> str:
+    return sha256(token.encode("utf-8")).hexdigest()
+
+
+def _invitation_url(hostname: str, token: str) -> str:
+    return f"https://{hostname}/?invite={quote(token)}"
 
 
 def _normalized_admin_role(is_admin: bool, requested_role: str) -> str:

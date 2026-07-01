@@ -884,6 +884,112 @@ def test_admin_role_can_invite_member_but_cannot_grant_admin(tmp_path):
     assert denied.json()["detail"] == "Admin role lacks admin.grant permission"
 
 
+def test_admin_can_create_invitation_link_and_user_can_accept_once(tmp_path):
+    with make_client(tmp_path) as client:
+        invitation = client.post(
+            "/api/v1/admin/invitations",
+            headers=admin_headers(),
+            json={
+                "email": "member@example.com",
+                "displayName": "Member User",
+                "expiresInSeconds": 3600,
+            },
+        )
+        token = invitation.json()["token"]
+        prefill = client.get(f"/api/v1/invitations/{token}")
+        accepted = client.post(
+            f"/api/v1/invitations/{token}/accept",
+            json={"password": "correct horse battery"},
+        )
+        reused = client.post(
+            f"/api/v1/invitations/{token}/accept",
+            json={"password": "correct horse battery"},
+        )
+        login = client.post(
+            "/api/v1/admin/session",
+            json={"email": "member@example.com", "password": "correct horse battery"},
+        )
+        with sqlite3.connect(tmp_path / "freemail.sqlite") as connection:
+            connection.row_factory = sqlite3.Row
+            row = connection.execute("SELECT * FROM user_invitations").fetchone()
+            raw_token_present = token in [str(value) for value in dict(row).values()]
+            user = connection.execute("SELECT * FROM users WHERE email = 'member@example.com'").fetchone()
+            audit_actions = [
+                row[0]
+                for row in connection.execute(
+                    "SELECT action FROM audit_log WHERE action LIKE 'user_invitation.%' ORDER BY id"
+                )
+            ]
+
+    assert invitation.status_code == 201
+    assert invitation.json()["email"] == "member@example.com"
+    assert invitation.json()["inviteUrl"].endswith(f"?invite={token}")
+    assert invitation.json()["isAdmin"] is False
+    assert "tokenHash" not in invitation.json()
+    assert prefill.status_code == 200
+    assert prefill.json() == {
+        "email": "member@example.com",
+        "displayName": "Member User",
+        "isAdmin": False,
+        "adminRole": "member",
+        "expiresAt": invitation.json()["expiresAt"],
+    }
+    assert accepted.status_code == 200
+    assert accepted.json()["user"]["email"] == "member@example.com"
+    assert reused.status_code == 410
+    assert login.status_code == 401
+    assert login.json()["detail"] == "Admin authentication failed"
+    assert raw_token_present is False
+    assert row["token_hash"] == sha256(token.encode("utf-8")).hexdigest()
+    assert row["accepted_at"] is not None
+    assert user["password_hash"] != "correct horse battery"
+    assert verify_password_hash(user["password_hash"], "correct horse battery") is True
+    assert audit_actions == ["user_invitation.create", "user_invitation.accept"]
+
+
+def test_admin_invitation_accept_can_override_display_name(tmp_path):
+    with make_client(tmp_path) as client:
+        invitation = client.post(
+            "/api/v1/admin/invitations",
+            headers=admin_headers(),
+            json={
+                "email": "member@example.com",
+                "displayName": "Placeholder",
+                "expiresInSeconds": 3600,
+            },
+        )
+        accepted = client.post(
+            f"/api/v1/invitations/{invitation.json()['token']}/accept",
+            json={"password": "correct horse battery", "displayName": "Member User"},
+        )
+
+    assert accepted.status_code == 200
+    assert accepted.json()["user"]["displayName"] == "Member User"
+
+
+def test_user_invitation_rejects_expired_token(tmp_path):
+    with make_client(tmp_path) as client:
+        invitation = client.post(
+            "/api/v1/admin/invitations",
+            headers=admin_headers(),
+            json={
+                "email": "member@example.com",
+                "displayName": "Member User",
+                "expiresInSeconds": 3600,
+            },
+        )
+        with sqlite3.connect(tmp_path / "freemail.sqlite") as connection:
+            connection.execute("UPDATE user_invitations SET expires_at = 1")
+        prefill = client.get(f"/api/v1/invitations/{invitation.json()['token']}")
+        accepted = client.post(
+            f"/api/v1/invitations/{invitation.json()['token']}/accept",
+            json={"password": "correct horse battery"},
+        )
+
+    assert prefill.status_code == 410
+    assert accepted.status_code == 410
+
+
 def test_operator_can_manage_domains_but_cannot_invite_users(tmp_path):
     with make_client(tmp_path) as client:
         client.post(
@@ -917,6 +1023,36 @@ def test_operator_can_manage_domains_but_cannot_invite_users(tmp_path):
     assert domain.status_code == 201
     assert denied.status_code == 403
     assert denied.json()["detail"] == "Admin role lacks admin.users permission"
+
+
+def test_operator_cannot_create_invitation_link(tmp_path):
+    with make_client(tmp_path) as client:
+        client.post(
+            "/api/v1/admin/users",
+            headers=admin_headers(),
+            json={
+                "email": "operator@example.com",
+                "displayName": "Operator User",
+                "initialPassword": "correct horse battery",
+                "isAdmin": True,
+                "adminRole": "operator",
+            },
+        )
+        login = client.post(
+            "/api/v1/admin/session",
+            json={"email": "operator@example.com", "password": "correct horse battery"},
+        )
+        response = client.post(
+            "/api/v1/admin/invitations",
+            headers={"Authorization": f"Bearer {login.json()['token']}"},
+            json={
+                "email": "member@example.com",
+                "displayName": "Member User",
+            },
+        )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Admin role lacks admin.users permission"
 
 
 def test_auditor_can_read_but_cannot_mutate_admin_metadata(tmp_path):

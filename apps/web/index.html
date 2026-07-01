@@ -125,6 +125,20 @@
           </form>
         </header>
 
+        <section class="invitation-signup" id="invitation-signup" hidden aria-label="Accept invitation">
+          <div>
+            <p class="eyebrow">Invitation</p>
+            <h2>Create your account</h2>
+            <p id="invitation-summary">Loading invitation...</p>
+          </div>
+          <form id="invitation-signup-form">
+            <label>Email <input name="email" type="email" autocomplete="username" readonly></label>
+            <label>Display name <input name="displayName" type="text" maxlength="160" required></label>
+            <label>Password <input name="password" type="password" minlength="12" autocomplete="new-password" required></label>
+            <button type="submit">Create account</button>
+          </form>
+        </section>
+
         <section class="mail-layout" aria-label="Mailbox">
           <section class="message-list" id="message-list" aria-label="Inbox messages">
             <div class="bulk-toolbar" aria-label="Bulk message actions">
@@ -265,6 +279,24 @@
                 </select>
               </label>
               <button type="submit">Invite user</button>
+            </form>
+
+            <form class="admin-card" id="admin-invitation-form" aria-label="Create invitation link">
+              <h3>Create invite link</h3>
+              <label>Email <input name="email" type="email" placeholder="user@example.com" required></label>
+              <label>Display name <input name="displayName" type="text" required></label>
+              <label>Expires in hours <input name="expiresHours" type="number" min="1" max="720" value="168" required></label>
+              <label class="checkbox-field"><input name="isAdmin" type="checkbox"> Administrator</label>
+              <label>Admin role
+                <select id="admin-invitation-role" name="adminRole">
+                  <option value="member">Member</option>
+                  <option value="auditor">Auditor</option>
+                  <option value="operator">Operator</option>
+                  <option value="admin">Admin</option>
+                  <option value="owner">Owner</option>
+                </select>
+              </label>
+              <button type="submit">Create link</button>
             </form>
 
             <form class="admin-card" id="admin-mfa-form" aria-label="Set up admin MFA">

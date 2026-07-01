@@ -71,6 +71,58 @@ class UserPasswordUpdate(ApiModel):
     new_password: str = Field(min_length=12, max_length=512)
 
 
+class UserInvitationCreate(ApiModel):
+    email: EmailStr
+    display_name: str = Field(min_length=1, max_length=160)
+    is_admin: bool = False
+    admin_role: str = Field(default="member", pattern=r"^(member|auditor|operator|admin|owner)$")
+    expires_in_seconds: int = Field(default=604800, ge=300, le=2592000)
+
+
+class StoredUserInvitationCreate(ApiModel):
+    email: EmailStr
+    display_name: str = Field(min_length=1, max_length=160)
+    token_hash: str = Field(min_length=64, max_length=64)
+    is_admin: bool = False
+    admin_role: str = Field(default="member", pattern=r"^(member|auditor|operator|admin|owner)$")
+    expires_at: int
+
+
+class UserInvitationRecord(ApiModel):
+    id: int
+    email: EmailStr
+    display_name: str
+    is_admin: bool
+    admin_role: str
+    expires_at: int
+    accepted_at: str | None = None
+    created_at: str
+
+    model_config = ConfigDict(alias_generator=to_camel, from_attributes=True, populate_by_name=True)
+
+
+class UserInvitationCreated(UserInvitationRecord):
+    token: str
+    invite_url: str
+
+
+class PublicUserInvitationRecord(ApiModel):
+    email: EmailStr
+    display_name: str
+    is_admin: bool
+    admin_role: str
+    expires_at: int
+
+
+class UserInvitationAccept(ApiModel):
+    password: str = Field(min_length=12, max_length=512)
+    display_name: str | None = Field(default=None, min_length=1, max_length=160)
+
+
+class UserInvitationAcceptRecord(ApiModel):
+    user: "UserRecord"
+
+
 class AdminSessionCreate(ApiModel):
     email: EmailStr
     password: str = Field(min_length=1, max_length=512)
