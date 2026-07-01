@@ -22,6 +22,8 @@ def main() -> int:
     parser.add_argument("--product-readiness-url", default="https://freemail.kuzuryu.ai/api/v1/product/readiness")
     parser.add_argument("--metadata-readiness-url", default="https://freemail.kuzuryu.ai/api/v1/metadata/readiness")
     parser.add_argument("--readiness-url", default="https://freemail.kuzuryu.ai/api/v1/mail-core/readiness")
+    parser.add_argument("--apple-app-site-association-url", default="https://freemail.kuzuryu.ai/.well-known/apple-app-site-association")
+    parser.add_argument("--assetlinks-url", default="https://freemail.kuzuryu.ai/.well-known/assetlinks.json")
     parser.add_argument("--metadata-backup", type=Path)
     parser.add_argument("--mail-store-backup", type=Path)
     parser.add_argument("--restore-drill-evidence", type=Path)
@@ -65,6 +67,8 @@ def _options_from_args(args: argparse.Namespace, manifest: ReleaseGateOptions | 
         product_readiness_url=args.product_readiness_url,
         metadata_readiness_url=args.metadata_readiness_url,
         readiness_url=args.readiness_url,
+        apple_app_site_association_url=args.apple_app_site_association_url,
+        assetlinks_url=args.assetlinks_url,
         metadata_backup=args.metadata_backup or _manifest_value(manifest, "metadata_backup"),
         mail_store_backup=args.mail_store_backup or _manifest_value(manifest, "mail_store_backup"),
         restore_drill_evidence=args.restore_drill_evidence or _manifest_value(manifest, "restore_drill_evidence"),

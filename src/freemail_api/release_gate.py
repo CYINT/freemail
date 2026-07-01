@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import hashlib
 import json
 from pathlib import Path
+import re
 import subprocess
 import sys
 from typing import Any
@@ -32,6 +33,10 @@ REQUIRED_CI_STEPS = (
     "Container build validation",
 )
 
+EXPECTED_IOS_APP_ID = "technology.cyint.freemail"
+EXPECTED_ANDROID_PACKAGE = "technology.cyint.freemail"
+ANDROID_SHA256_FINGERPRINT_PATTERN = re.compile(r"^[0-9A-F]{2}(?::[0-9A-F]{2}){31}$")
+
 
 @dataclass(frozen=True)
 class ReleaseGateOptions:
@@ -43,6 +48,8 @@ class ReleaseGateOptions:
     product_readiness_url: str | None = "https://freemail.kuzuryu.ai/api/v1/product/readiness"
     metadata_readiness_url: str | None = "https://freemail.kuzuryu.ai/api/v1/metadata/readiness"
     readiness_url: str | None = "https://freemail.kuzuryu.ai/api/v1/mail-core/readiness"
+    apple_app_site_association_url: str | None = "https://freemail.kuzuryu.ai/.well-known/apple-app-site-association"
+    assetlinks_url: str | None = "https://freemail.kuzuryu.ai/.well-known/assetlinks.json"
     metadata_backup: Path | None = None
     mail_store_backup: Path | None = None
     restore_drill_evidence: Path | None = None
@@ -110,6 +117,8 @@ def run_release_gate(options: ReleaseGateOptions) -> dict[str, Any]:
                 commit,
                 metadata_readiness_url=options.metadata_readiness_url,
                 product_readiness_url=options.product_readiness_url,
+                apple_app_site_association_url=options.apple_app_site_association_url,
+                assetlinks_url=options.assetlinks_url,
             )
         )
 
@@ -499,6 +508,8 @@ def _check_runtime(
     *,
     metadata_readiness_url: str | None = None,
     product_readiness_url: str | None = None,
+    apple_app_site_association_url: str | None = None,
+    assetlinks_url: str | None = None,
 ) -> list[dict[str, Any]]:
     checks: list[dict[str, Any]] = []
     if health_url:
@@ -608,7 +619,98 @@ def _check_runtime(
                 },
             )
         )
+    if apple_app_site_association_url:
+        checks.append(_check_apple_app_site_association(apple_app_site_association_url))
+    if assetlinks_url:
+        checks.append(_check_assetlinks(assetlinks_url))
     return checks
+
+
+def _check_apple_app_site_association(url: str) -> dict[str, Any]:
+    document = _fetch_json(url)
+    applinks = document.get("applinks") if isinstance(document.get("applinks"), dict) else {}
+    details = applinks.get("details") if isinstance(applinks.get("details"), list) else []
+    app_ids = [
+        str(app_id)
+        for detail in details
+        if isinstance(detail, dict)
+        for app_id in [detail.get("appID")]
+        if isinstance(app_id, str)
+    ]
+    has_valid_app_id = any(_valid_ios_app_id(app_id) for app_id in app_ids)
+    has_invite_component = any(_aasa_detail_has_invite_component(detail) for detail in details if isinstance(detail, dict))
+    return _check(
+        "mobile-apple-app-site-association",
+        applinks.get("apps") == [] and has_valid_app_id and has_invite_component,
+        {
+            "url": url,
+            "apps": applinks.get("apps"),
+            "appIDs": app_ids,
+            "expectedBundleID": EXPECTED_IOS_APP_ID,
+            "hasInviteComponent": has_invite_component,
+        },
+    )
+
+
+def _check_assetlinks(url: str) -> dict[str, Any]:
+    document = _fetch_json_value(url)
+    entries = document if isinstance(document, list) else []
+    package_entries = [
+        entry
+        for entry in entries
+        if isinstance(entry, dict)
+        and isinstance(entry.get("target"), dict)
+        and entry["target"].get("namespace") == "android_app"
+        and entry["target"].get("package_name") == EXPECTED_ANDROID_PACKAGE
+    ]
+    fingerprints = [
+        str(fingerprint)
+        for entry in package_entries
+        for fingerprint in entry["target"].get("sha256_cert_fingerprints", [])
+        if isinstance(fingerprint, str)
+    ]
+    relations = {
+        str(relation)
+        for entry in package_entries
+        for relation in entry.get("relation", [])
+        if isinstance(relation, str)
+    }
+    valid_fingerprints = [fingerprint for fingerprint in fingerprints if ANDROID_SHA256_FINGERPRINT_PATTERN.match(fingerprint)]
+    return _check(
+        "mobile-android-assetlinks",
+        bool(package_entries)
+        and "delegate_permission/common.handle_all_urls" in relations
+        and bool(valid_fingerprints)
+        and len(valid_fingerprints) == len(fingerprints),
+        {
+            "url": url,
+            "packageName": EXPECTED_ANDROID_PACKAGE,
+            "entryCount": len(package_entries),
+            "relations": sorted(relations),
+            "fingerprintCount": len(fingerprints),
+            "validFingerprintCount": len(valid_fingerprints),
+        },
+    )
+
+
+def _aasa_detail_has_invite_component(detail: dict[str, Any]) -> bool:
+    components = detail.get("components")
+    if not isinstance(components, list):
+        return False
+    for component in components:
+        if not isinstance(component, dict):
+            continue
+        query = component.get("?")
+        if isinstance(query, dict) and "invite" in query:
+            return True
+    return False
+
+
+def _valid_ios_app_id(app_id: str) -> bool:
+    if not app_id.endswith(f".{EXPECTED_IOS_APP_ID}") or "." not in app_id:
+        return False
+    team_id = app_id.split(".", 1)[0]
+    return len(team_id) == 10 and team_id.isalnum() and team_id.isupper()
 
 
 def _check_security_headers(url: str) -> dict[str, Any]:
@@ -647,12 +749,16 @@ def _checks_passed(checks: object) -> bool:
 
 
 def _fetch_json(url: str) -> dict[str, Any]:
-    with urlopen(url, timeout=10) as response:
-        payload = response.read().decode("utf-8")
-    data = json.loads(payload)
+    data = _fetch_json_value(url)
     if not isinstance(data, dict):
         raise ReleaseGateError(f"{url} did not return a JSON object")
     return data
+
+
+def _fetch_json_value(url: str) -> Any:
+    with urlopen(url, timeout=10) as response:
+        payload = response.read().decode("utf-8")
+    return json.loads(payload)
 
 
 def _fetch_headers(url: str) -> dict[str, str]:

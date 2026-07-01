@@ -44,6 +44,8 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
             return "repo secret QA passed"
         if command[1:] == ["scripts/qa_license_policy.py"]:
             return "license policy QA passed"
+        if command[1:] == ["scripts/qa_open_source_readiness.py"]:
+            return "open source readiness passed"
         if command[:3] == ["gh", "run", "list"]:
             return '[{"databaseId":1,"status":"completed","conclusion":"success","workflowName":"CI","url":"url"}]'
         if command[:3] == ["gh", "run", "view"]:
@@ -64,10 +66,14 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
                 "schemaRevision": "sqlite-schema-v1",
                 "checks": [{"name": "domains", "status": "pass", "missingColumns": []}],
             }
+        if url.endswith("/apple-app-site-association"):
+            return valid_apple_app_site_association()
         return {"status": "ready", "tcpReachable": True, "protocolReady": True}
 
     monkeypatch.setattr(release_gate, "_command", fake_command)
+    monkeypatch.setattr(release_gate, "_check_open_source_readiness", fake_open_source_readiness_check)
     monkeypatch.setattr(release_gate, "_fetch_json", fake_fetch)
+    monkeypatch.setattr(release_gate, "_fetch_json_value", lambda _url: valid_assetlinks())
     monkeypatch.setattr(release_gate, "_fetch_headers", lambda _url: valid_security_headers())
 
     result = run_release_gate(
@@ -123,6 +129,8 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
         "product-readiness",
         "metadata-readiness",
         "mail-core-readiness",
+        "mobile-apple-app-site-association",
+        "mobile-android-assetlinks",
     }
 
 
@@ -164,6 +172,8 @@ def test_release_gate_reports_failed_codecov_upload(tmp_path, monkeypatch):
             return "repo secret QA passed"
         if command[1:] == ["scripts/qa_license_policy.py"]:
             return "license policy QA passed"
+        if command[1:] == ["scripts/qa_open_source_readiness.py"]:
+            return "open source readiness passed"
         if command[:3] == ["gh", "run", "list"]:
             return '[{"databaseId":1,"status":"completed","conclusion":"success","workflowName":"CI","url":"url"}]'
         if command[:3] == ["gh", "run", "view"]:
@@ -171,6 +181,7 @@ def test_release_gate_reports_failed_codecov_upload(tmp_path, monkeypatch):
         raise AssertionError(command)
 
     monkeypatch.setattr(release_gate, "_command", fake_command)
+    monkeypatch.setattr(release_gate, "_check_open_source_readiness", fake_open_source_readiness_check)
 
     result = run_release_gate(
         ReleaseGateOptions(
@@ -253,6 +264,7 @@ def test_release_gate_can_skip_codecov_upload_when_ci_is_still_required(tmp_path
         raise AssertionError(command)
 
     monkeypatch.setattr(release_gate, "_command", fake_command)
+    monkeypatch.setattr(release_gate, "_check_open_source_readiness", fake_open_source_readiness_check)
 
     result = run_release_gate(
         ReleaseGateOptions(
@@ -529,6 +541,32 @@ def test_runtime_metadata_readiness_requires_ready_sqlite_schema(monkeypatch):
     assert checks[0]["details"]["checks"][0]["missingColumns"] == ["status"]
 
 
+def test_runtime_mobile_apple_association_requires_invite_component(monkeypatch):
+    payload = valid_apple_app_site_association()
+    payload["applinks"]["details"][0]["components"] = [{"/": "/*"}]
+    monkeypatch.setattr(release_gate, "_fetch_json", lambda _url: payload)
+
+    check = release_gate._check_apple_app_site_association(
+        "https://freemail.kuzuryu.ai/.well-known/apple-app-site-association"
+    )
+
+    assert check["name"] == "mobile-apple-app-site-association"
+    assert check["status"] == "fail"
+    assert check["details"]["hasInviteComponent"] is False
+
+
+def test_runtime_mobile_android_assetlinks_requires_valid_fingerprint(monkeypatch):
+    payload = valid_assetlinks()
+    payload[0]["target"]["sha256_cert_fingerprints"] = ["not-a-fingerprint"]
+    monkeypatch.setattr(release_gate, "_fetch_json_value", lambda _url: payload)
+
+    check = release_gate._check_assetlinks("https://freemail.kuzuryu.ai/.well-known/assetlinks.json")
+
+    assert check["name"] == "mobile-android-assetlinks"
+    assert check["status"] == "fail"
+    assert check["details"]["validFingerprintCount"] == 0
+
+
 def test_compose_loopback_bindings_accepts_loopback_published_ports(monkeypatch):
     monkeypatch.setattr(release_gate, "_command", lambda _command: json.dumps(valid_compose_config()))
 
@@ -662,6 +700,54 @@ def valid_mobile_app_config():
             "extra": {"apiBaseUrl": "https://freemail.kuzuryu.ai"},
         }
     }
+
+
+def fake_open_source_readiness_check():
+    return {
+        "name": "open-source-readiness",
+        "status": "pass",
+        "details": {
+            "credentialFreePublicRepo": True,
+            "license": "AGPL-3.0-or-later",
+            "releaseReady": False,
+            "releaseBlockers": ["decision-owner private-beta acceptance"],
+            "failedChecks": [],
+        },
+    }
+
+
+def valid_apple_app_site_association():
+    return {
+        "applinks": {
+            "apps": [],
+            "details": [
+                {
+                    "appID": "ABCDE12345.technology.cyint.freemail",
+                    "components": [
+                        {
+                            "/": "/invite",
+                            "?": {"invite": "*"},
+                        }
+                    ],
+                }
+            ],
+        }
+    }
+
+
+def valid_assetlinks():
+    return [
+        {
+            "relation": ["delegate_permission/common.handle_all_urls"],
+            "target": {
+                "namespace": "android_app",
+                "package_name": "technology.cyint.freemail",
+                "sha256_cert_fingerprints": [
+                    "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99"
+                ],
+            },
+        }
+    ]
 
 
 def fake_basic_release_command(command):
