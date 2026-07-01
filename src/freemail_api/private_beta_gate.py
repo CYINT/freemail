@@ -36,6 +36,8 @@ class PrivateBetaGateOptions:
     deployment_url: str | None = "https://freemail.kuzuryu.ai/api/v1/deployment"
     metadata_readiness_url: str | None = "https://freemail.kuzuryu.ai/api/v1/metadata/readiness"
     readiness_url: str | None = "https://freemail.kuzuryu.ai/api/v1/mail-core/readiness"
+    apple_app_site_association_url: str | None = "https://freemail.kuzuryu.ai/.well-known/apple-app-site-association"
+    assetlinks_url: str | None = "https://freemail.kuzuryu.ai/.well-known/assetlinks.json"
     runtime_commit: str | None = None
     skip_runtime: bool = False
 
@@ -51,6 +53,8 @@ def run_private_beta_gate(options: PrivateBetaGateOptions) -> dict[str, Any]:
                 options.readiness_url,
                 runtime_commit,
                 metadata_readiness_url=options.metadata_readiness_url,
+                apple_app_site_association_url=options.apple_app_site_association_url,
+                assetlinks_url=options.assetlinks_url,
             )
         )
     if not options.skip_dns:

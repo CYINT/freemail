@@ -11,6 +11,8 @@ def test_private_beta_gate_runtime_only_checks_vpn_boundary(monkeypatch):
             return {"status": "ok", "vpnOnly": True, "release": {"commit": "abc123"}}
         if url.endswith("/deployment"):
             return {"exposure": "vpn-only", "publicInternet": False, "requiredBoundary": "Dragonscale/VPN clients only"}
+        if url.endswith("/apple-app-site-association"):
+            return valid_apple_app_site_association()
         if url.endswith("/metadata/readiness"):
             return {
                 "status": "ready",
@@ -21,6 +23,7 @@ def test_private_beta_gate_runtime_only_checks_vpn_boundary(monkeypatch):
         return {"status": "ready", "tcpReachable": True, "protocolReady": True}
 
     monkeypatch.setattr("freemail_api.release_gate._fetch_json", fake_fetch)
+    monkeypatch.setattr("freemail_api.release_gate._fetch_json_value", lambda _url: valid_assetlinks())
     monkeypatch.setattr("freemail_api.release_gate._fetch_headers", lambda _url: valid_security_headers())
 
     result = run_private_beta_gate(
@@ -34,6 +37,8 @@ def test_private_beta_gate_runtime_only_checks_vpn_boundary(monkeypatch):
         "deployment-boundary",
         "metadata-readiness",
         "mail-core-readiness",
+        "mobile-apple-app-site-association",
+        "mobile-android-assetlinks",
     ]
 
 
@@ -43,6 +48,8 @@ def test_private_beta_gate_runtime_rejects_stale_commit(monkeypatch):
             return {"status": "ok", "vpnOnly": True, "release": {"commit": "old456"}}
         if url.endswith("/deployment"):
             return {"exposure": "vpn-only", "publicInternet": False, "requiredBoundary": "Dragonscale/VPN clients only"}
+        if url.endswith("/apple-app-site-association"):
+            return valid_apple_app_site_association()
         if url.endswith("/metadata/readiness"):
             return {
                 "status": "ready",
@@ -53,6 +60,7 @@ def test_private_beta_gate_runtime_rejects_stale_commit(monkeypatch):
         return {"status": "ready", "tcpReachable": True, "protocolReady": True}
 
     monkeypatch.setattr("freemail_api.release_gate._fetch_json", fake_fetch)
+    monkeypatch.setattr("freemail_api.release_gate._fetch_json_value", lambda _url: valid_assetlinks())
     monkeypatch.setattr("freemail_api.release_gate._fetch_headers", lambda _url: valid_security_headers())
 
     result = run_private_beta_gate(
@@ -82,6 +90,40 @@ def valid_security_headers():
         "x-content-type-options": "nosniff",
         "x-frame-options": "DENY",
     }
+
+
+def valid_apple_app_site_association():
+    return {
+        "applinks": {
+            "apps": [],
+            "details": [
+                {
+                    "appID": "ABCDEFGHIJ.technology.cyint.freemail",
+                    "components": [
+                        {
+                            "/": "/invite",
+                            "?": {"invite": "*"},
+                        }
+                    ],
+                }
+            ],
+        }
+    }
+
+
+def valid_assetlinks():
+    return [
+        {
+            "relation": ["delegate_permission/common.handle_all_urls"],
+            "target": {
+                "namespace": "android_app",
+                "package_name": "technology.cyint.freemail",
+                "sha256_cert_fingerprints": [
+                    "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99"
+                ],
+            },
+        }
+    ]
 
 
 def test_private_beta_gate_accepts_matching_observed_dns(tmp_path):

@@ -550,7 +550,7 @@ Run the private-beta runtime gate during development:
 .\.venv\Scripts\python.exe scripts\private_beta_gate.py --skip-dns --skip-evidence
 ```
 
-The runtime gate expects `https://freemail.kuzuryu.ai/health` to report the current Git commit by default. Use `--runtime-commit <sha>` only when validating a deployed candidate from a different checkout.
+The runtime gate expects `https://freemail.kuzuryu.ai/health` to report the current Git commit by default. It also validates the hosted iOS and Android app-link association documents used by mobile invite links. Use `--runtime-commit <sha>` only when validating a deployed candidate from a different checkout.
 
 For a real beta domain, pass admin DNS guidance plus observed DNS evidence, mail-flow evidence, queue evidence, credential-free mail-core apply evidence, backups, restore-drill evidence, and decision-owner acceptance. Omit `--observed-dns` only when the gate should resolve live MX/TXT records:
 

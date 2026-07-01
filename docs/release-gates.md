@@ -141,7 +141,7 @@ Do not use skipped gates as release evidence.
 
 ## Private-Beta Gate
 
-Before private-beta use, run the private-beta gate. Runtime-only development mode verifies the VPN-only deployment contract and mail-core readiness:
+Before private-beta use, run the private-beta gate. Runtime-only development mode verifies the VPN-only deployment contract, mail-core readiness, and hosted mobile app-link association documents:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\private_beta_gate.py --skip-dns --skip-evidence
@@ -149,7 +149,7 @@ Before private-beta use, run the private-beta gate. Runtime-only development mod
 
 The runtime check expects `/health` to report the current Git commit by default, matching the hard release gate's stale-deployment protection. Pass `--runtime-commit <sha>` only when validating a deployed candidate from a different checkout.
 
-The hard runtime gate also validates `/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json`. The Apple document must name the `technology.cyint.freemail` bundle behind a real 10-character Team ID and include an invite-link component. The Android document must name the `technology.cyint.freemail` package, include `delegate_permission/common.handle_all_urls`, and expose valid SHA-256 signing certificate fingerprints. Development deployments without real mobile identifiers should return `503` for these endpoints and must not pass the hard release gate.
+The private-beta and hard runtime gates validate `/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json`. The Apple document must name the `technology.cyint.freemail` bundle behind a real 10-character Team ID and include an invite-link component. The Android document must name the `technology.cyint.freemail` package, include `delegate_permission/common.handle_all_urls`, and expose valid SHA-256 signing certificate fingerprints. Development deployments without real mobile identifiers should return `503` for these endpoints and must not pass runtime release evidence gates.
 
 For a controlled domain, first export DNS guidance from the admin API, capture observed DNS values, run controlled mail-flow and queue checks, apply the Stalwart mail-core plan, collect credential-free apply evidence, collect deliverability/abuse evidence, collect backup evidence, collect restore-drill evidence, record decision-owner acceptance, then run:
 

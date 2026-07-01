@@ -30,6 +30,11 @@ def main() -> int:
     parser.add_argument("--metadata-readiness-url", default="https://freemail.kuzuryu.ai/api/v1/metadata/readiness")
     parser.add_argument("--readiness-url", default="https://freemail.kuzuryu.ai/api/v1/mail-core/readiness")
     parser.add_argument(
+        "--apple-app-site-association-url",
+        default="https://freemail.kuzuryu.ai/.well-known/apple-app-site-association",
+    )
+    parser.add_argument("--assetlinks-url", default="https://freemail.kuzuryu.ai/.well-known/assetlinks.json")
+    parser.add_argument(
         "--runtime-commit",
         help="Expected runtime release commit. Defaults to the current Git HEAD when runtime checks are enabled.",
     )
@@ -63,6 +68,8 @@ def _options_from_args(args: argparse.Namespace, manifest: PrivateBetaGateOption
         deployment_url=args.deployment_url,
         metadata_readiness_url=args.metadata_readiness_url,
         readiness_url=args.readiness_url,
+        apple_app_site_association_url=args.apple_app_site_association_url,
+        assetlinks_url=args.assetlinks_url,
         runtime_commit=args.runtime_commit or _manifest_value(manifest, "runtime_commit"),
         skip_runtime=args.skip_runtime,
     )
