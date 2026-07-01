@@ -59,6 +59,14 @@ def validate_mobile(root: Path) -> list[str]:
 
     for marker in [
         "/api/v1/mailbox/session",
+        "/api/v1/invitations/",
+        "loadUserInvitation",
+        "acceptUserInvitation",
+        "Invitation signup",
+        "Load invitation",
+        "Accept invitation",
+        "extractInvitationToken",
+        "Linking.getInitialURL",
         "/api/v1/mailbox/sessions",
         "/api/v1/mailbox/snapshot",
         "/api/v1/mailbox/search",

@@ -4,6 +4,21 @@ export type MailboxSession = {
   apiBaseUrl: string;
 };
 
+export type PublicUserInvitation = {
+  email: string;
+  displayName: string;
+  isAdmin: boolean;
+  adminRole: string;
+  expiresAt: number;
+};
+
+export type AcceptedUserInvitation = {
+  email: string;
+  displayName: string;
+  isAdmin: boolean;
+  adminRole: string;
+};
+
 export type MailboxSessionSummary = {
   id: number;
   email: string;
@@ -255,6 +270,27 @@ export async function createMailboxSession(apiBaseUrl: string, email: string, pa
     token: String(payload.token),
     apiBaseUrl: normalizedApiBaseUrl(apiBaseUrl),
   };
+}
+
+export async function loadUserInvitation(apiBaseUrl: string, token: string): Promise<PublicUserInvitation> {
+  const response = await request(apiBaseUrl, `/api/v1/invitations/${encodeURIComponent(token)}`, {
+    method: "GET",
+  });
+  return response.json();
+}
+
+export async function acceptUserInvitation(
+  apiBaseUrl: string,
+  token: string,
+  password: string,
+  displayName = "",
+): Promise<AcceptedUserInvitation> {
+  const response = await request(apiBaseUrl, `/api/v1/invitations/${encodeURIComponent(token)}/accept`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password, displayName }),
+  });
+  return response.json();
 }
 
 export async function revokeMailboxSession(session: MailboxSession): Promise<void> {

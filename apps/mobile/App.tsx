@@ -9,6 +9,7 @@ import {
   Alert,
   FlatList,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   SafeAreaView,
@@ -20,6 +21,7 @@ import {
 } from "react-native";
 
 import {
+  acceptUserInvitation,
   applyMailboxSenderRules,
   archiveMailboxMessage,
   bulkMailboxMessageAction,
@@ -46,6 +48,7 @@ import {
   loadMailboxSessions,
   loadMailboxSnapshot,
   loadMailboxThread,
+  loadUserInvitation,
   loadSavedMailboxContacts,
   MailAttachment,
   MailboxPreferences,
@@ -60,6 +63,7 @@ import {
   MailboxPushNotification,
   MailboxRecipientRule,
   MailboxSenderRule,
+  PublicUserInvitation,
   moveMailboxMessage,
   renameMailboxFolder,
   registerMailboxPushDevice,
@@ -120,6 +124,10 @@ export default function App() {
   const [apiBaseUrl, setApiBaseUrl] = useState(defaultApiBaseUrl);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [invitationToken, setInvitationToken] = useState("");
+  const [invitationPassword, setInvitationPassword] = useState("");
+  const [invitationDisplayName, setInvitationDisplayName] = useState("");
+  const [invitation, setInvitation] = useState<PublicUserInvitation | null>(null);
   const [session, setSession] = useState<MailboxSession | null>(null);
   const [folder, setFolder] = useState("INBOX");
   const [folders, setFolders] = useState<MailFolder[]>([]);
@@ -178,6 +186,14 @@ export default function App() {
     });
   }, []);
 
+  useEffect(() => {
+    Linking.getInitialURL()
+      .then((url) => applyInviteUrl(url))
+      .catch(() => undefined);
+    const subscription = Linking.addEventListener("url", (event) => applyInviteUrl(event.url));
+    return () => subscription.remove();
+  }, []);
+
   const selectedSubject = useMemo(() => selectedMessage?.subject || "Select a message", [selectedMessage]);
   const canMutateFolder = !protectedFolders.has(folder);
   const canEmptyFolder = !emptyProtectedFolders.has(folder);
@@ -195,6 +211,57 @@ export default function App() {
       await refreshSenderRules(created);
       await refreshRecipientRules(created);
       await prepareDevelopmentPushDevice();
+    } catch (error) {
+      setStatus(readableError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadInvitation() {
+    const token = extractInvitationToken(invitationToken);
+    if (!token) {
+      setStatus("Paste an invitation link or token first.");
+      return;
+    }
+    setLoading(true);
+    setStatus("Loading invitation...");
+    try {
+      const loaded = await loadUserInvitation(apiBaseUrl, token);
+      setInvitationToken(token);
+      setInvitation(loaded);
+      setEmail(loaded.email);
+      setInvitationDisplayName(loaded.displayName || "");
+      setStatus(`Invitation loaded for ${loaded.email}.`);
+    } catch (error) {
+      setInvitation(null);
+      setStatus(readableError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function acceptInvitation() {
+    const token = extractInvitationToken(invitationToken);
+    if (!token) {
+      setStatus("Paste an invitation link or token first.");
+      return;
+    }
+    if (!invitationPassword) {
+      setStatus("Choose a password before accepting the invitation.");
+      return;
+    }
+    setLoading(true);
+    setStatus("Accepting invitation...");
+    try {
+      const accepted = await acceptUserInvitation(apiBaseUrl, token, invitationPassword, invitationDisplayName.trim());
+      setInvitation(null);
+      setInvitationToken("");
+      setInvitationPassword("");
+      setInvitationDisplayName("");
+      setEmail(accepted.email);
+      setPassword("");
+      setStatus(`Invitation accepted for ${accepted.email}. Start a session with the password you chose.`);
     } catch (error) {
       setStatus(readableError(error));
     } finally {
@@ -1214,6 +1281,14 @@ export default function App() {
     );
   }
 
+  function applyInviteUrl(url: string | null) {
+    const token = extractInvitationToken(url || "");
+    if (token) {
+      setInvitationToken(token);
+      setStatus("Invitation link loaded. Review it before creating the account.");
+    }
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
@@ -1231,14 +1306,54 @@ export default function App() {
         </View>
 
         {!session ? (
-          <View style={styles.panel}>
-            <TextInput value={apiBaseUrl} onChangeText={setApiBaseUrl} style={styles.input} autoCapitalize="none" />
-            <TextInput value={email} onChangeText={setEmail} style={styles.input} autoCapitalize="none" placeholder="Mailbox email" />
-            <TextInput value={password} onChangeText={setPassword} style={styles.input} placeholder="Mailbox password" secureTextEntry />
-            <Pressable style={styles.primaryButton} onPress={signIn}>
-              <Text style={styles.primaryButtonText}>Start session</Text>
-            </Pressable>
-          </View>
+          <ScrollView style={styles.workspace} contentContainerStyle={styles.workspaceContent}>
+            <View style={styles.panel}>
+              <Text style={styles.sectionTitle}>Mailbox session</Text>
+              <TextInput value={apiBaseUrl} onChangeText={setApiBaseUrl} style={styles.input} autoCapitalize="none" />
+              <TextInput value={email} onChangeText={setEmail} style={styles.input} autoCapitalize="none" placeholder="Mailbox email" />
+              <TextInput value={password} onChangeText={setPassword} style={styles.input} placeholder="Mailbox password" secureTextEntry />
+              <Pressable style={styles.primaryButton} onPress={signIn}>
+                <Text style={styles.primaryButtonText}>Start session</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.panel}>
+              <Text style={styles.sectionTitle}>Invitation signup</Text>
+              <TextInput
+                value={invitationToken}
+                onChangeText={setInvitationToken}
+                style={styles.input}
+                autoCapitalize="none"
+                placeholder="Invite link or token"
+              />
+              <Pressable style={styles.secondaryButton} onPress={loadInvitation}>
+                <Text>Load invitation</Text>
+              </Pressable>
+              {invitation ? (
+                <>
+                  <Text style={styles.meta}>
+                    {invitation.email} - expires {formatSessionExpiry(invitation.expiresAt)}
+                  </Text>
+                  <TextInput
+                    value={invitationDisplayName}
+                    onChangeText={setInvitationDisplayName}
+                    style={styles.input}
+                    placeholder="Display name"
+                  />
+                  <TextInput
+                    value={invitationPassword}
+                    onChangeText={setInvitationPassword}
+                    style={styles.input}
+                    placeholder="Choose password"
+                    secureTextEntry
+                  />
+                  <Pressable style={styles.primaryButton} onPress={acceptInvitation}>
+                    <Text style={styles.primaryButtonText}>Accept invitation</Text>
+                  </Pressable>
+                </>
+              ) : null}
+            </View>
+          </ScrollView>
         ) : (
           <>
           <View style={styles.mobileTabBar} accessibilityLabel="Mobile shell navigation">
@@ -1763,6 +1878,18 @@ export default function App() {
 
 function readableError(error: unknown): string {
   return error instanceof Error ? error.message.slice(0, 180) : "Request failed.";
+}
+
+function extractInvitationToken(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+  const inviteMatch = /[?&]invite=([^&#]+)/.exec(trimmed);
+  if (inviteMatch?.[1]) {
+    return decodeURIComponent(inviteMatch[1].replace(/\+/g, "%20"));
+  }
+  return trimmed.replace(/^.*\/invitations\//, "").split(/[?#]/)[0];
 }
 
 function prefixedSubject(prefix: string, subject: string): string {
