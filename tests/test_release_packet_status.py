@@ -244,6 +244,59 @@ def test_release_packet_status_script_discovers_default_manifest(tmp_path):
     assert artifacts["metadata_backup"].read_text(encoding="utf-8") == "{}"
 
 
+def test_release_packet_status_script_discovers_conventional_external_evidence_when_manifest_is_blank(tmp_path):
+    workspace = tmp_path / "workspace"
+    release_dir = workspace / ".freemail-qa" / "release"
+    release_dir.mkdir(parents=True)
+    copy_script_tree(workspace)
+    artifacts = create_packet_files(workspace)
+    conventional_mobile = workspace / ".freemail-qa" / "mobile-release-evidence.freemail.kuzuryu.ai.json"
+    conventional_private_beta = workspace / ".freemail-qa" / "private-beta-gate.freemail.kuzuryu.ai.json"
+    artifacts["mobile_release_evidence"].replace(conventional_mobile)
+    artifacts["private_beta_evidence"].replace(conventional_private_beta)
+    manifest = release_dir / "release-evidence-manifest.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "releaseVersion": "v0.1.0-private-beta",
+                "requireMobileStoreSubmission": True,
+                "releaseGateInputs": {
+                    "--metadata-backup": "../backups/metadata.json",
+                    "--mail-store-backup": "../backups/stalwart-mail-store.tar.gz",
+                    "--restore-drill-evidence": "../backups/restore-drill-evidence.json",
+                    "--mobile-release-evidence": "",
+                    "--mobile-app-config": "../../apps/mobile/app.json",
+                    "--private-beta-evidence": "",
+                    "--release-notes": "../../docs/release-notes/v0.1.0-private-beta.md",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    completed = subprocess.run(
+        [sys.executable, "scripts/release_packet_status.py"],
+        cwd=workspace,
+        capture_output=True,
+        env={**os.environ, "PYTHONPATH": str(ROOT / "src")},
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0
+    payload = json.loads(completed.stdout)
+    artifacts_by_flag = {artifact["flag"]: artifact for artifact in payload["artifacts"]}
+    assert payload["ready"] is True
+    assert Path(artifacts_by_flag["--mobile-release-evidence"]["path"]).parts == (
+        ".freemail-qa",
+        "mobile-release-evidence.freemail.kuzuryu.ai.json",
+    )
+    assert Path(artifacts_by_flag["--private-beta-evidence"]["path"]).parts == (
+        ".freemail-qa",
+        "private-beta-gate.freemail.kuzuryu.ai.json",
+    )
+
+
 def valid_mobile_app_config():
     return {
         "expo": {

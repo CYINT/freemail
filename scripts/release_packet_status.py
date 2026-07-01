@@ -12,6 +12,14 @@ from freemail_api.release_packet_status import ReleasePacketStatusOptions, summa
 DEFAULT_MANIFEST = Path(".freemail-qa/release/release-evidence-manifest.json")
 DEFAULT_RELEASE_NOTES = Path("docs/release-notes/v0.1.0-private-beta.md")
 DEFAULT_MOBILE_APP_CONFIG = Path("apps/mobile/app.json")
+DEFAULT_MOBILE_RELEASE_EVIDENCE_CANDIDATES = (
+    Path(".freemail-qa/mobile-release-evidence.freemail.kuzuryu.ai.json"),
+    Path(".freemail-qa/mobile-release-evidence.json"),
+)
+DEFAULT_PRIVATE_BETA_EVIDENCE_CANDIDATES = (
+    Path(".freemail-qa/private-beta-gate.freemail.kuzuryu.ai.json"),
+    Path(".freemail-qa/private-beta-gate.json"),
+)
 
 
 def main() -> int:
@@ -47,11 +55,15 @@ def _options_from_args(
         metadata_backup=args.metadata_backup or _manifest_value(manifest, "metadata_backup"),
         mail_store_backup=args.mail_store_backup or _manifest_value(manifest, "mail_store_backup"),
         restore_drill_evidence=args.restore_drill_evidence or _manifest_value(manifest, "restore_drill_evidence"),
-        mobile_release_evidence=args.mobile_release_evidence or _manifest_value(manifest, "mobile_release_evidence"),
+        mobile_release_evidence=args.mobile_release_evidence
+        or _manifest_value(manifest, "mobile_release_evidence")
+        or _default_existing(DEFAULT_MOBILE_RELEASE_EVIDENCE_CANDIDATES),
         mobile_app_config=args.mobile_app_config
         or _manifest_value(manifest, "mobile_app_config")
         or DEFAULT_MOBILE_APP_CONFIG,
-        private_beta_evidence=args.private_beta_evidence or _manifest_value(manifest, "private_beta_evidence"),
+        private_beta_evidence=args.private_beta_evidence
+        or _manifest_value(manifest, "private_beta_evidence")
+        or _default_existing(DEFAULT_PRIVATE_BETA_EVIDENCE_CANDIDATES),
         release_notes=args.release_notes or _manifest_value(manifest, "release_notes") or DEFAULT_RELEASE_NOTES,
         release_version=args.release_version or _manifest_value(manifest, "release_version"),
         require_mobile_store_submission=args.require_mobile_store_submission
@@ -61,6 +73,10 @@ def _options_from_args(
 
 def _default_manifest() -> Path | None:
     return DEFAULT_MANIFEST if DEFAULT_MANIFEST.exists() else None
+
+
+def _default_existing(paths: tuple[Path, ...]) -> Path | None:
+    return next((path for path in paths if path.exists()), None)
 
 
 def _manifest_value(manifest: ReleasePacketStatusOptions | None, field: str):

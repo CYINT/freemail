@@ -499,7 +499,7 @@ Before running the hard release gate, inspect the local release packet inventory
 .\.venv\Scripts\python.exe scripts\release_packet_status.py
 ```
 
-Packet status is read-only. By default it uses `.freemail-qa\release\release-evidence-manifest.json` when that ignored manifest exists, always checks the committed `docs\release-notes\v0.1.0-private-beta.md`, and validates restore-drill, mobile release, private-beta, and release-notes evidence locally. It does not replace the hard release gate's GitHub Actions, Docker Compose, VPN runtime, runtime security-header, product-readiness, metadata-readiness, or mail-core-readiness checks.
+Packet status is read-only. By default it uses `.freemail-qa\release\release-evidence-manifest.json` when that ignored manifest exists, falls back to conventional external evidence paths such as `.freemail-qa\mobile-release-evidence.freemail.kuzuryu.ai.json` and `.freemail-qa\private-beta-gate.freemail.kuzuryu.ai.json` when manifest fields are blank, always checks the committed `docs\release-notes\v0.1.0-private-beta.md`, and validates restore-drill, mobile release, private-beta, and release-notes evidence locally. It does not replace the hard release gate's GitHub Actions, Docker Compose, VPN runtime, runtime security-header, product-readiness, metadata-readiness, or mail-core-readiness checks.
 
 Explicit artifact flags can override manifest entries when evidence is stored in a different location:
 
