@@ -827,7 +827,7 @@ h2 {
 
 .audit-log-filter {
   display: grid;
-  grid-template-columns: repeat(4, minmax(9rem, 1fr)) auto auto;
+  grid-template-columns: repeat(4, minmax(8rem, 1fr)) repeat(3, auto);
   align-items: end;
   gap: 0.55rem;
   margin-top: 0.7rem;

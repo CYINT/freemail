@@ -1,7 +1,9 @@
 import binascii
 from collections.abc import Iterator
 from contextlib import asynccontextmanager
+import csv
 from hashlib import sha256
+import io
 import base64
 import imaplib
 import smtplib
@@ -2131,6 +2133,38 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             target_id=target_id,
         )
         return {**page, "items": _rows_to_dicts(page["items"])}
+
+    @app.get("/api/v1/admin/audit-log/export")
+    def audit_log_export(
+        limit: int = Query(default=1000, ge=1, le=1000),
+        offset: int = Query(default=0, ge=0),
+        actor: str | None = Query(default=None, min_length=1, max_length=256),
+        action: str | None = Query(default=None, min_length=1, max_length=128),
+        target_type: str | None = Query(default=None, alias="targetType", min_length=1, max_length=64),
+        target_id: int | None = Query(default=None, alias="targetId", ge=1),
+        principal: AdminPrincipal = Depends(require_admin),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> Response:
+        require_permission(principal, "admin.read")
+        page = database.list_audit_log(
+            connection,
+            limit=limit,
+            offset=offset,
+            actor=actor,
+            action=action,
+            target_type=target_type,
+            target_id=target_id,
+        )
+        output = io.StringIO()
+        fieldnames = ["id", "actor", "action", "target_type", "target_id", "created_at"]
+        writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore", lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(_rows_to_dicts(page["items"]))
+        return Response(
+            content=output.getvalue(),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": 'attachment; filename="freemail-audit-log.csv"'},
+        )
 
     return app
 

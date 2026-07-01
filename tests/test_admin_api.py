@@ -1,4 +1,6 @@
 from hashlib import sha256
+import csv
+import io
 from pathlib import Path
 import sqlite3
 
@@ -214,6 +216,64 @@ def test_admin_audit_log_page_filters_and_paginates(tmp_path):
 def test_admin_audit_log_page_rejects_unbounded_limit(tmp_path):
     with make_client(tmp_path) as client:
         response = client.get("/api/v1/admin/audit-log/page?limit=1000", headers=admin_headers())
+
+    assert response.status_code == 422
+
+
+def test_admin_audit_log_export_filters_and_downloads_csv(tmp_path):
+    with make_client(tmp_path) as client:
+        domain = client.post(
+            "/api/v1/admin/domains",
+            headers=admin_headers(),
+            json={"name": "example.com"},
+        )
+        user = client.post(
+            "/api/v1/admin/users",
+            headers=admin_headers(),
+            json={
+                "email": "admin@example.com",
+                "displayName": "Admin User",
+                "initialPassword": "correct horse battery",
+                "isAdmin": True,
+            },
+        )
+        client.post(
+            "/api/v1/admin/mailboxes",
+            headers=admin_headers(),
+            json={"userId": user.json()["id"], "localPart": "admin", "domainId": domain.json()["id"]},
+        )
+
+        response = client.get(
+            "/api/v1/admin/audit-log/export?action=user.invite",
+            headers=admin_headers(),
+        )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/csv")
+    assert response.headers["content-disposition"] == 'attachment; filename="freemail-audit-log.csv"'
+    rows = list(csv.DictReader(io.StringIO(response.text)))
+    assert rows == [
+        {
+            "id": "2",
+            "actor": "admin-api",
+            "action": "user.invite",
+            "target_type": "user",
+            "target_id": str(user.json()["id"]),
+            "created_at": rows[0]["created_at"],
+        }
+    ]
+
+
+def test_admin_audit_log_export_requires_admin_read_permission(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.get("/api/v1/admin/audit-log/export")
+
+    assert response.status_code in {401, 403}
+
+
+def test_admin_audit_log_export_rejects_unbounded_limit(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.get("/api/v1/admin/audit-log/export?limit=1001", headers=admin_headers())
 
     assert response.status_code == 422
 

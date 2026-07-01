@@ -2636,9 +2636,25 @@ function renderAdminSessions(payload) {
 }
 
 function adminAuditLogPath() {
-  const params = new URLSearchParams({
+  return `${adminAuditLogBasePath("/api/v1/admin/audit-log/page")}`;
+}
+
+function adminAuditLogExportPath() {
+  const params = adminAuditLogParams({ limit: "1000", offset: String(adminAuditLogQuery.offset) });
+  return `/api/v1/admin/audit-log/export?${params.toString()}`;
+}
+
+function adminAuditLogBasePath(endpoint) {
+  const params = adminAuditLogParams({
     limit: String(adminAuditLogQuery.limit),
     offset: String(adminAuditLogQuery.offset),
+  });
+  return `${endpoint}?${params.toString()}`;
+}
+
+function adminAuditLogParams(baseParams) {
+  const params = new URLSearchParams({
+    ...baseParams,
   });
   ["actor", "action", "targetType", "targetId"].forEach((key) => {
     const value = String(adminAuditLogQuery[key] || "").trim();
@@ -2646,7 +2662,7 @@ function adminAuditLogPath() {
       params.set(key, value);
     }
   });
-  return `/api/v1/admin/audit-log/page?${params.toString()}`;
+  return params;
 }
 
 function adminAuditLogPanel(page) {
@@ -2665,6 +2681,7 @@ function adminAuditLogPanel(page) {
     labeledAuditInput("Target type", "targetType", "user"),
     labeledAuditInput("Target ID", "targetId", "42", "number"),
     auditFilterButton("Apply", "submit"),
+    auditFilterButton("Export CSV", "button", exportAdminAuditLog),
     auditFilterButton("Clear", "button", () => {
       adminAuditLogQuery = { ...adminAuditLogQuery, offset: 0, actor: "", action: "", targetType: "", targetId: "" };
       loadAdminOverview();
@@ -2701,6 +2718,30 @@ function adminAuditLogPanel(page) {
 
   section.replaceChildren(heading, form, table, pager);
   return section;
+}
+
+async function exportAdminAuditLog() {
+  if (!hasAdminCredential()) {
+    setAdminStatus("Save an admin session before exporting audit events.", "error");
+    return;
+  }
+  try {
+    const response = await fetch(new URL(adminAuditLogExportPath(), adminSession.apiBaseUrl), {
+      headers: adminHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const blob = await response.blob();
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "freemail-audit-log.csv";
+    link.click();
+    URL.revokeObjectURL(link.href);
+    setAdminStatus("Audit CSV exported.", "ready");
+  } catch (error) {
+    setAdminStatus(`Audit export failed: ${readableError(error)}`, "error");
+  }
 }
 
 function labeledAuditInput(labelText, name, placeholder, type = "search") {
