@@ -32,12 +32,16 @@ def main() -> int:
     html = root / "apps" / "web" / "index.html"
     css = root / "apps" / "web" / "styles.css"
     js = root / "apps" / "web" / "app.js"
+    caddyfile = root / "ops" / "caddy" / "Caddyfile"
+    compose = root / "docker-compose.yml"
     parser = StaticWebParser()
     parser.feed(html.read_text(encoding="utf-8"))
     css_text = css.read_text(encoding="utf-8")
     js_text = js.read_text(encoding="utf-8")
+    caddy_text = caddyfile.read_text(encoding="utf-8")
+    compose_text = compose.read_text(encoding="utf-8")
 
-    failures = _validate(parser, css_text, js_text)
+    failures = _validate(parser, css_text, js_text, caddy_text, compose_text)
     if failures:
         for failure in failures:
             print(failure, file=sys.stderr)
@@ -46,7 +50,7 @@ def main() -> int:
     return 0
 
 
-def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]:
+def _validate(parser: StaticWebParser, css_text: str, js_text: str, caddy_text: str, compose_text: str) -> list[str]:
     failures = []
     required_classes = {
         "app-shell",
@@ -103,6 +107,25 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str) -> list[str]
         failures.append("missing visible focus styling")
     if "border-radius: 8px" not in css_text:
         failures.append("missing bounded 8px radius")
+    for marker in [
+        "./ops/caddy/Caddyfile:/etc/caddy/Caddyfile:ro",
+        "Content-Security-Policy",
+        "default-src 'self'",
+        "connect-src 'self' http://127.0.0.1:18090 https://freemail.kuzuryu.ai",
+        "frame-ancestors 'none'",
+        "Cross-Origin-Opener-Policy",
+        "same-origin",
+        "Permissions-Policy",
+        "camera=(), geolocation=(), microphone=(), payment=(), usb=()",
+        "Referrer-Policy",
+        "no-referrer",
+        "X-Content-Type-Options",
+        "nosniff",
+        "X-Frame-Options",
+        "DENY",
+    ]:
+        if marker not in f"{compose_text}\n{caddy_text}":
+            failures.append(f"missing web security header marker: {marker}")
     if "./app.js" not in parser.attributes.get("src", []):
         failures.append("missing webmail client script")
     for marker in [

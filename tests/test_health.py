@@ -25,6 +25,19 @@ def test_health_reports_vpn_only_release_metadata():
     }
 
 
+def test_api_responses_include_security_headers():
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.headers["content-security-policy"].startswith("default-src 'self'")
+    assert "frame-ancestors 'none'" in response.headers["content-security-policy"]
+    assert response.headers["cross-origin-opener-policy"] == "same-origin"
+    assert "camera=()" in response.headers["permissions-policy"]
+    assert response.headers["referrer-policy"] == "no-referrer"
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+
+
 def test_product_scope_includes_server_web_and_mobile():
     response = client.get("/api/v1/product")
 

@@ -187,6 +187,27 @@ ROLE_PERMISSIONS = {
 }
 
 
+SECURITY_HEADERS = {
+    "Content-Security-Policy": (
+        "default-src 'self'; "
+        "base-uri 'self'; "
+        "connect-src 'self' http://127.0.0.1:18090 https://freemail.kuzuryu.ai; "
+        "form-action 'self'; "
+        "frame-ancestors 'none'; "
+        "img-src 'self' data:; "
+        "object-src 'none'; "
+        "script-src 'self'; "
+        "style-src 'self'; "
+        "upgrade-insecure-requests"
+    ),
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Permissions-Policy": "camera=(), geolocation=(), microphone=(), payment=(), usb=()",
+    "Referrer-Policy": "no-referrer",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+}
+
+
 COMPONENT_READINESS = {
     "adminApi": {
         "status": "ready",
@@ -215,7 +236,7 @@ COMPONENT_READINESS = {
             "persistent mailbox preferences with default compose signatures and saved address-book contacts",
             "server-side Drafts persistence and compose reopen support for saved drafts",
             "server-side Sent Items persistence for accepted outbound messages",
-            "tab-scoped browser bearer-session storage and token-gated admin console for bootstrap, MFA setup, users, password rotation, domains, mailboxes, aliases, DKIM, DNS guidance, status actions, sync status, and audit logs",
+            "tab-scoped browser bearer-session storage, HTTP security headers, and token-gated admin console for bootstrap, MFA setup, users, password rotation, domains, mailboxes, aliases, DKIM, DNS guidance, status actions, sync status, and audit logs",
             "browser and static QA in CI",
         ],
         "remainingReleaseEvidence": [
@@ -271,6 +292,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "X-FreeMail-Mailbox-Password",
             ],
         )
+
+    @app.middleware("http")
+    async def add_security_headers(request, call_next):
+        response = await call_next(request)
+        for name, value in SECURITY_HEADERS.items():
+            response.headers.setdefault(name, value)
+        return response
 
     def get_connection() -> Iterator[sqlite3.Connection]:
         with database.connect(active_settings.database_path) as connection:

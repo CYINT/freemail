@@ -1,6 +1,20 @@
 from scripts.qa_web_static import StaticWebParser, _validate
 
 
+CSS_FIXTURE = "@media (max-width: 640px) {} button { min-height: 38px; outline: 1px solid; border-radius: 8px; }"
+CADDY_FIXTURE = (
+    "Content-Security-Policy \"default-src 'self'; "
+    "connect-src 'self' http://127.0.0.1:18090 https://freemail.kuzuryu.ai; "
+    "frame-ancestors 'none';\" "
+    "Cross-Origin-Opener-Policy \"same-origin\" "
+    "Permissions-Policy \"camera=(), geolocation=(), microphone=(), payment=(), usb=()\" "
+    "Referrer-Policy \"no-referrer\" "
+    "X-Content-Type-Options \"nosniff\" "
+    "X-Frame-Options \"DENY\""
+)
+COMPOSE_FIXTURE = "./ops/caddy/Caddyfile:/etc/caddy/Caddyfile:ro"
+
+
 def test_static_web_parser_collects_classes_and_text():
     parser = StaticWebParser()
     parser.feed('<main class="app-shell"><section>Inbox</section></main>')
@@ -20,8 +34,10 @@ def test_static_web_validation_flags_provider_trade_dress_text():
 
     failures = _validate(
         parser,
-        "@media (max-width: 640px) {} button { min-height: 38px; outline: 1px solid; border-radius: 8px; }",
+        CSS_FIXTURE,
         "",
+        CADDY_FIXTURE,
+        COMPOSE_FIXTURE,
     )
 
     assert "forbidden provider/trade-dress text found: Gmail" in failures
@@ -69,7 +85,7 @@ def test_static_web_validation_flags_credential_storage():
 
     failures = _validate(
         parser,
-        "@media (max-width: 640px) {} button { min-height: 38px; outline: 1px solid; border-radius: 8px; }",
+        CSS_FIXTURE,
         "fetch('/api/v1/mailbox/session', {headers: {Authorization: 'Bearer token'}}); "
         "fetch('/api/v1/mailbox/sessions'); loadMailboxSessions(); revokeAllMailboxSessions(); "
         "mailbox-sessions-refresh; mailbox-sessions-revoke-all; "
@@ -123,6 +139,8 @@ def test_static_web_validation_flags_credential_storage():
         "isDraftMessage({}); quoteMessage({}, 'reply'); "
         "fetch('/api/v1/mailbox/send', {method: \"POST\", "
         'headers: {"Content-Type": "application/json"}}); localStorage.setItem("password", "secret");',
+        CADDY_FIXTURE,
+        COMPOSE_FIXTURE,
     )
 
     assert "mailbox client must not store mailbox passwords in localStorage" in failures

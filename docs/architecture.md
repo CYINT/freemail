@@ -124,3 +124,7 @@ The current mobile foundation covers:
 Raw and encrypted push-provider tokens are never returned by API responses and are excluded from metadata backups. APNS/FCM dispatch remains disabled until operators configure `FREEMAIL_PUSH_TOKEN_SECRET` plus the corresponding provider credentials in deployment secrets.
 
 Remaining mobile release work is macOS iOS native build-drill evidence, app-store signing, and private-beta device validation.
+
+## Web And API Security Headers
+
+The FastAPI app attaches a conservative HTTP security-header baseline to API responses, including CSP, frame denial, no-referrer policy, content-type sniffing prevention, opener isolation, and a restrictive permissions policy. The Caddy web container mounts `ops/caddy/Caddyfile` and applies the same baseline to static webmail assets. `scripts/qa_web_static.py` validates that Docker Compose still mounts that Caddyfile and that the expected header directives remain present.

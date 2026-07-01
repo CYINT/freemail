@@ -32,6 +32,7 @@ services:
     image: caddy:2-alpine
     profiles: ["web"]
     volumes:
+      - ./ops/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - ./apps/web:/usr/share/caddy:ro
     ports:
       - "${FREEMAIL_BIND_ADDRESS:-127.0.0.1}:${FREEMAIL_WEB_PORT:-18091}:80"
