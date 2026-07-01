@@ -89,6 +89,22 @@ jobs:
         if: ${{ always() }}
         run: |
           mkdir -p .freemail-qa/mobile-eas
+          confirmation_accepted=false
+          if [ "${{ inputs.confirmation }}" = "launch-mobile-private-beta" ]; then
+            confirmation_accepted=true
+          fi
+          expo_token_configured=false
+          if [ -n "$EXPO_TOKEN" ]; then
+            expo_token_configured=true
+          fi
+          submit_platform_valid=true
+          if [ "${{ inputs.submit_after_build }}" = "true" ] && [ "${{ inputs.platform }}" = "all" ]; then
+            submit_platform_valid=false
+          fi
+          ready_to_launch_eas=false
+          if [ "$confirmation_accepted" = "true" ] && [ "$expo_token_configured" = "true" ] && [ "$submit_platform_valid" = "true" ]; then
+            ready_to_launch_eas=true
+          fi
           cat > .freemail-qa/mobile-eas/workflow-summary.json <<JSON
           {
             "credentialFree": true,
@@ -97,9 +113,14 @@ jobs:
             "runId": "${{ github.run_id }}",
             "runAttempt": "${{ github.run_attempt }}",
             "commit": "${{ github.sha }}",
+            "jobStatus": "${{ job.status }}",
             "platform": "${{ inputs.platform }}",
             "profile": "${{ inputs.profile }}",
             "submitAfterBuild": ${{ inputs.submit_after_build }},
+            "confirmationAccepted": $confirmation_accepted,
+            "expoTokenConfigured": $expo_token_configured,
+            "submitPlatformValid": $submit_platform_valid,
+            "readyToLaunchEas": $ready_to_launch_eas,
             "buildEvidenceCommand": "python scripts/collect_mobile_build_evidence.py --platform <ios-or-android> --signed --distribution private-beta --build-url <https-build-evidence-url> --native-build-id <native-build-id> --artifact-type <ipa-or-aab> --artifact-bytes <bytes> --artifact-sha256 <sha256>",
             "storeSubmissionEvidenceCommand": "python scripts/collect_mobile_store_submission.py --platform <ios-or-android> --submitted --track <testflight-or-internal-testing> --submission-url <https-store-submission-url> --native-build-id <native-build-id> --submitted-at <iso-8601> --review-state <state>"
           }
