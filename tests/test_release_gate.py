@@ -643,8 +643,22 @@ def valid_mobile_app_config():
         "expo": {
             "name": "FreeMail",
             "version": "0.1.0-dev",
-            "ios": {"bundleIdentifier": "technology.cyint.freemail"},
-            "android": {"package": "technology.cyint.freemail"},
+            "scheme": "freemail",
+            "ios": {
+                "bundleIdentifier": "technology.cyint.freemail",
+                "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
+            },
+            "android": {
+                "package": "technology.cyint.freemail",
+                "intentFilters": [
+                    {
+                        "action": "VIEW",
+                        "autoVerify": True,
+                        "data": [{"scheme": "https", "host": "freemail.kuzuryu.ai"}],
+                        "category": ["BROWSABLE", "DEFAULT"],
+                    }
+                ],
+            },
             "extra": {"apiBaseUrl": "https://freemail.kuzuryu.ai"},
         }
     }

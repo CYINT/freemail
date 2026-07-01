@@ -111,6 +111,7 @@ The current mobile foundation covers:
 
 - VPN-only default API target at `https://freemail.kuzuryu.ai`
 - mobile invitation signup from deep links or pasted invite tokens
+- native invite-link routing through the `freemail` URL scheme, iOS associated domains, and Android verified HTTPS intent filters
 - mailbox session creation and revocation
 - SecureStore-backed bearer-session persistence
 - paginated inbox snapshot/search, message read, read/unread and star-state controls, bulk message actions, compose/send, reply, and forward workflows

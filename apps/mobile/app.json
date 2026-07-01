@@ -7,10 +7,29 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "bundleIdentifier": "technology.cyint.freemail"
+      "bundleIdentifier": "technology.cyint.freemail",
+      "associatedDomains": [
+        "applinks:freemail.kuzuryu.ai"
+      ]
     },
     "android": {
-      "package": "technology.cyint.freemail"
+      "package": "technology.cyint.freemail",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "freemail.kuzuryu.ai"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "extra": {
       "apiBaseUrl": "https://freemail.kuzuryu.ai"

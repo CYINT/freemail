@@ -13,6 +13,9 @@ from .release_gate import _file_evidence_details
 EXPECTED_IOS_BUNDLE_ID = "technology.cyint.freemail"
 EXPECTED_ANDROID_PACKAGE = "technology.cyint.freemail"
 EXPECTED_API_BASE_URL = "https://freemail.kuzuryu.ai"
+EXPECTED_URL_SCHEME = "freemail"
+EXPECTED_ASSOCIATED_DOMAIN = "applinks:freemail.kuzuryu.ai"
+EXPECTED_INVITE_HOST = "freemail.kuzuryu.ai"
 FORBIDDEN_EVIDENCE_KEYS = {
     "apiKey",
     "api_key",
@@ -98,8 +101,11 @@ def _check_app_metadata(app_config: dict[str, Any], evidence: dict[str, Any]) ->
     app = evidence.get("app", {})
     passed = (
         app_config.get("name") == "FreeMail"
+        and app_config.get("scheme") == EXPECTED_URL_SCHEME
         and app_config.get("ios", {}).get("bundleIdentifier") == EXPECTED_IOS_BUNDLE_ID
+        and EXPECTED_ASSOCIATED_DOMAIN in app_config.get("ios", {}).get("associatedDomains", [])
         and app_config.get("android", {}).get("package") == EXPECTED_ANDROID_PACKAGE
+        and _has_android_invite_intent_filter(app_config)
         and app_config.get("extra", {}).get("apiBaseUrl") == EXPECTED_API_BASE_URL
         and app.get("name") == app_config.get("name")
         and app.get("version") == app_config.get("version")
@@ -112,10 +118,39 @@ def _check_app_metadata(app_config: dict[str, Any], evidence: dict[str, Any]) ->
             "name": app.get("name"),
             "version": app.get("version"),
             "apiBaseUrl": app.get("apiBaseUrl"),
+            "scheme": app_config.get("scheme"),
             "iosBundleIdentifier": app_config.get("ios", {}).get("bundleIdentifier"),
+            "iosAssociatedDomains": app_config.get("ios", {}).get("associatedDomains", []),
             "androidPackage": app_config.get("android", {}).get("package"),
+            "androidInviteIntentFilter": _has_android_invite_intent_filter(app_config),
         },
     )
+
+
+def _has_android_invite_intent_filter(app_config: dict[str, Any]) -> bool:
+    filters = app_config.get("android", {}).get("intentFilters", [])
+    if not isinstance(filters, list):
+        return False
+    for intent_filter in filters:
+        if not isinstance(intent_filter, dict):
+            continue
+        categories = intent_filter.get("category", [])
+        data_items = intent_filter.get("data", [])
+        if (
+            intent_filter.get("action") == "VIEW"
+            and intent_filter.get("autoVerify") is True
+            and isinstance(categories, list)
+            and {"BROWSABLE", "DEFAULT"}.issubset(set(categories))
+            and isinstance(data_items, list)
+            and any(
+                isinstance(item, dict)
+                and item.get("scheme") == "https"
+                and item.get("host") == EXPECTED_INVITE_HOST
+                for item in data_items
+            )
+        ):
+            return True
+    return False
 
 
 def _check_platform_build(evidence: dict[str, Any], *, platform: str) -> dict[str, Any]:

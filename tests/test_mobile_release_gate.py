@@ -13,8 +13,22 @@ def test_mobile_release_gate_accepts_signed_build_evidence(tmp_path):
             "expo": {
                 "name": "FreeMail",
                 "version": "0.1.0-dev",
-                "ios": {"bundleIdentifier": "technology.cyint.freemail"},
-                "android": {"package": "technology.cyint.freemail"},
+                "scheme": "freemail",
+                "ios": {
+                    "bundleIdentifier": "technology.cyint.freemail",
+                    "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
+                },
+                "android": {
+                    "package": "technology.cyint.freemail",
+                    "intentFilters": [
+                        {
+                            "action": "VIEW",
+                            "autoVerify": True,
+                            "data": [{"scheme": "https", "host": "freemail.kuzuryu.ai"}],
+                            "category": ["BROWSABLE", "DEFAULT"],
+                        }
+                    ],
+                },
                 "extra": {"apiBaseUrl": "https://freemail.kuzuryu.ai"},
             }
         },
@@ -36,8 +50,22 @@ def test_mobile_release_gate_accepts_store_submission_evidence_when_required(tmp
             "expo": {
                 "name": "FreeMail",
                 "version": "0.1.0-dev",
-                "ios": {"bundleIdentifier": "technology.cyint.freemail"},
-                "android": {"package": "technology.cyint.freemail"},
+                "scheme": "freemail",
+                "ios": {
+                    "bundleIdentifier": "technology.cyint.freemail",
+                    "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
+                },
+                "android": {
+                    "package": "technology.cyint.freemail",
+                    "intentFilters": [
+                        {
+                            "action": "VIEW",
+                            "autoVerify": True,
+                            "data": [{"scheme": "https", "host": "freemail.kuzuryu.ai"}],
+                            "category": ["BROWSABLE", "DEFAULT"],
+                        }
+                    ],
+                },
                 "extra": {"apiBaseUrl": "https://freemail.kuzuryu.ai"},
             }
         },
@@ -64,8 +92,22 @@ def test_mobile_release_gate_requires_store_submission_evidence_when_enabled(tmp
             "expo": {
                 "name": "FreeMail",
                 "version": "0.1.0-dev",
-                "ios": {"bundleIdentifier": "technology.cyint.freemail"},
-                "android": {"package": "technology.cyint.freemail"},
+                "scheme": "freemail",
+                "ios": {
+                    "bundleIdentifier": "technology.cyint.freemail",
+                    "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
+                },
+                "android": {
+                    "package": "technology.cyint.freemail",
+                    "intentFilters": [
+                        {
+                            "action": "VIEW",
+                            "autoVerify": True,
+                            "data": [{"scheme": "https", "host": "freemail.kuzuryu.ai"}],
+                            "category": ["BROWSABLE", "DEFAULT"],
+                        }
+                    ],
+                },
                 "extra": {"apiBaseUrl": "https://freemail.kuzuryu.ai"},
             }
         },
@@ -92,8 +134,22 @@ def test_mobile_release_gate_rejects_secret_bearing_evidence(tmp_path):
             "expo": {
                 "name": "FreeMail",
                 "version": "0.1.0-dev",
-                "ios": {"bundleIdentifier": "technology.cyint.freemail"},
-                "android": {"package": "technology.cyint.freemail"},
+                "scheme": "freemail",
+                "ios": {
+                    "bundleIdentifier": "technology.cyint.freemail",
+                    "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
+                },
+                "android": {
+                    "package": "technology.cyint.freemail",
+                    "intentFilters": [
+                        {
+                            "action": "VIEW",
+                            "autoVerify": True,
+                            "data": [{"scheme": "https", "host": "freemail.kuzuryu.ai"}],
+                            "category": ["BROWSABLE", "DEFAULT"],
+                        }
+                    ],
+                },
                 "extra": {"apiBaseUrl": "https://freemail.kuzuryu.ai"},
             }
         },
@@ -118,8 +174,22 @@ def test_mobile_release_gate_rejects_wrong_android_identifier(tmp_path):
             "expo": {
                 "name": "FreeMail",
                 "version": "0.1.0-dev",
-                "ios": {"bundleIdentifier": "technology.cyint.freemail"},
-                "android": {"package": "technology.cyint.freemail"},
+                "scheme": "freemail",
+                "ios": {
+                    "bundleIdentifier": "technology.cyint.freemail",
+                    "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
+                },
+                "android": {
+                    "package": "technology.cyint.freemail",
+                    "intentFilters": [
+                        {
+                            "action": "VIEW",
+                            "autoVerify": True,
+                            "data": [{"scheme": "https", "host": "freemail.kuzuryu.ai"}],
+                            "category": ["BROWSABLE", "DEFAULT"],
+                        }
+                    ],
+                },
                 "extra": {"apiBaseUrl": "https://freemail.kuzuryu.ai"},
             }
         },
@@ -144,8 +214,22 @@ def test_mobile_release_gate_rejects_missing_device_validation(tmp_path):
             "expo": {
                 "name": "FreeMail",
                 "version": "0.1.0-dev",
-                "ios": {"bundleIdentifier": "technology.cyint.freemail"},
-                "android": {"package": "technology.cyint.freemail"},
+                "scheme": "freemail",
+                "ios": {
+                    "bundleIdentifier": "technology.cyint.freemail",
+                    "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
+                },
+                "android": {
+                    "package": "technology.cyint.freemail",
+                    "intentFilters": [
+                        {
+                            "action": "VIEW",
+                            "autoVerify": True,
+                            "data": [{"scheme": "https", "host": "freemail.kuzuryu.ai"}],
+                            "category": ["BROWSABLE", "DEFAULT"],
+                        }
+                    ],
+                },
                 "extra": {"apiBaseUrl": "https://freemail.kuzuryu.ai"},
             }
         },
@@ -170,8 +254,22 @@ def test_mobile_release_gate_rejects_device_validation_without_vpn_boundary(tmp_
             "expo": {
                 "name": "FreeMail",
                 "version": "0.1.0-dev",
-                "ios": {"bundleIdentifier": "technology.cyint.freemail"},
-                "android": {"package": "technology.cyint.freemail"},
+                "scheme": "freemail",
+                "ios": {
+                    "bundleIdentifier": "technology.cyint.freemail",
+                    "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
+                },
+                "android": {
+                    "package": "technology.cyint.freemail",
+                    "intentFilters": [
+                        {
+                            "action": "VIEW",
+                            "autoVerify": True,
+                            "data": [{"scheme": "https", "host": "freemail.kuzuryu.ai"}],
+                            "category": ["BROWSABLE", "DEFAULT"],
+                        }
+                    ],
+                },
                 "extra": {"apiBaseUrl": "https://freemail.kuzuryu.ai"},
             }
         },
@@ -196,8 +294,22 @@ def test_mobile_release_gate_rejects_malformed_artifact_hash(tmp_path):
             "expo": {
                 "name": "FreeMail",
                 "version": "0.1.0-dev",
-                "ios": {"bundleIdentifier": "technology.cyint.freemail"},
-                "android": {"package": "technology.cyint.freemail"},
+                "scheme": "freemail",
+                "ios": {
+                    "bundleIdentifier": "technology.cyint.freemail",
+                    "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
+                },
+                "android": {
+                    "package": "technology.cyint.freemail",
+                    "intentFilters": [
+                        {
+                            "action": "VIEW",
+                            "autoVerify": True,
+                            "data": [{"scheme": "https", "host": "freemail.kuzuryu.ai"}],
+                            "category": ["BROWSABLE", "DEFAULT"],
+                        }
+                    ],
+                },
                 "extra": {"apiBaseUrl": "https://freemail.kuzuryu.ai"},
             }
         },
@@ -222,8 +334,22 @@ def test_mobile_release_gate_rejects_insecure_build_url(tmp_path):
             "expo": {
                 "name": "FreeMail",
                 "version": "0.1.0-dev",
-                "ios": {"bundleIdentifier": "technology.cyint.freemail"},
-                "android": {"package": "technology.cyint.freemail"},
+                "scheme": "freemail",
+                "ios": {
+                    "bundleIdentifier": "technology.cyint.freemail",
+                    "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
+                },
+                "android": {
+                    "package": "technology.cyint.freemail",
+                    "intentFilters": [
+                        {
+                            "action": "VIEW",
+                            "autoVerify": True,
+                            "data": [{"scheme": "https", "host": "freemail.kuzuryu.ai"}],
+                            "category": ["BROWSABLE", "DEFAULT"],
+                        }
+                    ],
+                },
                 "extra": {"apiBaseUrl": "https://freemail.kuzuryu.ai"},
             }
         },
@@ -248,8 +374,22 @@ def test_mobile_release_gate_rejects_insecure_store_submission_url(tmp_path):
             "expo": {
                 "name": "FreeMail",
                 "version": "0.1.0-dev",
-                "ios": {"bundleIdentifier": "technology.cyint.freemail"},
-                "android": {"package": "technology.cyint.freemail"},
+                "scheme": "freemail",
+                "ios": {
+                    "bundleIdentifier": "technology.cyint.freemail",
+                    "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
+                },
+                "android": {
+                    "package": "technology.cyint.freemail",
+                    "intentFilters": [
+                        {
+                            "action": "VIEW",
+                            "autoVerify": True,
+                            "data": [{"scheme": "https", "host": "freemail.kuzuryu.ai"}],
+                            "category": ["BROWSABLE", "DEFAULT"],
+                        }
+                    ],
+                },
                 "extra": {"apiBaseUrl": "https://freemail.kuzuryu.ai"},
             }
         },
@@ -277,8 +417,22 @@ def test_mobile_release_gate_rejects_malformed_store_submission_timestamp(tmp_pa
             "expo": {
                 "name": "FreeMail",
                 "version": "0.1.0-dev",
-                "ios": {"bundleIdentifier": "technology.cyint.freemail"},
-                "android": {"package": "technology.cyint.freemail"},
+                "scheme": "freemail",
+                "ios": {
+                    "bundleIdentifier": "technology.cyint.freemail",
+                    "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
+                },
+                "android": {
+                    "package": "technology.cyint.freemail",
+                    "intentFilters": [
+                        {
+                            "action": "VIEW",
+                            "autoVerify": True,
+                            "data": [{"scheme": "https", "host": "freemail.kuzuryu.ai"}],
+                            "category": ["BROWSABLE", "DEFAULT"],
+                        }
+                    ],
+                },
                 "extra": {"apiBaseUrl": "https://freemail.kuzuryu.ai"},
             }
         },
@@ -306,8 +460,22 @@ def test_mobile_release_gate_rejects_timezone_free_store_submission_timestamp(tm
             "expo": {
                 "name": "FreeMail",
                 "version": "0.1.0-dev",
-                "ios": {"bundleIdentifier": "technology.cyint.freemail"},
-                "android": {"package": "technology.cyint.freemail"},
+                "scheme": "freemail",
+                "ios": {
+                    "bundleIdentifier": "technology.cyint.freemail",
+                    "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
+                },
+                "android": {
+                    "package": "technology.cyint.freemail",
+                    "intentFilters": [
+                        {
+                            "action": "VIEW",
+                            "autoVerify": True,
+                            "data": [{"scheme": "https", "host": "freemail.kuzuryu.ai"}],
+                            "category": ["BROWSABLE", "DEFAULT"],
+                        }
+                    ],
+                },
                 "extra": {"apiBaseUrl": "https://freemail.kuzuryu.ai"},
             }
         },

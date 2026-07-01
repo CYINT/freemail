@@ -49,12 +49,18 @@ def validate_mobile(root: Path) -> list[str]:
         if dependency not in dependencies:
             failures.append(f"missing mobile dependency: {dependency}")
     expo_config = app_config.get("expo", {})
+    if expo_config.get("scheme") != "freemail":
+        failures.append("mobile app must declare the freemail URL scheme")
     if expo_config.get("extra", {}).get("apiBaseUrl") != "https://freemail.kuzuryu.ai":
         failures.append("mobile app must default to the VPN hostname")
     if expo_config.get("ios", {}).get("bundleIdentifier") != "technology.cyint.freemail":
         failures.append("mobile iOS bundle identifier must be technology.cyint.freemail")
+    if "applinks:freemail.kuzuryu.ai" not in expo_config.get("ios", {}).get("associatedDomains", []):
+        failures.append("mobile iOS associated domains must include freemail.kuzuryu.ai invite links")
     if expo_config.get("android", {}).get("package") != "technology.cyint.freemail":
         failures.append("mobile Android package must be technology.cyint.freemail")
+    if not _has_android_invite_intent_filter(expo_config):
+        failures.append("mobile Android intent filters must include freemail.kuzuryu.ai invite links")
     failures.extend(validate_eas_config(eas_config))
 
     for marker in [
@@ -67,6 +73,10 @@ def validate_mobile(root: Path) -> list[str]:
         "Accept invitation",
         "extractInvitationToken",
         "Linking.getInitialURL",
+        "\"scheme\": \"freemail\"",
+        "applinks:freemail.kuzuryu.ai",
+        "\"autoVerify\": true",
+        "\"host\": \"freemail.kuzuryu.ai\"",
         "/api/v1/mailbox/sessions",
         "/api/v1/mailbox/snapshot",
         "/api/v1/mailbox/search",
@@ -327,6 +337,33 @@ def validate_eas_config(eas_config: dict[str, object]) -> list[str]:
 
 def as_mapping(value: object) -> dict[str, object]:
     return value if isinstance(value, dict) else {}
+
+
+def _has_android_invite_intent_filter(expo_config: dict[str, object]) -> bool:
+    android = as_mapping(expo_config.get("android"))
+    filters = android.get("intentFilters")
+    if not isinstance(filters, list):
+        return False
+    for intent_filter in filters:
+        if not isinstance(intent_filter, dict):
+            continue
+        data_items = intent_filter.get("data")
+        categories = intent_filter.get("category")
+        if (
+            intent_filter.get("action") == "VIEW"
+            and intent_filter.get("autoVerify") is True
+            and isinstance(categories, list)
+            and {"BROWSABLE", "DEFAULT"}.issubset(set(categories))
+            and isinstance(data_items, list)
+            and any(
+                isinstance(item, dict)
+                and item.get("scheme") == "https"
+                and item.get("host") == "freemail.kuzuryu.ai"
+                for item in data_items
+            )
+        ):
+            return True
+    return False
 
 
 if __name__ == "__main__":
