@@ -207,6 +207,11 @@ def test_release_packet_status_reports_mobile_child_failed_requirements(tmp_path
         "required-checks"
     ]
     assert mobile_check["details"]["failedRequirements"]["ios-store-submission"] == ["submitted"]
+    assert [action["id"] for action in mobile_check["details"]["nextActions"]] == [
+        "record-ios-signed-build",
+        "record-android-device-validation",
+        "record-ios-store-submission",
+    ]
 
 
 def test_release_packet_status_reports_private_beta_failed_requirements(tmp_path):

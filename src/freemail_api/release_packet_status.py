@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .mobile_release_gate import MobileReleaseGateOptions, run_mobile_release_gate
+from .mobile_release_status import mobile_release_next_actions
 from .release_gate import _check_private_beta_evidence, _check_release_notes, _check_restore_drill_evidence
 
 
@@ -113,6 +114,7 @@ def _mobile_release_check(
             "requireStoreSubmission": require_store_submission,
             "failedChecks": [check["name"] for check in result["checks"] if check["status"] != "pass"],
             "failedRequirements": _mobile_failed_requirements(result["checks"]),
+            "nextActions": mobile_release_next_actions(result["checks"]),
             "evidenceDetails": result["evidenceDetails"],
         },
     )

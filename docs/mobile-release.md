@@ -117,7 +117,7 @@ Inspect the evidence packet before using it in a release candidate:
 .\.venv\Scripts\python.exe scripts\mobile_release_status.py --require-store-submission
 ```
 
-The status command is read-only. It reports the evidence file path, checksum, failed mobile-release checks, and whether the packet is ready for the hard release gate. It does not run native builds, access app-store APIs, sign artifacts, or connect to real devices.
+The status command is read-only. It reports the evidence file path, checksum, failed mobile-release checks, credential-free `nextActions`, and whether the packet is ready for the hard release gate. It does not run native builds, access app-store APIs, sign artifacts, or connect to real devices. The `nextActions` commands intentionally use placeholders for build URLs, hashes, byte counts, devices, testers, and store URLs so operators can collect the missing evidence without copying secrets into the evidence packet.
 
 After each signed build completes in the private signing environment, update the credential-free `builds` section through the collector:
 

@@ -20,6 +20,7 @@ def test_mobile_release_status_reports_missing_evidence(tmp_path):
     assert result["ready"] is False
     assert result["failedChecks"] == ["mobile-release-evidence"]
     assert result["checks"][0]["details"]["status"] == "missing"
+    assert [action["id"] for action in result["nextActions"]] == ["create-mobile-release-evidence-template"]
 
 
 def test_mobile_release_status_reports_failed_gate_checks_for_draft(tmp_path):
@@ -65,6 +66,21 @@ def test_mobile_release_status_reports_failed_gate_checks_for_draft(tmp_path):
         "ios-store-submission",
         "android-store-submission",
     ]
+    assert [action["id"] for action in result["nextActions"]] == [
+        "record-ios-signed-build",
+        "record-android-signed-build",
+        "record-ios-device-validation",
+        "record-android-device-validation",
+        "record-ios-store-submission",
+        "record-android-store-submission",
+    ]
+    assert set(result["nextActions"][0]["failedRequirements"]) >= {
+        "signed",
+        "artifact-sha256",
+        "artifact-bytes",
+        "build-url",
+    }
+    assert "<https-build-evidence-url>" in result["nextActions"][0]["command"]
     assert result["evidenceDetails"]["sha256"]
 
 
@@ -78,6 +94,7 @@ def test_mobile_release_status_accepts_complete_store_submission_packet(tmp_path
 
     assert result["ready"] is True
     assert result["failedChecks"] == []
+    assert result["nextActions"] == []
     assert [check["status"] for check in result["checks"]] == ["pass"] * 9
 
 
@@ -106,6 +123,10 @@ def test_mobile_release_status_script_exits_nonzero_until_ready(tmp_path):
     payload = json.loads(result.stdout)
     assert payload["ready"] is False
     assert payload["failedChecks"] == ["ios-store-submission", "android-store-submission"]
+    assert [action["id"] for action in payload["nextActions"]] == [
+        "record-ios-store-submission",
+        "record-android-store-submission",
+    ]
 
 
 def test_mobile_release_status_script_discovers_domain_specific_default_evidence(tmp_path):
