@@ -215,7 +215,7 @@ COMPONENT_READINESS = {
         "status": "ready",
         "evidence": [
             "administrator bootstrap, bearer-session login, and authenticator-app MFA",
-            "domain, user, user-password rotation, suspension-triggered session revocation, admin session inspection/revocation, mailbox quota, alias, DKIM, DNS, status, and filterable audit APIs",
+            "domain, user, user-password rotation, suspension-triggered session revocation, admin session inspection/revocation, mailbox quota, alias, DKIM, DNS, status, and filterable/exportable audit APIs",
             "metadata readiness endpoint and backup/restore coverage",
         ],
         "remainingReleaseEvidence": [],
@@ -238,7 +238,7 @@ COMPONENT_READINESS = {
             "persistent mailbox preferences with default compose signatures and saved address-book contacts",
             "server-side Drafts persistence and compose reopen support for saved drafts",
             "server-side Sent Items persistence for accepted outbound messages",
-            "tab-scoped browser bearer-session storage, HTTP security headers, and token-gated admin console for bootstrap, MFA setup, users, password rotation, domains, mailboxes, aliases, DKIM, DNS guidance, status actions, sync status, and audit logs",
+            "tab-scoped browser bearer-session storage, HTTP security headers, and token-gated admin console for bootstrap, MFA setup, users, password rotation, domains, mailboxes, aliases, DKIM, DNS guidance, status actions, sync status, and audit-log filtering, pagination, and CSV export",
             "browser and static QA in CI",
         ],
         "remainingReleaseEvidence": [
