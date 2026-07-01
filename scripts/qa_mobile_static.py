@@ -55,10 +55,18 @@ def validate_mobile(root: Path) -> list[str]:
         failures.append("mobile app must default to the VPN hostname")
     if expo_config.get("ios", {}).get("bundleIdentifier") != "technology.cyint.freemail":
         failures.append("mobile iOS bundle identifier must be technology.cyint.freemail")
+    if not str(expo_config.get("ios", {}).get("buildNumber", "")).strip():
+        failures.append("mobile iOS buildNumber must be set for release evidence binding")
     if "applinks:freemail.kuzuryu.ai" not in expo_config.get("ios", {}).get("associatedDomains", []):
         failures.append("mobile iOS associated domains must include freemail.kuzuryu.ai invite links")
     if expo_config.get("android", {}).get("package") != "technology.cyint.freemail":
         failures.append("mobile Android package must be technology.cyint.freemail")
+    try:
+        android_version_code = int(expo_config.get("android", {}).get("versionCode", 0) or 0)
+    except (TypeError, ValueError):
+        android_version_code = 0
+    if android_version_code <= 0:
+        failures.append("mobile Android versionCode must be a positive integer for release evidence binding")
     if not _has_android_invite_intent_filter(expo_config):
         failures.append("mobile Android intent filters must include freemail.kuzuryu.ai invite links")
     failures.extend(validate_eas_config(eas_config))

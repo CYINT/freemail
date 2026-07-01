@@ -684,10 +684,12 @@ def valid_mobile_app_config():
             "scheme": "freemail",
             "ios": {
                 "bundleIdentifier": "technology.cyint.freemail",
+                "buildNumber": "1",
                 "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
             },
             "android": {
                 "package": "technology.cyint.freemail",
+                "versionCode": 1,
                 "intentFilters": [
                     {
                         "action": "VIEW",
@@ -863,9 +865,11 @@ def valid_mobile_release_evidence():
             "version": "0.1.0-dev",
             "apiBaseUrl": "https://freemail.kuzuryu.ai",
         },
+        "nativeBuilds": {"ios": "1", "android": "1"},
         "builds": {
             "ios": {
                 "identifier": "technology.cyint.freemail",
+                "nativeBuildId": "1",
                 "signed": True,
                 "distribution": "private-beta",
                 "buildUrl": "https://example.invalid/ios-build",
@@ -873,6 +877,7 @@ def valid_mobile_release_evidence():
             },
             "android": {
                 "identifier": "technology.cyint.freemail",
+                "nativeBuildId": "1",
                 "signed": True,
                 "distribution": "private-beta",
                 "buildUrl": "https://example.invalid/android-build",
@@ -883,6 +888,7 @@ def valid_mobile_release_evidence():
             "ios": {
                 "store": "app-store-connect",
                 "identifier": "technology.cyint.freemail",
+                "nativeBuildId": "1",
                 "track": "testflight",
                 "submitted": True,
                 "submissionUrl": "https://example.invalid/testflight",
@@ -892,6 +898,7 @@ def valid_mobile_release_evidence():
             "android": {
                 "store": "play-console",
                 "identifier": "technology.cyint.freemail",
+                "nativeBuildId": "1",
                 "track": "internal-testing",
                 "submitted": True,
                 "submissionUrl": "https://example.invalid/play-internal",

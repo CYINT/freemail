@@ -181,9 +181,11 @@ def test_collect_mobile_device_validation_script_exits_nonzero_for_partial_recor
 def mobile_evidence_with_signed_builds():
     return {
         "app": {"name": "FreeMail", "version": "0.1.0-dev", "apiBaseUrl": "https://freemail.kuzuryu.ai"},
+        "nativeBuilds": {"ios": "1", "android": "1"},
         "builds": {
             "ios": {
                 "identifier": "technology.cyint.freemail",
+                "nativeBuildId": "1",
                 "signed": True,
                 "distribution": "private-beta",
                 "buildUrl": "https://example.invalid/ios-build",
@@ -191,6 +193,7 @@ def mobile_evidence_with_signed_builds():
             },
             "android": {
                 "identifier": "technology.cyint.freemail",
+                "nativeBuildId": "1",
                 "signed": True,
                 "distribution": "private-beta",
                 "buildUrl": "https://example.invalid/android-build",
@@ -234,10 +237,12 @@ def valid_app_config():
             "scheme": "freemail",
             "ios": {
                 "bundleIdentifier": "technology.cyint.freemail",
+                "buildNumber": "1",
                 "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
             },
             "android": {
                 "package": "technology.cyint.freemail",
+                "versionCode": 1,
                 "intentFilters": [
                     {
                         "action": "VIEW",

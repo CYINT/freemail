@@ -16,6 +16,7 @@ def main() -> int:
     parser.add_argument("--signed", action="store_true", help="Explicitly record that this build is signed.")
     parser.add_argument("--distribution", default="private-beta")
     parser.add_argument("--build-url", required=True, help="HTTPS URL to credential-free build provenance.")
+    parser.add_argument("--native-build-id", required=True, help="iOS buildNumber or Android versionCode used for this artifact.")
     parser.add_argument("--artifact-type", required=True, help="ipa for iOS; aab or apk for Android.")
     parser.add_argument("--artifact-bytes", type=int, required=True)
     parser.add_argument("--artifact-sha256", required=True)
@@ -28,6 +29,7 @@ def main() -> int:
             signed=args.signed,
             distribution=args.distribution,
             build_url=args.build_url,
+            native_build_id=args.native_build_id,
             artifact_type=args.artifact_type,
             artifact_bytes=args.artifact_bytes,
             artifact_sha256=args.artifact_sha256,

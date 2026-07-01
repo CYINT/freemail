@@ -16,10 +16,12 @@ def test_mobile_release_gate_accepts_signed_build_evidence(tmp_path):
                 "scheme": "freemail",
                 "ios": {
                     "bundleIdentifier": "technology.cyint.freemail",
+                    "buildNumber": "1",
                     "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
                 },
                 "android": {
                     "package": "technology.cyint.freemail",
+                    "versionCode": 1,
                     "intentFilters": [
                         {
                             "action": "VIEW",
@@ -53,10 +55,12 @@ def test_mobile_release_gate_accepts_store_submission_evidence_when_required(tmp
                 "scheme": "freemail",
                 "ios": {
                     "bundleIdentifier": "technology.cyint.freemail",
+                    "buildNumber": "1",
                     "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
                 },
                 "android": {
                     "package": "technology.cyint.freemail",
+                    "versionCode": 1,
                     "intentFilters": [
                         {
                             "action": "VIEW",
@@ -95,10 +99,12 @@ def test_mobile_release_gate_requires_store_submission_evidence_when_enabled(tmp
                 "scheme": "freemail",
                 "ios": {
                     "bundleIdentifier": "technology.cyint.freemail",
+                    "buildNumber": "1",
                     "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
                 },
                 "android": {
                     "package": "technology.cyint.freemail",
+                    "versionCode": 1,
                     "intentFilters": [
                         {
                             "action": "VIEW",
@@ -137,10 +143,12 @@ def test_mobile_release_gate_rejects_secret_bearing_evidence(tmp_path):
                 "scheme": "freemail",
                 "ios": {
                     "bundleIdentifier": "technology.cyint.freemail",
+                    "buildNumber": "1",
                     "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
                 },
                 "android": {
                     "package": "technology.cyint.freemail",
+                    "versionCode": 1,
                     "intentFilters": [
                         {
                             "action": "VIEW",
@@ -177,10 +185,12 @@ def test_mobile_release_gate_rejects_wrong_android_identifier(tmp_path):
                 "scheme": "freemail",
                 "ios": {
                     "bundleIdentifier": "technology.cyint.freemail",
+                    "buildNumber": "1",
                     "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
                 },
                 "android": {
                     "package": "technology.cyint.freemail",
+                    "versionCode": 1,
                     "intentFilters": [
                         {
                             "action": "VIEW",
@@ -217,10 +227,12 @@ def test_mobile_release_gate_rejects_missing_device_validation(tmp_path):
                 "scheme": "freemail",
                 "ios": {
                     "bundleIdentifier": "technology.cyint.freemail",
+                    "buildNumber": "1",
                     "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
                 },
                 "android": {
                     "package": "technology.cyint.freemail",
+                    "versionCode": 1,
                     "intentFilters": [
                         {
                             "action": "VIEW",
@@ -257,10 +269,12 @@ def test_mobile_release_gate_rejects_device_validation_without_vpn_boundary(tmp_
                 "scheme": "freemail",
                 "ios": {
                     "bundleIdentifier": "technology.cyint.freemail",
+                    "buildNumber": "1",
                     "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
                 },
                 "android": {
                     "package": "technology.cyint.freemail",
+                    "versionCode": 1,
                     "intentFilters": [
                         {
                             "action": "VIEW",
@@ -297,10 +311,12 @@ def test_mobile_release_gate_rejects_malformed_artifact_hash(tmp_path):
                 "scheme": "freemail",
                 "ios": {
                     "bundleIdentifier": "technology.cyint.freemail",
+                    "buildNumber": "1",
                     "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
                 },
                 "android": {
                     "package": "technology.cyint.freemail",
+                    "versionCode": 1,
                     "intentFilters": [
                         {
                             "action": "VIEW",
@@ -337,10 +353,12 @@ def test_mobile_release_gate_rejects_insecure_build_url(tmp_path):
                 "scheme": "freemail",
                 "ios": {
                     "bundleIdentifier": "technology.cyint.freemail",
+                    "buildNumber": "1",
                     "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
                 },
                 "android": {
                     "package": "technology.cyint.freemail",
+                    "versionCode": 1,
                     "intentFilters": [
                         {
                             "action": "VIEW",
@@ -365,6 +383,49 @@ def test_mobile_release_gate_rejects_insecure_build_url(tmp_path):
     assert android_check["status"] == "fail"
 
 
+def test_mobile_release_gate_rejects_build_with_wrong_native_build_id(tmp_path):
+    app_config = tmp_path / "app.json"
+    evidence = tmp_path / "mobile-release.json"
+    write_json(
+        app_config,
+        {
+            "expo": {
+                "name": "FreeMail",
+                "version": "0.1.0-dev",
+                "scheme": "freemail",
+                "ios": {
+                    "bundleIdentifier": "technology.cyint.freemail",
+                    "buildNumber": "1",
+                    "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
+                },
+                "android": {
+                    "package": "technology.cyint.freemail",
+                    "versionCode": 1,
+                    "intentFilters": [
+                        {
+                            "action": "VIEW",
+                            "autoVerify": True,
+                            "data": [{"scheme": "https", "host": "freemail.kuzuryu.ai"}],
+                            "category": ["BROWSABLE", "DEFAULT"],
+                        }
+                    ],
+                },
+                "extra": {"apiBaseUrl": "https://freemail.kuzuryu.ai"},
+            }
+        },
+    )
+    payload = valid_evidence()
+    payload["builds"]["ios"]["nativeBuildId"] = "2"
+    write_json(evidence, payload)
+
+    result = run_mobile_release_gate(MobileReleaseGateOptions(evidence=evidence, app_config=app_config))
+
+    assert result["passed"] is False
+    ios_check = next(check for check in result["checks"] if check["name"] == "ios-signed-build")
+    assert ios_check["status"] == "fail"
+    assert ios_check["details"]["expectedNativeBuildId"] == "1"
+
+
 def test_mobile_release_gate_rejects_insecure_store_submission_url(tmp_path):
     app_config = tmp_path / "app.json"
     evidence = tmp_path / "mobile-release.json"
@@ -377,10 +438,12 @@ def test_mobile_release_gate_rejects_insecure_store_submission_url(tmp_path):
                 "scheme": "freemail",
                 "ios": {
                     "bundleIdentifier": "technology.cyint.freemail",
+                    "buildNumber": "1",
                     "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
                 },
                 "android": {
                     "package": "technology.cyint.freemail",
+                    "versionCode": 1,
                     "intentFilters": [
                         {
                             "action": "VIEW",
@@ -408,6 +471,52 @@ def test_mobile_release_gate_rejects_insecure_store_submission_url(tmp_path):
     assert ios_check["status"] == "fail"
 
 
+def test_mobile_release_gate_rejects_store_submission_for_different_native_build(tmp_path):
+    app_config = tmp_path / "app.json"
+    evidence = tmp_path / "mobile-release.json"
+    write_json(
+        app_config,
+        {
+            "expo": {
+                "name": "FreeMail",
+                "version": "0.1.0-dev",
+                "scheme": "freemail",
+                "ios": {
+                    "bundleIdentifier": "technology.cyint.freemail",
+                    "buildNumber": "1",
+                    "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
+                },
+                "android": {
+                    "package": "technology.cyint.freemail",
+                    "versionCode": 1,
+                    "intentFilters": [
+                        {
+                            "action": "VIEW",
+                            "autoVerify": True,
+                            "data": [{"scheme": "https", "host": "freemail.kuzuryu.ai"}],
+                            "category": ["BROWSABLE", "DEFAULT"],
+                        }
+                    ],
+                },
+                "extra": {"apiBaseUrl": "https://freemail.kuzuryu.ai"},
+            }
+        },
+    )
+    payload = valid_evidence()
+    payload["storeSubmissions"] = valid_store_submissions()
+    payload["storeSubmissions"]["android"]["nativeBuildId"] = "2"
+    write_json(evidence, payload)
+
+    result = run_mobile_release_gate(
+        MobileReleaseGateOptions(evidence=evidence, app_config=app_config, require_store_submission=True)
+    )
+
+    assert result["passed"] is False
+    android_check = next(check for check in result["checks"] if check["name"] == "android-store-submission")
+    assert android_check["status"] == "fail"
+    assert android_check["details"]["buildNativeBuildId"] == "1"
+
+
 def test_mobile_release_gate_rejects_malformed_store_submission_timestamp(tmp_path):
     app_config = tmp_path / "app.json"
     evidence = tmp_path / "mobile-release.json"
@@ -420,10 +529,12 @@ def test_mobile_release_gate_rejects_malformed_store_submission_timestamp(tmp_pa
                 "scheme": "freemail",
                 "ios": {
                     "bundleIdentifier": "technology.cyint.freemail",
+                    "buildNumber": "1",
                     "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
                 },
                 "android": {
                     "package": "technology.cyint.freemail",
+                    "versionCode": 1,
                     "intentFilters": [
                         {
                             "action": "VIEW",
@@ -463,10 +574,12 @@ def test_mobile_release_gate_rejects_timezone_free_store_submission_timestamp(tm
                 "scheme": "freemail",
                 "ios": {
                     "bundleIdentifier": "technology.cyint.freemail",
+                    "buildNumber": "1",
                     "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
                 },
                 "android": {
                     "package": "technology.cyint.freemail",
+                    "versionCode": 1,
                     "intentFilters": [
                         {
                             "action": "VIEW",
@@ -501,9 +614,11 @@ def valid_evidence():
             "version": "0.1.0-dev",
             "apiBaseUrl": "https://freemail.kuzuryu.ai",
         },
+        "nativeBuilds": {"ios": "1", "android": "1"},
         "builds": {
             "ios": {
                 "identifier": "technology.cyint.freemail",
+                "nativeBuildId": "1",
                 "signed": True,
                 "distribution": "private-beta",
                 "buildUrl": "https://example.invalid/ios-build",
@@ -511,6 +626,7 @@ def valid_evidence():
             },
             "android": {
                 "identifier": "technology.cyint.freemail",
+                "nativeBuildId": "1",
                 "signed": True,
                 "distribution": "private-beta",
                 "buildUrl": "https://example.invalid/android-build",
@@ -559,6 +675,7 @@ def valid_store_submissions():
         "ios": {
             "store": "app-store-connect",
             "identifier": "technology.cyint.freemail",
+            "nativeBuildId": "1",
             "track": "testflight",
             "submitted": True,
             "submissionUrl": "https://example.invalid/testflight",
@@ -568,6 +685,7 @@ def valid_store_submissions():
         "android": {
             "store": "play-console",
             "identifier": "technology.cyint.freemail",
+            "nativeBuildId": "1",
             "track": "internal-testing",
             "submitted": True,
             "submissionUrl": "https://example.invalid/play-internal",

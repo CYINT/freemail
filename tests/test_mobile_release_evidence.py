@@ -21,6 +21,8 @@ def test_mobile_release_evidence_template_uses_app_config_and_failing_defaults(t
             "expo": {
                 "name": "FreeMail",
                 "version": "0.1.0-dev",
+                "ios": {"buildNumber": "1"},
+                "android": {"versionCode": 1},
                 "extra": {"apiBaseUrl": "https://freemail.kuzuryu.ai"},
             }
         },
@@ -39,9 +41,12 @@ def test_mobile_release_evidence_template_uses_app_config_and_failing_defaults(t
     assert payload["app"]["name"] == "FreeMail"
     assert payload["app"]["version"] == "0.1.0-dev"
     assert payload["app"]["apiBaseUrl"] == "https://freemail.kuzuryu.ai"
+    assert payload["nativeBuilds"] == {"ios": "1", "android": "1"}
     assert payload["builds"]["ios"]["identifier"] == "technology.cyint.freemail"
+    assert payload["builds"]["ios"]["nativeBuildId"] == "1"
     assert payload["builds"]["ios"]["signed"] is False
     assert payload["builds"]["android"]["artifact"]["type"] == "aab"
+    assert payload["storeSubmissions"]["android"]["nativeBuildId"] == "1"
     assert payload["storeSubmissions"]["ios"]["submitted"] is False
     assert payload["deviceValidation"]["ios"]["tested"] is False
     assert payload["deviceValidation"]["android"]["checks"][0]["name"] == "vpn-dns-resolution"
@@ -61,10 +66,12 @@ def test_mobile_release_evidence_template_does_not_accidentally_pass_gate(tmp_pa
                 "scheme": "freemail",
                 "ios": {
                     "bundleIdentifier": "technology.cyint.freemail",
+                    "buildNumber": "1",
                     "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
                 },
                 "android": {
                     "package": "technology.cyint.freemail",
+                    "versionCode": 1,
                     "intentFilters": [
                         {
                             "action": "VIEW",

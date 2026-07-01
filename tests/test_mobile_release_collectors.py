@@ -26,6 +26,7 @@ def test_collect_mobile_build_evidence_updates_platform_record(tmp_path):
             platform="ios",
             signed=True,
             build_url="https://example.invalid/ios-build",
+            native_build_id="1",
             artifact_type="ipa",
             artifact_bytes=123,
             artifact_sha256="a" * 64,
@@ -53,6 +54,7 @@ def test_collect_mobile_build_evidence_stays_failing_without_signed_flag(tmp_pat
             platform="android",
             signed=False,
             build_url="https://example.invalid/android-build",
+            native_build_id="1",
             artifact_type="aab",
             artifact_bytes=456,
             artifact_sha256="b" * 64,
@@ -74,6 +76,7 @@ def test_collect_mobile_build_evidence_rejects_wrong_artifact_type(tmp_path):
                 platform="ios",
                 signed=True,
                 build_url="https://example.invalid/ios-build",
+                native_build_id="1",
                 artifact_type="aab",
                 artifact_bytes=123,
                 artifact_sha256="a" * 64,
@@ -92,6 +95,7 @@ def test_collect_mobile_store_submission_updates_platform_record(tmp_path):
             submitted=True,
             track="internal-testing",
             submission_url="https://example.invalid/play-internal",
+            native_build_id="1",
             submitted_at=datetime(2026, 6, 30, tzinfo=UTC),
             review_state="draft-release-created",
         )
@@ -114,6 +118,7 @@ def test_collect_mobile_store_submission_stays_failing_without_submitted_flag(tm
             submitted=False,
             track="testflight",
             submission_url="https://example.invalid/testflight",
+            native_build_id="1",
             submitted_at=datetime(2026, 6, 30, tzinfo=UTC),
             review_state="processing",
         )
@@ -135,6 +140,7 @@ def test_collect_mobile_store_submission_rejects_timezone_free_timestamp(tmp_pat
                 submitted=True,
                 track="testflight",
                 submission_url="https://example.invalid/testflight",
+                native_build_id="1",
                 submitted_at=datetime(2026, 6, 30),
                 review_state="processing",
             )
@@ -153,6 +159,7 @@ def test_collectors_reject_credential_markers(tmp_path):
                 submitted=True,
                 track="internal-testing",
                 submission_url="https://example.invalid/play?token=abc",
+                native_build_id="1",
                 submitted_at=datetime(2026, 6, 30, tzinfo=UTC),
                 review_state="draft-release-created",
             )
@@ -174,6 +181,8 @@ def test_collect_mobile_build_evidence_script_exits_success_for_ready_platform(t
             "--signed",
             "--build-url",
             "https://example.invalid/ios-build",
+            "--native-build-id",
+            "1",
             "--artifact-type",
             "ipa",
             "--artifact-bytes",
@@ -206,6 +215,8 @@ def test_collect_mobile_store_submission_script_exits_nonzero_without_submitted_
             "testflight",
             "--submission-url",
             "https://example.invalid/testflight",
+            "--native-build-id",
+            "1",
             "--submitted-at",
             "2026-06-30T00:00:00Z",
             "--review-state",
@@ -223,9 +234,20 @@ def test_collect_mobile_store_submission_script_exits_nonzero_without_submitted_
 def mobile_evidence_with_device_validation():
     return {
         "app": {"name": "FreeMail", "version": "0.1.0-dev", "apiBaseUrl": "https://freemail.kuzuryu.ai"},
+        "nativeBuilds": {"ios": "1", "android": "1"},
         "builds": {
-            "ios": {"identifier": "technology.cyint.freemail", "signed": False, "artifact": {"type": "ipa"}},
-            "android": {"identifier": "technology.cyint.freemail", "signed": False, "artifact": {"type": "aab"}},
+            "ios": {
+                "identifier": "technology.cyint.freemail",
+                "nativeBuildId": "1",
+                "signed": False,
+                "artifact": {"type": "ipa"},
+            },
+            "android": {
+                "identifier": "technology.cyint.freemail",
+                "nativeBuildId": "1",
+                "signed": False,
+                "artifact": {"type": "aab"},
+            },
         },
         "deviceValidation": {
             "ios": valid_device_validation("ios"),
@@ -272,10 +294,12 @@ def valid_app_config():
             "scheme": "freemail",
             "ios": {
                 "bundleIdentifier": "technology.cyint.freemail",
+                "buildNumber": "1",
                 "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
             },
             "android": {
                 "package": "technology.cyint.freemail",
+                "versionCode": 1,
                 "intentFilters": [
                     {
                         "action": "VIEW",

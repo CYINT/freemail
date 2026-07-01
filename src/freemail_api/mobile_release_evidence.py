@@ -40,6 +40,8 @@ def _load_app_config(path: Path) -> dict[str, Any]:
         "name": expo.get("name", "FreeMail"),
         "version": expo.get("version", ""),
         "apiBaseUrl": expo.get("extra", {}).get("apiBaseUrl", EXPECTED_API_BASE_URL),
+        "iosBuildNumber": str(expo.get("ios", {}).get("buildNumber", "")).strip(),
+        "androidVersionCode": str(expo.get("android", {}).get("versionCode", "")).strip(),
     }
 
 
@@ -58,15 +60,21 @@ def _mobile_release_template(app_config: dict[str, Any], generated_at: str) -> d
             "version": app_config["version"],
             "apiBaseUrl": app_config["apiBaseUrl"],
         },
+        "nativeBuilds": {
+            "ios": app_config["iosBuildNumber"],
+            "android": app_config["androidVersionCode"],
+        },
         "builds": {
             "ios": _build_template(
                 identifier=EXPECTED_IOS_BUNDLE_ID,
                 artifact_type="ipa",
+                native_build_id=app_config["iosBuildNumber"],
                 evidence_note="Fill after the signed iOS IPA is produced in the private signing environment.",
             ),
             "android": _build_template(
                 identifier=EXPECTED_ANDROID_PACKAGE,
                 artifact_type="aab",
+                native_build_id=app_config["androidVersionCode"],
                 evidence_note="Fill after the signed Android AAB or APK is produced in the private signing environment.",
             ),
         },
@@ -75,12 +83,14 @@ def _mobile_release_template(app_config: dict[str, Any], generated_at: str) -> d
                 store="app-store-connect",
                 identifier=EXPECTED_IOS_BUNDLE_ID,
                 track="testflight",
+                native_build_id=app_config["iosBuildNumber"],
                 evidence_note="Fill after TestFlight or App Store Connect submission is complete.",
             ),
             "android": _submission_template(
                 store="play-console",
                 identifier=EXPECTED_ANDROID_PACKAGE,
                 track="internal-testing",
+                native_build_id=app_config["androidVersionCode"],
                 evidence_note="Fill after Play Console internal-testing or closed-testing submission is complete.",
             ),
         },
@@ -107,9 +117,10 @@ def _mobile_release_template(app_config: dict[str, Any], generated_at: str) -> d
     }
 
 
-def _build_template(*, identifier: str, artifact_type: str, evidence_note: str) -> dict[str, Any]:
+def _build_template(*, identifier: str, artifact_type: str, native_build_id: str, evidence_note: str) -> dict[str, Any]:
     return {
         "identifier": identifier,
+        "nativeBuildId": native_build_id,
         "signed": False,
         "distribution": "private-beta",
         "buildUrl": "",
@@ -118,10 +129,11 @@ def _build_template(*, identifier: str, artifact_type: str, evidence_note: str) 
     }
 
 
-def _submission_template(*, store: str, identifier: str, track: str, evidence_note: str) -> dict[str, Any]:
+def _submission_template(*, store: str, identifier: str, track: str, native_build_id: str, evidence_note: str) -> dict[str, Any]:
     return {
         "store": store,
         "identifier": identifier,
+        "nativeBuildId": native_build_id,
         "track": track,
         "submitted": False,
         "submissionUrl": "",

@@ -8,12 +8,14 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "technology.cyint.freemail",
+      "buildNumber": "1",
       "associatedDomains": [
         "applinks:freemail.kuzuryu.ai"
       ]
     },
     "android": {
       "package": "technology.cyint.freemail",
+      "versionCode": 1,
       "intentFilters": [
         {
           "action": "VIEW",

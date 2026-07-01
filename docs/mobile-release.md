@@ -6,7 +6,9 @@ FreeMail Mobile is an Expo/React Native client that must remain self-hostable an
 
 - Product name: `FreeMail`.
 - iOS bundle identifier: `technology.cyint.freemail`.
+- iOS native build number: `apps/mobile/app.json` `expo.ios.buildNumber`.
 - Android package: `technology.cyint.freemail`.
+- Android native version code: `apps/mobile/app.json` `expo.android.versionCode`.
 - Default API base URL: `https://freemail.kuzuryu.ai`.
 - Hosted app-link association paths: `/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json`.
 - License metadata: `AGPL-3.0-or-later`.
@@ -77,7 +79,7 @@ npx eas build --platform android --profile private-beta
 Pop-Location
 ```
 
-The EAS build result is not release evidence by itself. After each signed build, use `scripts\collect_mobile_build_evidence.py` to record credential-free artifact provenance and then validate it with `scripts\mobile_release_status.py`.
+The EAS build result is not release evidence by itself. After each signed build, use `scripts\collect_mobile_build_evidence.py` to record credential-free artifact provenance, including the native build identifier from `apps/mobile/app.json`, and then validate it with `scripts\mobile_release_status.py`.
 
 ## Signing Material
 
@@ -123,6 +125,7 @@ After each signed build completes in the private signing environment, update the
   --platform ios `
   --signed `
   --build-url "https://example.invalid/ios-build" `
+  --native-build-id "1" `
   --artifact-type ipa `
   --artifact-bytes 123 `
   --artifact-sha256 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -132,12 +135,13 @@ After each signed build completes in the private signing environment, update the
   --platform android `
   --signed `
   --build-url "https://example.invalid/android-build" `
+  --native-build-id "1" `
   --artifact-type aab `
   --artifact-bytes 456 `
   --artifact-sha256 "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 ```
 
-The signed-build collector exits nonzero unless the platform build record is complete. It records only artifact type, byte count, SHA-256, distribution, and a credential-free HTTPS provenance URL; never pass keystores, provisioning profiles, signing passwords, certificates, raw Expo credentials, or private CI logs.
+The signed-build collector exits nonzero unless the platform build record is complete. It records only native build identifier, artifact type, byte count, SHA-256, distribution, and a credential-free HTTPS provenance URL; never pass keystores, provisioning profiles, signing passwords, certificates, raw Expo credentials, or private CI logs.
 
 After each real-device private-beta test, update the credential-free `deviceValidation` section through the collector instead of hand-editing JSON:
 
@@ -182,6 +186,7 @@ Record those store submissions with:
   --submitted `
   --track testflight `
   --submission-url "https://example.invalid/testflight" `
+  --native-build-id "1" `
   --submitted-at "2026-06-30T00:00:00Z" `
   --review-state "processing"
 
@@ -191,13 +196,14 @@ Record those store submissions with:
   --submitted `
   --track internal-testing `
   --submission-url "https://example.invalid/play-internal" `
+  --native-build-id "1" `
   --submitted-at "2026-06-30T00:00:00Z" `
   --review-state "draft-release-created"
 ```
 
-The store-submission collector exits nonzero unless the platform submission record is complete. It records store, identifier, track, submitted timestamp, review state, and a credential-free HTTPS evidence URL; never pass App Store Connect API keys, Play service-account JSON, passwords, private keys, provisioning profiles, keystores, or raw tokens.
+The store-submission collector exits nonzero unless the platform submission record is complete. It records store, identifier, native build identifier, track, submitted timestamp, review state, and a credential-free HTTPS evidence URL; never pass App Store Connect API keys, Play service-account JSON, passwords, private keys, provisioning profiles, keystores, or raw tokens.
 
-The evidence must not include API keys, Apple certificates, provisioning profiles, keystores, passwords, private keys, service-account JSON, or raw tokens. It must include signed build records, store-submission records when `--require-store-submission` is used, real-device validation records for iOS and Android, and the VPN-only private-beta boundary. Build, submission, and device evidence URLs must be HTTPS URLs to credential-free evidence. Store submission `submittedAt` and device validation `testedAt` values must be timezone-aware ISO-8601 timestamps. Artifact `sha256` values must be full 64-character SHA-256 hex strings:
+The evidence must not include API keys, Apple certificates, provisioning profiles, keystores, passwords, private keys, service-account JSON, or raw tokens. It must include signed build records, store-submission records when `--require-store-submission` is used, real-device validation records for iOS and Android, and the VPN-only private-beta boundary. Build, submission, and device evidence URLs must be HTTPS URLs to credential-free evidence. Store submission `submittedAt` and device validation `testedAt` values must be timezone-aware ISO-8601 timestamps. Artifact `sha256` values must be full 64-character SHA-256 hex strings. The `nativeBuilds`, signed-build `nativeBuildId`, and store-submission `nativeBuildId` values must match the native identifiers in `apps/mobile/app.json` so store evidence is tied to the exact signed artifact:
 
 ```json
 {
@@ -206,9 +212,14 @@ The evidence must not include API keys, Apple certificates, provisioning profile
     "version": "0.1.0-dev",
     "apiBaseUrl": "https://freemail.kuzuryu.ai"
   },
+  "nativeBuilds": {
+    "ios": "1",
+    "android": "1"
+  },
   "builds": {
     "ios": {
       "identifier": "technology.cyint.freemail",
+      "nativeBuildId": "1",
       "signed": true,
       "distribution": "private-beta",
       "buildUrl": "https://example.invalid/ios-build",
@@ -220,6 +231,7 @@ The evidence must not include API keys, Apple certificates, provisioning profile
     },
     "android": {
       "identifier": "technology.cyint.freemail",
+      "nativeBuildId": "1",
       "signed": true,
       "distribution": "private-beta",
       "buildUrl": "https://example.invalid/android-build",
@@ -234,6 +246,7 @@ The evidence must not include API keys, Apple certificates, provisioning profile
     "ios": {
       "store": "app-store-connect",
       "identifier": "technology.cyint.freemail",
+      "nativeBuildId": "1",
       "track": "testflight",
       "submitted": true,
       "submissionUrl": "https://example.invalid/testflight",
@@ -243,6 +256,7 @@ The evidence must not include API keys, Apple certificates, provisioning profile
     "android": {
       "store": "play-console",
       "identifier": "technology.cyint.freemail",
+      "nativeBuildId": "1",
       "track": "internal-testing",
       "submitted": true,
       "submissionUrl": "https://example.invalid/play-internal",

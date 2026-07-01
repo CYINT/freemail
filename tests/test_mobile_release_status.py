@@ -23,12 +23,23 @@ def test_mobile_release_status_reports_failed_gate_checks_for_draft(tmp_path):
     write_app_config(app_config)
     write_json(
         evidence,
-        {
-            "app": {"name": "FreeMail", "version": "0.1.0-dev", "apiBaseUrl": "https://freemail.kuzuryu.ai"},
-            "builds": {
-                "ios": {"identifier": "technology.cyint.freemail", "signed": False, "artifact": {}},
-                "android": {"identifier": "technology.cyint.freemail", "signed": False, "artifact": {}},
-            },
+            {
+                "app": {"name": "FreeMail", "version": "0.1.0-dev", "apiBaseUrl": "https://freemail.kuzuryu.ai"},
+                "nativeBuilds": {"ios": "1", "android": "1"},
+                "builds": {
+                    "ios": {
+                        "identifier": "technology.cyint.freemail",
+                        "nativeBuildId": "1",
+                        "signed": False,
+                        "artifact": {},
+                    },
+                    "android": {
+                        "identifier": "technology.cyint.freemail",
+                        "nativeBuildId": "1",
+                        "signed": False,
+                        "artifact": {},
+                    },
+                },
             "privateBetaBoundary": {
                 "hostname": "freemail.kuzuryu.ai",
                 "vpnOnly": True,
@@ -102,10 +113,12 @@ def write_app_config(path):
                 "scheme": "freemail",
                 "ios": {
                     "bundleIdentifier": "technology.cyint.freemail",
+                    "buildNumber": "1",
                     "associatedDomains": ["applinks:freemail.kuzuryu.ai"],
                 },
                 "android": {
                     "package": "technology.cyint.freemail",
+                    "versionCode": 1,
                     "intentFilters": [
                         {
                             "action": "VIEW",
@@ -124,9 +137,11 @@ def write_app_config(path):
 def complete_evidence():
     return {
         "app": {"name": "FreeMail", "version": "0.1.0-dev", "apiBaseUrl": "https://freemail.kuzuryu.ai"},
+        "nativeBuilds": {"ios": "1", "android": "1"},
         "builds": {
             "ios": {
                 "identifier": "technology.cyint.freemail",
+                "nativeBuildId": "1",
                 "signed": True,
                 "distribution": "private-beta",
                 "buildUrl": "https://example.invalid/ios-build",
@@ -134,6 +149,7 @@ def complete_evidence():
             },
             "android": {
                 "identifier": "technology.cyint.freemail",
+                "nativeBuildId": "1",
                 "signed": True,
                 "distribution": "private-beta",
                 "buildUrl": "https://example.invalid/android-build",
@@ -148,6 +164,7 @@ def complete_evidence():
             "ios": {
                 "store": "app-store-connect",
                 "identifier": "technology.cyint.freemail",
+                "nativeBuildId": "1",
                 "track": "testflight",
                 "submitted": True,
                 "submissionUrl": "https://example.invalid/testflight",
@@ -157,6 +174,7 @@ def complete_evidence():
             "android": {
                 "store": "play-console",
                 "identifier": "technology.cyint.freemail",
+                "nativeBuildId": "1",
                 "track": "internal-testing",
                 "submitted": True,
                 "submissionUrl": "https://example.invalid/play-internal",

@@ -99,17 +99,24 @@ def _find_forbidden_keys(value: Any, prefix: str = "") -> set[str]:
 
 def _check_app_metadata(app_config: dict[str, Any], evidence: dict[str, Any]) -> dict[str, Any]:
     app = evidence.get("app", {})
+    native_builds = evidence.get("nativeBuilds", {}) if isinstance(evidence.get("nativeBuilds"), dict) else {}
+    ios_build_number = str(app_config.get("ios", {}).get("buildNumber", "")).strip()
+    android_version_code = str(app_config.get("android", {}).get("versionCode", "")).strip()
     passed = (
         app_config.get("name") == "FreeMail"
         and app_config.get("scheme") == EXPECTED_URL_SCHEME
         and app_config.get("ios", {}).get("bundleIdentifier") == EXPECTED_IOS_BUNDLE_ID
+        and bool(ios_build_number)
         and EXPECTED_ASSOCIATED_DOMAIN in app_config.get("ios", {}).get("associatedDomains", [])
         and app_config.get("android", {}).get("package") == EXPECTED_ANDROID_PACKAGE
+        and bool(android_version_code)
         and _has_android_invite_intent_filter(app_config)
         and app_config.get("extra", {}).get("apiBaseUrl") == EXPECTED_API_BASE_URL
         and app.get("name") == app_config.get("name")
         and app.get("version") == app_config.get("version")
         and app.get("apiBaseUrl") == EXPECTED_API_BASE_URL
+        and str(native_builds.get("ios", "")).strip() == ios_build_number
+        and str(native_builds.get("android", "")).strip() == android_version_code
     )
     return _check(
         "app-metadata",
@@ -120,9 +127,12 @@ def _check_app_metadata(app_config: dict[str, Any], evidence: dict[str, Any]) ->
             "apiBaseUrl": app.get("apiBaseUrl"),
             "scheme": app_config.get("scheme"),
             "iosBundleIdentifier": app_config.get("ios", {}).get("bundleIdentifier"),
+            "iosBuildNumber": ios_build_number,
             "iosAssociatedDomains": app_config.get("ios", {}).get("associatedDomains", []),
             "androidPackage": app_config.get("android", {}).get("package"),
+            "androidVersionCode": android_version_code,
             "androidInviteIntentFilter": _has_android_invite_intent_filter(app_config),
+            "evidenceNativeBuilds": native_builds,
         },
     )
 
@@ -156,11 +166,13 @@ def _has_android_invite_intent_filter(app_config: dict[str, Any]) -> bool:
 def _check_platform_build(evidence: dict[str, Any], *, platform: str) -> dict[str, Any]:
     build = evidence.get("builds", {}).get(platform, {})
     expected_identifier = EXPECTED_IOS_BUNDLE_ID if platform == "ios" else EXPECTED_ANDROID_PACKAGE
+    expected_native_build_id = _expected_native_build_id(evidence, platform)
     expected_artifact_types = {"ipa"} if platform == "ios" else {"aab", "apk"}
     artifact = build.get("artifact", {})
     passed = (
         build.get("signed") is True
         and build.get("identifier") == expected_identifier
+        and str(build.get("nativeBuildId", "")).strip() == expected_native_build_id
         and build.get("distribution") in {"internal", "private-beta", "store-review", "production"}
         and artifact.get("type") in expected_artifact_types
         and _is_sha256(artifact.get("sha256"))
@@ -172,6 +184,8 @@ def _check_platform_build(evidence: dict[str, Any], *, platform: str) -> dict[st
         passed,
         {
             "identifier": build.get("identifier"),
+            "nativeBuildId": build.get("nativeBuildId"),
+            "expectedNativeBuildId": expected_native_build_id,
             "signed": build.get("signed"),
             "distribution": build.get("distribution"),
             "artifactType": artifact.get("type"),
@@ -258,12 +272,16 @@ def _check_device_validation(evidence: dict[str, Any], app_config: dict[str, Any
 
 def _check_store_submission(evidence: dict[str, Any], *, platform: str) -> dict[str, Any]:
     submission = evidence.get("storeSubmissions", {}).get(platform, {})
+    build = evidence.get("builds", {}).get(platform, {})
     expected_store = "app-store-connect" if platform == "ios" else "play-console"
     expected_identifier = EXPECTED_IOS_BUNDLE_ID if platform == "ios" else EXPECTED_ANDROID_PACKAGE
+    expected_native_build_id = _expected_native_build_id(evidence, platform)
     allowed_tracks = {"internal", "testflight", "private-beta", "closed-testing", "internal-testing", "store-review"}
     passed = (
         submission.get("store") == expected_store
         and submission.get("identifier") == expected_identifier
+        and str(submission.get("nativeBuildId", "")).strip() == expected_native_build_id
+        and str(submission.get("nativeBuildId", "")).strip() == str(build.get("nativeBuildId", "")).strip()
         and submission.get("track") in allowed_tracks
         and submission.get("submitted") is True
         and _is_https_url(submission.get("submissionUrl"))
@@ -276,6 +294,9 @@ def _check_store_submission(evidence: dict[str, Any], *, platform: str) -> dict[
         {
             "store": submission.get("store"),
             "identifier": submission.get("identifier"),
+            "nativeBuildId": submission.get("nativeBuildId"),
+            "expectedNativeBuildId": expected_native_build_id,
+            "buildNativeBuildId": build.get("nativeBuildId"),
             "track": submission.get("track"),
             "submitted": submission.get("submitted"),
             "submissionUrl": submission.get("submissionUrl"),
@@ -283,6 +304,12 @@ def _check_store_submission(evidence: dict[str, Any], *, platform: str) -> dict[
             "reviewState": submission.get("reviewState"),
         },
     )
+
+
+def _expected_native_build_id(evidence: dict[str, Any], platform: str) -> str:
+    native_builds = evidence.get("nativeBuilds") if isinstance(evidence.get("nativeBuilds"), dict) else {}
+    value = native_builds.get(platform) if isinstance(native_builds, dict) else None
+    return str(value or "").strip()
 
 
 def _load_json(path: Path) -> dict[str, Any]:

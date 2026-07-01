@@ -20,6 +20,7 @@ def main() -> int:
     parser.add_argument("--submitted", action="store_true", help="Explicitly record that this submission was made.")
     parser.add_argument("--track", required=True)
     parser.add_argument("--submission-url", required=True, help="HTTPS URL to credential-free store-submission evidence.")
+    parser.add_argument("--native-build-id", required=True, help="iOS buildNumber or Android versionCode submitted to the store.")
     parser.add_argument("--submitted-at", required=True, help="Timezone-aware ISO-8601 timestamp.")
     parser.add_argument("--review-state", required=True)
     args = parser.parse_args()
@@ -31,6 +32,7 @@ def main() -> int:
             submitted=args.submitted,
             track=args.track,
             submission_url=args.submission_url,
+            native_build_id=args.native_build_id,
             submitted_at=_parse_timestamp(args.submitted_at),
             review_state=args.review_state,
         )

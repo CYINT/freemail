@@ -31,6 +31,7 @@ class MobileBuildEvidenceOptions:
     platform: str
     signed: bool
     build_url: str
+    native_build_id: str
     artifact_type: str
     artifact_bytes: int
     artifact_sha256: str
@@ -43,6 +44,7 @@ class MobileStoreSubmissionOptions:
     platform: str
     submitted: bool
     submission_url: str
+    native_build_id: str
     submitted_at: datetime | None
     review_state: str
     track: str
@@ -59,6 +61,7 @@ def collect_mobile_build_evidence(options: MobileBuildEvidenceOptions) -> dict[s
         raise ValueError(f"distribution must be one of: {', '.join(sorted(ALLOWED_DISTRIBUTIONS))}")
     build = {
         "identifier": _expected_identifier(platform),
+        "nativeBuildId": _require_native_build_id(options.native_build_id),
         "signed": options.signed,
         "distribution": options.distribution,
         "buildUrl": _require_https_url(options.build_url, "build_url"),
@@ -90,6 +93,7 @@ def collect_mobile_store_submission(options: MobileStoreSubmissionOptions) -> di
     submission = {
         "store": "app-store-connect" if platform == "ios" else "play-console",
         "identifier": _expected_identifier(platform),
+        "nativeBuildId": _require_native_build_id(options.native_build_id),
         "track": track,
         "submitted": options.submitted,
         "submissionUrl": _require_https_url(options.submission_url, "submission_url"),
@@ -115,6 +119,7 @@ def _build_ready(build: dict[str, Any], platform: str) -> bool:
     artifact = build.get("artifact") if isinstance(build.get("artifact"), dict) else {}
     return (
         build.get("identifier") == _expected_identifier(platform)
+        and bool(str(build.get("nativeBuildId", "")).strip())
         and build.get("signed") is True
         and build.get("distribution") in ALLOWED_DISTRIBUTIONS
         and _is_https_url(build.get("buildUrl"))
@@ -128,6 +133,7 @@ def _submission_ready(submission: dict[str, Any], platform: str) -> bool:
     return (
         submission.get("store") == ("app-store-connect" if platform == "ios" else "play-console")
         and submission.get("identifier") == _expected_identifier(platform)
+        and bool(str(submission.get("nativeBuildId", "")).strip())
         and submission.get("track") in ALLOWED_STORE_TRACKS
         and submission.get("submitted") is True
         and _is_https_url(submission.get("submissionUrl"))
@@ -169,6 +175,10 @@ def _require_nonempty(value: str, field: str) -> str:
     if not normalized:
         raise ValueError(f"{field} is required")
     return normalized
+
+
+def _require_native_build_id(value: str) -> str:
+    return _require_nonempty(value, "native_build_id")
 
 
 def _require_sha256(value: str) -> str:
