@@ -14,6 +14,7 @@ REQUIRED_DEVICE_CHECKS = (
     "inbox-sync",
     "message-read",
     "compose-send",
+    "invite-link-open",
     "offline-cache",
 )
 ALLOWED_PLATFORMS = {"ios", "android"}

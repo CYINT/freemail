@@ -37,7 +37,9 @@ def test_collect_mobile_device_validation_updates_platform_record(tmp_path):
     assert result["platformReady"] is True
     assert payload["deviceValidation"]["ios"]["testedAt"] == "2026-06-30T00:00:00Z"
     assert payload["deviceValidation"]["ios"]["appVersion"] == "0.1.0-dev"
-    assert [check["status"] for check in payload["deviceValidation"]["ios"]["checks"]] == ["pass"] * 6
+    assert [check["status"] for check in payload["deviceValidation"]["ios"]["checks"]] == ["pass"] * len(
+        REQUIRED_DEVICE_CHECKS
+    )
 
     gate = run_mobile_release_gate(MobileReleaseGateOptions(evidence=evidence, app_config=app_config))
     failed = [check["name"] for check in gate["checks"] if check["status"] != "pass"]

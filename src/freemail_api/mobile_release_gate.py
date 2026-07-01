@@ -217,6 +217,7 @@ def _check_device_validation(evidence: dict[str, Any], app_config: dict[str, Any
         "inbox-sync",
         "message-read",
         "compose-send",
+        "invite-link-open",
         "offline-cache",
     }
     app = evidence.get("app", {})

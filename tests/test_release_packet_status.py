@@ -397,6 +397,7 @@ def valid_mobile_device_validation(platform):
             {"name": "inbox-sync", "status": "pass"},
             {"name": "message-read", "status": "pass"},
             {"name": "compose-send", "status": "pass"},
+            {"name": "invite-link-open", "status": "pass"},
             {"name": "offline-cache", "status": "pass"},
         ],
     }

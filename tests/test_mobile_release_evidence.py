@@ -45,6 +45,7 @@ def test_mobile_release_evidence_template_uses_app_config_and_failing_defaults(t
     assert payload["storeSubmissions"]["ios"]["submitted"] is False
     assert payload["deviceValidation"]["ios"]["tested"] is False
     assert payload["deviceValidation"]["android"]["checks"][0]["name"] == "vpn-dns-resolution"
+    assert {"name": "invite-link-open", "status": "pending"} in payload["deviceValidation"]["ios"]["checks"]
     assert payload["privateBetaBoundary"]["vpnOnly"] is True
 
 

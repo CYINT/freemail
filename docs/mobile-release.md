@@ -268,6 +268,7 @@ The evidence must not include API keys, Apple certificates, provisioning profile
         {"name": "inbox-sync", "status": "pass"},
         {"name": "message-read", "status": "pass"},
         {"name": "compose-send", "status": "pass"},
+        {"name": "invite-link-open", "status": "pass"},
         {"name": "offline-cache", "status": "pass"}
       ]
     },
@@ -288,6 +289,7 @@ The evidence must not include API keys, Apple certificates, provisioning profile
         {"name": "inbox-sync", "status": "pass"},
         {"name": "message-read", "status": "pass"},
         {"name": "compose-send", "status": "pass"},
+        {"name": "invite-link-open", "status": "pass"},
         {"name": "offline-cache", "status": "pass"}
       ]
     }
@@ -303,7 +305,7 @@ The evidence must not include API keys, Apple certificates, provisioning profile
 
 Store submission evidence must be credential-free. It records what was submitted, where, when, and its review state; it must not include App Store Connect API keys, Play service-account JSON, passwords, private keys, provisioning profiles, keystores, or raw tokens.
 
-Real-device validation evidence must also be credential-free. The device validation record stores the platform, tester label, device model, OS version, app version, VPN hostname, evidence URL, and pass/fail results for VPN DNS resolution, auth login, inbox sync, message read, compose/send, and offline cache behavior. Do not include mailbox passwords, bearer tokens, raw push-provider tokens, profile screenshots containing secrets, or private network configuration exports.
+Real-device validation evidence must also be credential-free. The device validation record stores the platform, tester label, device model, OS version, app version, VPN hostname, evidence URL, and pass/fail results for VPN DNS resolution, auth login, inbox sync, message read, compose/send, HTTPS invite-link app opening, and offline cache behavior. Do not include mailbox passwords, bearer tokens, raw push-provider tokens, profile screenshots containing secrets, or private network configuration exports.
 
 ## Private Beta Boundary
 

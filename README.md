@@ -182,7 +182,7 @@ The committed `apps\mobile\eas.json` contains only credential-free build and sub
 Signed mobile builds, app-store submission evidence, and real-device private-beta validation are validated with `scripts\mobile_release_gate.py` from credential-free evidence stored outside Git.
 Use `scripts\create_mobile_release_evidence_template.py` to create a failing credential-free draft evidence file before private signing, store-submission, and device-validation runs.
 Use `scripts\collect_mobile_build_evidence.py` after each signed iOS or Android build to record credential-free artifact provenance.
-Use `scripts\collect_mobile_device_validation.py` after each real iOS or Android private-beta device test to update the credential-free `deviceValidation` section without hand-editing JSON.
+Use `scripts\collect_mobile_device_validation.py` after each real iOS or Android private-beta device test to update the credential-free `deviceValidation` section without hand-editing JSON. The required real-device checklist includes VPN DNS resolution, authenticator login, inbox sync, message read, compose/send, HTTPS invite-link app opening, and offline metadata cache behavior.
 Use `scripts\collect_mobile_store_submission.py` after each TestFlight/App Store Connect or Play Console internal-testing submission to record credential-free store evidence.
 Use `scripts\mobile_release_status.py --require-store-submission` to inspect that evidence packet before the hard release gate; it is read-only and reports missing or failing signed-build, store-submission, and device-validation checks.
 

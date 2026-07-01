@@ -149,6 +149,7 @@ def _device_validation_template(*, platform: str, evidence_note: str) -> dict[st
             {"name": "inbox-sync", "status": "pending"},
             {"name": "message-read", "status": "pending"},
             {"name": "compose-send", "status": "pending"},
+            {"name": "invite-link-open", "status": "pending"},
             {"name": "offline-cache", "status": "pending"},
         ],
         "evidenceNote": evidence_note,
