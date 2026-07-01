@@ -78,7 +78,12 @@ import {
   updateMailboxPreferences,
 } from "./src/api";
 import { clearCachedMailboxSnapshots, loadCachedMailboxSnapshot, saveCachedMailboxSnapshot } from "./src/offlineCache";
-import { clearStoredMailboxSession, loadStoredMailboxSession, saveMailboxSession } from "./src/sessionStore";
+import {
+  clearStoredMailboxSession,
+  getOrCreateMailboxDeviceRegistration,
+  loadStoredMailboxSession,
+  saveMailboxSession,
+} from "./src/sessionStore";
 
 const defaultApiBaseUrl = "https://freemail.kuzuryu.ai";
 const mailboxPageSize = 25;
@@ -157,6 +162,7 @@ export default function App() {
         refreshMailboxSessions(stored);
         refreshSenderRules(stored);
         refreshRecipientRules(stored);
+        prepareDevelopmentPushDevice();
       }
     });
   }, []);
@@ -177,6 +183,7 @@ export default function App() {
       await refreshMailboxSessions(created);
       await refreshSenderRules(created);
       await refreshRecipientRules(created);
+      await prepareDevelopmentPushDevice();
     } catch (error) {
       setStatus(readableError(error));
     } finally {
@@ -546,14 +553,45 @@ export default function App() {
     }
   }
 
+  async function prepareDevelopmentPushDevice() {
+    try {
+      const registration = await getOrCreateMailboxDeviceRegistration();
+      setPushDeviceId(registration.deviceId);
+      setPushToken(registration.developmentPushToken);
+      return registration;
+    } catch (error) {
+      setStatus(`Push setup failed: ${readableError(error)}`);
+      return null;
+    }
+  }
+
+  async function useThisDeviceForPush() {
+    const registration = await prepareDevelopmentPushDevice();
+    if (registration) {
+      setStatus("Development push identity ready for VPN beta testing.");
+    }
+  }
+
   async function registerPushDevice() {
-    if (!session || !pushDeviceId.trim() || !pushToken.trim()) {
+    if (!session) {
+      return;
+    }
+    const registration =
+      pushDeviceId.trim() && pushToken.trim()
+        ? { deviceId: pushDeviceId.trim(), developmentPushToken: pushToken.trim() }
+        : await prepareDevelopmentPushDevice();
+    if (!registration) {
       return;
     }
     setLoading(true);
     setStatus("Registering push device...");
     try {
-      const registered = await registerMailboxPushDevice(session, pushDeviceId.trim(), pushToken.trim());
+      const registered = await registerMailboxPushDevice(
+        session,
+        registration.deviceId,
+        registration.developmentPushToken,
+        "development",
+      );
       setPushToken("");
       setPushDevices((current) => [registered, ...current.filter((device) => device.deviceId !== registered.deviceId)]);
       setStatus(`Push device ${registered.deviceId} registered.`);
@@ -1533,6 +1571,10 @@ export default function App() {
 
             <View style={styles.panel}>
               <Text style={styles.sectionTitle}>Push devices</Text>
+              <Text style={styles.meta}>
+                Register this device with the development provider for VPN beta delivery tests. Production APNS/FCM tokens
+                are configured only in signed private builds.
+              </Text>
               <View style={styles.inlineControls}>
                 <TextInput
                   value={pushDeviceId}
@@ -1550,6 +1592,9 @@ export default function App() {
                   secureTextEntry
                 />
               </View>
+              <Pressable style={styles.secondaryButton} onPress={useThisDeviceForPush}>
+                <Text>Use this device</Text>
+              </Pressable>
               <Pressable style={styles.secondaryButton} onPress={registerPushDevice}>
                 <Text>Register push device</Text>
               </Pressable>

@@ -14,7 +14,7 @@ The current mobile implementation is a source-level foundation, not a production
 - Folder-scoped search, saved contacts, contacts loaded from mailbox headers, sender block-rule application for the current folder, and recipient block rules before outbound SMTP submission.
 - Header inspection, attachment metadata display, authenticated download/share handling, single-message EML import/export/share, and bounded document-picker compose attachments.
 - Secure offline metadata cache for the last loaded folder, messages, and contacts.
-- Bearer-authenticated push-device registration, listing, revocation, and delivery-status contract.
+- Bearer-authenticated push-device registration, listing, revocation, delivery-status contract, and a SecureStore-backed development device identity for VPN beta push tests.
 - Optional credential-backed APNS/FCM adapters and native release workflows.
 
 ## Development
@@ -47,7 +47,7 @@ Static mobile QA runs from the repository root and does not require a native too
 
 The static gate checks that the mobile client uses provider-neutral FreeMail language, references the expected mailbox API endpoints for sessions, paginated and thread-aware snapshots, paginated search, conversation lookup, saved and extracted contacts, sender rules and current-folder block application, recipient rules, folders, mailbox preferences/signatures, message details, header inspection, message read-state/star-state/archive/move/bulk actions, attachments, EML import/export, push-device registration, send, draft saving, and draft reopen into compose, defaults to the VPN hostname, and does not persist mailbox passwords or bearer sessions in insecure browser-style storage. It also guards the document-picker/base64 compose attachment path plus the authenticated attachment download/share path. The offline cache stores mailbox metadata only and the static gate fails if credential markers are added to that cache path.
 
-Push-provider delivery is provider-neutral at this stage. The mobile client can register and revoke a provider token through the FreeMail API, send a push test, and read recent notification delivery status. The API stores a hashed provider token for lookup and stores encrypted runtime token material only when `FREEMAIL_PUSH_TOKEN_SECRET` is configured. `contract-only` and `development` registrations use a deterministic development provider; APNS/FCM delivery runs only when the operator configures the corresponding provider credentials through deployment secrets, otherwise notifications remain queued as `pending_provider`.
+Push-provider delivery is provider-neutral at this stage. The mobile client can create a stable local FreeMail device identity in SecureStore, register that identity through the development provider for VPN beta tests, revoke a provider token through the FreeMail API, send a push test, and read recent notification delivery status. The API stores a hashed provider token for lookup and stores encrypted runtime token material only when `FREEMAIL_PUSH_TOKEN_SECRET` is configured. `contract-only` and `development` registrations use a deterministic development provider; APNS/FCM delivery runs only when the operator configures the corresponding provider credentials through deployment secrets, otherwise notifications remain queued as `pending_provider`.
 
 ## Native Release Readiness
 
