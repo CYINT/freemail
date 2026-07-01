@@ -96,6 +96,10 @@ from .schemas import (
     MailboxPreferencesRecord,
     MailboxPreferencesUpdate,
     MailboxQuotaUpdate,
+    MailboxRecipientRuleCreate,
+    MailboxRecipientRuleDeleteRecord,
+    MailboxRecipientRuleRecord,
+    MailboxRecipientRulesRecord,
     MailCoreSyncPlanStatusCreate,
     MailCoreSyncPlanStatusRecord,
     MailboxPushDeviceCreate,
@@ -203,7 +207,7 @@ COMPONENT_READINESS = {
     "webmail": {
         "status": "beta-ready",
         "evidence": [
-            "mailbox session login, session inspection, targeted and bulk session revocation, paginated and thread-aware folder navigation and search, conversation lookup, contacts, sender allow/block rules with current-folder block enforcement, message read, header inspection, EML import/export, read/unread state, star state, compose, attachments, archive, move, delete, and empty-folder controls",
+            "mailbox session login, session inspection, targeted and bulk session revocation, paginated and thread-aware folder navigation and search, conversation lookup, contacts, sender allow/block rules with current-folder block enforcement, recipient allow/block rules with pre-SMTP outbound enforcement, message read, header inspection, EML import/export, read/unread state, star state, compose, attachments, archive, move, delete, and empty-folder controls",
             "bulk message actions for read/unread, star/unstar, archive, spam, delete, and move",
             "persistent mailbox preferences with default compose signatures and saved address-book contacts",
             "server-side Drafts persistence and compose reopen support for saved drafts",
@@ -218,7 +222,7 @@ COMPONENT_READINESS = {
     "mobile": {
         "status": "source-ready",
         "evidence": [
-            "Expo/React Native client with VPN API target, mailbox sessions, targeted and bulk session revocation, paginated and thread-aware message workflows, conversation lookup, header inspection, EML import/export/share, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder and empty-folder controls, extracted and saved contacts, sender allow/block rules with current-folder block enforcement, attachments, offline metadata cache, and push-device flows",
+            "Expo/React Native client with VPN API target, mailbox sessions, targeted and bulk session revocation, paginated and thread-aware message workflows, conversation lookup, header inspection, EML import/export/share, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder and empty-folder controls, extracted and saved contacts, sender allow/block rules with current-folder block enforcement, recipient allow/block rules with pre-SMTP outbound enforcement, attachments, offline metadata cache, and push-device flows",
             "bulk read/star/archive/spam/delete/move client controls over the shared mailbox API",
             "mobile preference controls for default compose signatures",
             "compose/send path uses the shared mailbox API contract with Sent Items persistence status",
@@ -855,6 +859,71 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except imaplib.IMAP4.error as error:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
         return result.as_dict()
+
+    @app.get("/api/v1/mailbox/recipient-rules", response_model=MailboxRecipientRulesRecord)
+    def mailbox_recipient_rules_list(
+        authorization: str | None = Header(default=None),
+        x_freemail_mailbox_email: str | None = Header(default=None),
+        x_freemail_mailbox_password: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=x_freemail_mailbox_email,
+            x_freemail_mailbox_password=x_freemail_mailbox_password,
+            connection=connection,
+        )
+        normalized_email = credentials.email.lower()
+        return {
+            "mailbox_email": normalized_email,
+            "rules": _rows_to_dicts(database.list_mailbox_recipient_rules(connection, email=normalized_email)),
+        }
+
+    @app.put("/api/v1/mailbox/recipient-rules", response_model=MailboxRecipientRuleRecord)
+    def mailbox_recipient_rule_upsert(
+        payload: MailboxRecipientRuleCreate,
+        authorization: str | None = Header(default=None),
+        x_freemail_mailbox_email: str | None = Header(default=None),
+        x_freemail_mailbox_password: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=x_freemail_mailbox_email,
+            x_freemail_mailbox_password=x_freemail_mailbox_password,
+            connection=connection,
+        )
+        rule = database.upsert_mailbox_recipient_rule(
+            connection,
+            email=credentials.email,
+            recipient_email=str(payload.recipient_email),
+            action=payload.action,
+            notes=payload.notes,
+        )
+        return dict(rule)
+
+    @app.delete("/api/v1/mailbox/recipient-rules/{rule_id}", response_model=MailboxRecipientRuleDeleteRecord)
+    def mailbox_recipient_rule_delete(
+        rule_id: int,
+        authorization: str | None = Header(default=None),
+        x_freemail_mailbox_email: str | None = Header(default=None),
+        x_freemail_mailbox_password: str | None = Header(default=None),
+        connection: sqlite3.Connection = Depends(get_connection),
+    ) -> dict[str, object]:
+        credentials = mailbox_credentials(
+            authorization=authorization,
+            x_freemail_mailbox_email=x_freemail_mailbox_email,
+            x_freemail_mailbox_password=x_freemail_mailbox_password,
+            connection=connection,
+        )
+        return {
+            "deleted": database.delete_mailbox_recipient_rule(
+                connection,
+                email=credentials.email,
+                rule_id=rule_id,
+            ),
+            "rule_id": rule_id,
+        }
 
     @app.post("/api/v1/mailbox/push/devices", response_model=MailboxPushDeviceRecord)
     def mailbox_push_device_register(
@@ -1573,7 +1642,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         try:
             validate_attachments(payload.attachments, attachment_policy())
-            recipient_count = len(payload.recipients)
+            recipients = [str(recipient) for recipient in payload.recipients]
+            blocked_recipients = database.blocked_mailbox_recipients(
+                connection,
+                email=credentials.email,
+                recipients=recipients,
+            )
+            if blocked_recipients:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Blocked recipient rule matched: {', '.join(blocked_recipients)}",
+                )
+            recipient_count = len(recipients)
             enforce_outbound_rate_limit(
                 connection,
                 email=credentials.email,
@@ -1587,7 +1667,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 port=active_settings.submission_port,
                 imap_host=active_settings.mail_core_host,
                 imap_port=active_settings.imap_port,
-                recipients=[str(recipient) for recipient in payload.recipients],
+                recipients=recipients,
                 subject=payload.subject,
                 body=payload.body,
                 attachments=[

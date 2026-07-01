@@ -80,6 +80,24 @@
             <p>Sign in to manage sender rules.</p>
           </div>
         </section>
+        <section class="recipient-rules-panel" aria-label="Recipient rules">
+          <div>
+            <strong>Recipient rules</strong>
+            <button id="recipient-rules-refresh" type="button">Load</button>
+          </div>
+          <form class="recipient-rule-form" id="recipient-rule-form" aria-label="Save recipient rule">
+            <input id="recipient-rule-email" name="recipientEmail" type="email" placeholder="recipient@example.com">
+            <select id="recipient-rule-action" name="action">
+              <option value="block">Block</option>
+              <option value="allow">Allow</option>
+            </select>
+            <input id="recipient-rule-notes" name="notes" type="text" placeholder="Notes" maxlength="2000">
+            <button type="submit">Save rule</button>
+          </form>
+          <div id="recipient-rules-list">
+            <p>Sign in to manage recipient rules.</p>
+          </div>
+        </section>
         <section class="sessions-panel" aria-label="Mailbox sessions">
           <div>
             <strong>Sessions</strong>

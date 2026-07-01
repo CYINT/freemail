@@ -57,6 +57,11 @@ const senderRuleForm = document.querySelector("#sender-rule-form");
 const senderRuleEmail = document.querySelector("#sender-rule-email");
 const senderRuleNotes = document.querySelector("#sender-rule-notes");
 const senderRulesList = document.querySelector("#sender-rules-list");
+const recipientRulesRefresh = document.querySelector("#recipient-rules-refresh");
+const recipientRuleForm = document.querySelector("#recipient-rule-form");
+const recipientRuleEmail = document.querySelector("#recipient-rule-email");
+const recipientRuleNotes = document.querySelector("#recipient-rule-notes");
+const recipientRulesList = document.querySelector("#recipient-rules-list");
 const mailboxSessionsRefresh = document.querySelector("#mailbox-sessions-refresh");
 const mailboxSessionsList = document.querySelector("#mailbox-sessions-list");
 const mailboxSessionsRevokeAll = document.querySelector("#mailbox-sessions-revoke-all");
@@ -360,6 +365,20 @@ senderRuleForm?.addEventListener("submit", async (event) => {
   });
 });
 
+recipientRulesRefresh?.addEventListener("click", async () => {
+  await loadMailboxRecipientRules();
+});
+
+recipientRuleForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = new FormData(recipientRuleForm);
+  await saveMailboxRecipientRule({
+    recipientEmail: String(form.get("recipientEmail") || "").trim(),
+    action: String(form.get("action") || "block"),
+    notes: String(form.get("notes") || "").trim(),
+  });
+});
+
 logoutAction?.addEventListener("click", async () => {
   await revokeMailboxSession();
 });
@@ -533,6 +552,7 @@ async function createMailboxSession({ email, password, apiBaseUrl }) {
     await loadMailboxPreferences({ quiet: true });
     await loadMailboxSessions({ quiet: true });
     await loadMailboxSenderRules({ quiet: true });
+    await loadMailboxRecipientRules({ quiet: true });
   } catch (error) {
     forgetMailboxSession();
     setStatus(`Session start failed: ${readableError(error)}`, "error");
@@ -557,6 +577,7 @@ async function revokeMailboxSession() {
   renderMessages([]);
   renderMailboxSessions([]);
   renderMailboxSenderRules([]);
+  renderMailboxRecipientRules([]);
   setStatus("Signed out.", "idle");
 }
 
@@ -1264,6 +1285,92 @@ async function applyMailboxSenderRules() {
   }
 }
 
+async function loadMailboxRecipientRules({ quiet = false } = {}) {
+  if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
+    renderMailboxRecipientRules([]);
+    if (!quiet) {
+      setStatus("Sign in to load recipient rules.", "error");
+    }
+    return;
+  }
+  if (!quiet) {
+    setStatus("Loading recipient rules...", "loading");
+  }
+  try {
+    const response = await fetch(new URL("/api/v1/mailbox/recipient-rules", mailboxSession.apiBaseUrl), {
+      headers: mailboxHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const result = await response.json();
+    renderMailboxRecipientRules(result.rules || []);
+    if (!quiet) {
+      setStatus(`Loaded ${result.rules?.length || 0} recipient rules.`, "ready");
+    }
+  } catch (error) {
+    if (!quiet) {
+      setStatus(`Recipient rules load failed: ${readableError(error)}`, "error");
+    }
+  }
+}
+
+async function saveMailboxRecipientRule(rule) {
+  if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
+    setStatus("Sign in before saving recipient rules.", "error");
+    return;
+  }
+  if (!rule.recipientEmail) {
+    setStatus("Enter a recipient email address before saving a rule.", "error");
+    return;
+  }
+  setStatus("Saving recipient rule...", "loading");
+  try {
+    const response = await fetch(new URL("/api/v1/mailbox/recipient-rules", mailboxSession.apiBaseUrl), {
+      method: "PUT",
+      headers: {
+        ...mailboxHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(rule),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    if (recipientRuleEmail) {
+      recipientRuleEmail.value = "";
+    }
+    if (recipientRuleNotes) {
+      recipientRuleNotes.value = "";
+    }
+    await loadMailboxRecipientRules({ quiet: true });
+    setStatus(`${rule.action === "allow" ? "Allowed" : "Blocked"} ${rule.recipientEmail}.`, "ready");
+  } catch (error) {
+    setStatus(`Save recipient rule failed: ${readableError(error)}`, "error");
+  }
+}
+
+async function deleteMailboxRecipientRule(ruleId) {
+  if (!mailboxSession.token || !mailboxSession.apiBaseUrl) {
+    setStatus("Sign in before deleting recipient rules.", "error");
+    return;
+  }
+  setStatus("Deleting recipient rule...", "loading");
+  try {
+    const response = await fetch(new URL(`/api/v1/mailbox/recipient-rules/${ruleId}`, mailboxSession.apiBaseUrl), {
+      method: "DELETE",
+      headers: mailboxHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    await loadMailboxRecipientRules({ quiet: true });
+    setStatus("Recipient rule deleted.", "ready");
+  } catch (error) {
+    setStatus(`Delete recipient rule failed: ${readableError(error)}`, "error");
+  }
+}
+
 async function saveSelectedSenderRule(action) {
   if (!selectedMessageDetail) {
     setStatus("Select a message before saving a sender rule.", "error");
@@ -1557,6 +1664,34 @@ function renderMailboxSenderRules(rules) {
     }),
   );
   senderRulesList.replaceChildren(list);
+}
+
+function renderMailboxRecipientRules(rules) {
+  if (!recipientRulesList) {
+    return;
+  }
+  if (!rules.length) {
+    const empty = document.createElement("p");
+    empty.textContent = mailboxSession.token ? "No recipient rules saved." : "Sign in to manage recipient rules.";
+    recipientRulesList.replaceChildren(empty);
+    return;
+  }
+  const list = document.createElement("ul");
+  list.replaceChildren(
+    ...rules.map((rule) => {
+      const item = document.createElement("li");
+      const description = document.createElement("span");
+      const label = rule.action === "allow" ? "Allow" : "Block";
+      description.textContent = `${label} ${rule.recipientEmail}${rule.notes ? ` - ${rule.notes}` : ""}`;
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.textContent = "Delete";
+      deleteButton.addEventListener("click", () => deleteMailboxRecipientRule(rule.id));
+      item.replaceChildren(description, deleteButton);
+      return item;
+    }),
+  );
+  recipientRulesList.replaceChildren(list);
 }
 
 function renderFolders(folders, activeFolder) {
@@ -2075,6 +2210,7 @@ function restoreMailboxSession() {
     loadMailboxPreferences({ quiet: true });
     loadMailboxSessions({ quiet: true });
     loadMailboxSenderRules({ quiet: true });
+    loadMailboxRecipientRules({ quiet: true });
   } catch (_error) {
     forgetMailboxSession();
   }
@@ -2100,6 +2236,7 @@ function forgetMailboxSession() {
   selectedMessageIds = new Set();
   renderMailboxPreferences();
   renderMailboxSenderRules([]);
+  renderMailboxRecipientRules([]);
   renderDraftActions(null);
   clearSearch();
 }

@@ -179,6 +179,20 @@ CREATE TABLE IF NOT EXISTS mailbox_sender_rules (
 
 CREATE INDEX IF NOT EXISTS idx_mailbox_sender_rules_mailbox
 ON mailbox_sender_rules(mailbox_email, action, sender_email);
+
+CREATE TABLE IF NOT EXISTS mailbox_recipient_rules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mailbox_email TEXT NOT NULL,
+    recipient_email TEXT NOT NULL,
+    action TEXT NOT NULL,
+    notes TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(mailbox_email, recipient_email)
+);
+
+CREATE INDEX IF NOT EXISTS idx_mailbox_recipient_rules_mailbox
+ON mailbox_recipient_rules(mailbox_email, action, recipient_email);
 """
 
 
@@ -268,6 +282,15 @@ REQUIRED_TABLE_COLUMNS = {
         "created_at",
         "updated_at",
     },
+    "mailbox_recipient_rules": {
+        "id",
+        "mailbox_email",
+        "recipient_email",
+        "action",
+        "notes",
+        "created_at",
+        "updated_at",
+    },
 }
 
 
@@ -325,6 +348,7 @@ def list_rows(connection: sqlite3.Connection, table: str) -> list[sqlite3.Row]:
         "mailbox_preferences",
         "mailbox_contacts",
         "mailbox_sender_rules",
+        "mailbox_recipient_rules",
     }
     if table not in allowed_tables:
         raise ValueError(f"Unsupported table: {table}")
@@ -958,6 +982,84 @@ def delete_mailbox_sender_rule(connection: sqlite3.Connection, *, email: str, ru
     return cursor.rowcount > 0
 
 
+def list_mailbox_recipient_rules(connection: sqlite3.Connection, *, email: str) -> list[sqlite3.Row]:
+    return list(
+        connection.execute(
+            """
+            SELECT id, mailbox_email, recipient_email, action, notes, created_at, updated_at
+            FROM mailbox_recipient_rules
+            WHERE mailbox_email = ?
+            ORDER BY action, recipient_email COLLATE NOCASE
+            """,
+            [email.lower()],
+        )
+    )
+
+
+def upsert_mailbox_recipient_rule(
+    connection: sqlite3.Connection,
+    *,
+    email: str,
+    recipient_email: str,
+    action: str,
+    notes: str,
+) -> sqlite3.Row:
+    if action not in {"allow", "block"}:
+        raise ValueError("recipient rule action must be allow or block")
+    normalized_email = email.lower()
+    normalized_recipient = recipient_email.lower()
+    connection.execute(
+        """
+        INSERT INTO mailbox_recipient_rules (mailbox_email, recipient_email, action, notes, updated_at)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(mailbox_email, recipient_email) DO UPDATE SET
+            action = excluded.action,
+            notes = excluded.notes,
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        [normalized_email, normalized_recipient, action, notes.strip()],
+    )
+    connection.commit()
+    row = connection.execute(
+        """
+        SELECT id, mailbox_email, recipient_email, action, notes, created_at, updated_at
+        FROM mailbox_recipient_rules
+        WHERE mailbox_email = ? AND recipient_email = ?
+        """,
+        [normalized_email, normalized_recipient],
+    ).fetchone()
+    if row is None:
+        raise MissingRecordError(f"recipient rule {recipient_email} was not found")
+    return row
+
+
+def delete_mailbox_recipient_rule(connection: sqlite3.Connection, *, email: str, rule_id: int) -> bool:
+    cursor = connection.execute(
+        "DELETE FROM mailbox_recipient_rules WHERE mailbox_email = ? AND id = ?",
+        [email.lower(), rule_id],
+    )
+    connection.commit()
+    return cursor.rowcount > 0
+
+
+def blocked_mailbox_recipients(
+    connection: sqlite3.Connection,
+    *,
+    email: str,
+    recipients: list[str],
+) -> list[str]:
+    if not recipients:
+        return []
+    rules = list_mailbox_recipient_rules(connection, email=email)
+    actions = {str(rule["recipient_email"]).lower(): str(rule["action"]) for rule in rules}
+    blocked = []
+    for recipient in recipients:
+        normalized = recipient.lower()
+        if actions.get(normalized) == "block":
+            blocked.append(normalized)
+    return sorted(set(blocked))
+
+
 def upsert_mailbox_push_device(
     connection: sqlite3.Connection,
     *,
@@ -1126,6 +1228,8 @@ def _metadata_order_column(table: str) -> str:
         return "mailbox_email, contact_email"
     if table == "mailbox_sender_rules":
         return "mailbox_email, action, sender_email"
+    if table == "mailbox_recipient_rules":
+        return "mailbox_email, action, recipient_email"
     if table == "mailbox_preferences":
         return "mailbox_email"
     return "id"
@@ -1212,6 +1316,26 @@ def _migrate_schema(connection: sqlite3.Connection) -> None:
         """
         CREATE INDEX IF NOT EXISTS idx_mailbox_sender_rules_mailbox
         ON mailbox_sender_rules(mailbox_email, action, sender_email)
+        """
+    )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS mailbox_recipient_rules (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            mailbox_email TEXT NOT NULL,
+            recipient_email TEXT NOT NULL,
+            action TEXT NOT NULL,
+            notes TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(mailbox_email, recipient_email)
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_mailbox_recipient_rules_mailbox
+        ON mailbox_recipient_rules(mailbox_email, action, recipient_email)
         """
     )
     connection.commit()

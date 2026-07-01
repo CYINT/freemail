@@ -18,6 +18,7 @@ BACKUP_TABLES = (
     "mailbox_preferences",
     "mailbox_contacts",
     "mailbox_sender_rules",
+    "mailbox_recipient_rules",
 )
 RESTORE_DELETE_ORDER = tuple(reversed(BACKUP_TABLES))
 
@@ -80,6 +81,8 @@ def _order_column(table: str) -> str:
         return "mailbox_email, contact_email"
     if table == "mailbox_sender_rules":
         return "mailbox_email, action, sender_email"
+    if table == "mailbox_recipient_rules":
+        return "mailbox_email, action, recipient_email"
     if table == "mailbox_preferences":
         return "mailbox_email"
     return "id"
@@ -95,7 +98,12 @@ def _validated_tables(payload: Mapping[str, Any]) -> dict[str, list[dict[str, An
     tables: dict[str, list[dict[str, Any]]] = {}
     for table in BACKUP_TABLES:
         raw_rows = raw_tables.get(table)
-        if raw_rows is None and table in {"admin_totp_secrets", "mailbox_contacts", "mailbox_sender_rules"}:
+        if raw_rows is None and table in {
+            "admin_totp_secrets",
+            "mailbox_contacts",
+            "mailbox_sender_rules",
+            "mailbox_recipient_rules",
+        }:
             raw_rows = []
         if not isinstance(raw_rows, list):
             raise BackupError(f"backup payload must contain a {table} row list")

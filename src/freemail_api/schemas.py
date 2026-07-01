@@ -499,6 +499,34 @@ class MailboxSenderRulesApplyRecord(ApiModel):
     moved: int
 
 
+class MailboxRecipientRuleCreate(ApiModel):
+    recipient_email: EmailStr
+    action: str = Field(pattern=r"^(allow|block)$")
+    notes: str = Field(default="", max_length=2000)
+
+
+class MailboxRecipientRuleRecord(ApiModel):
+    id: int
+    mailbox_email: EmailStr
+    recipient_email: EmailStr
+    action: str
+    notes: str
+    created_at: str
+    updated_at: str
+
+    model_config = ConfigDict(alias_generator=to_camel, from_attributes=True, populate_by_name=True)
+
+
+class MailboxRecipientRulesRecord(ApiModel):
+    mailbox_email: EmailStr
+    rules: list[MailboxRecipientRuleRecord]
+
+
+class MailboxRecipientRuleDeleteRecord(ApiModel):
+    deleted: bool
+    rule_id: int
+
+
 class MailboxSessionCreate(ApiModel):
     email: EmailStr
     password: str = Field(min_length=1, max_length=512)

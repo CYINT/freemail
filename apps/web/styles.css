@@ -212,6 +212,7 @@ textarea:focus-visible,
 }
 
 .sender-rules-panel,
+.recipient-rules-panel,
 .sessions-panel {
   display: grid;
   gap: 0.55rem;
@@ -220,6 +221,7 @@ textarea:focus-visible,
 }
 
 .sender-rules-panel > div:first-child,
+.recipient-rules-panel > div:first-child,
 .sessions-panel > div:first-child {
   display: flex;
   align-items: center;
@@ -229,12 +231,14 @@ textarea:focus-visible,
 }
 
 .sender-rules-panel button,
+.recipient-rules-panel button,
 .sessions-panel button {
   min-height: 32px;
   padding: 0.25rem 0.55rem;
 }
 
 .sender-rules-panel ul,
+.recipient-rules-panel ul,
 .sessions-panel ul {
   display: grid;
   gap: 0.3rem;
@@ -244,6 +248,7 @@ textarea:focus-visible,
 }
 
 .sender-rules-panel li,
+.recipient-rules-panel li,
 .sessions-panel li {
   display: flex;
   align-items: center;
@@ -253,6 +258,8 @@ textarea:focus-visible,
 
 .sender-rules-panel li span,
 .sender-rules-panel p,
+.recipient-rules-panel li span,
+.recipient-rules-panel p,
 .sessions-panel li span,
 .sessions-panel p {
   margin: 0;
@@ -261,19 +268,23 @@ textarea:focus-visible,
 }
 
 .sender-rules-panel li button,
+.recipient-rules-panel li button,
 .sessions-panel li button {
   min-height: 28px;
   padding: 0.18rem 0.5rem;
   font-size: 0.78rem;
 }
 
-.sender-rule-form {
+.sender-rule-form,
+.recipient-rule-form {
   display: grid;
   gap: 0.35rem;
 }
 
 .sender-rule-form input,
-.sender-rule-form select {
+.sender-rule-form select,
+.recipient-rule-form input,
+.recipient-rule-form select {
   width: 100%;
   min-height: 34px;
   border: 1px solid #c8d2dc;

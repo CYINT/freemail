@@ -2608,6 +2608,84 @@ def test_mailbox_sender_rules_apply_uses_effective_block_rules(tmp_path, monkeyp
     }
 
 
+def test_mailbox_recipient_rules_require_mailbox_credentials(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.get("/api/v1/mailbox/recipient-rules")
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Mailbox credentials required"
+
+
+def test_mailbox_recipient_rules_upsert_list_update_and_delete(tmp_path):
+    headers = {
+        "X-FreeMail-Mailbox-Email": "Admin@Example.com",
+        "X-FreeMail-Mailbox-Password": "secret",
+    }
+
+    with make_client(tmp_path) as client:
+        empty_response = client.get("/api/v1/mailbox/recipient-rules", headers=headers)
+        saved_response = client.put(
+            "/api/v1/mailbox/recipient-rules",
+            headers=headers,
+            json={"recipientEmail": "Recipient@Example.net", "action": "block", "notes": "Outbound abuse"},
+        )
+        updated_response = client.put(
+            "/api/v1/mailbox/recipient-rules",
+            headers=headers,
+            json={"recipientEmail": "Recipient@Example.net", "action": "allow", "notes": "Approved"},
+        )
+        listed_response = client.get("/api/v1/mailbox/recipient-rules", headers=headers)
+        rule_id = saved_response.json()["id"]
+        delete_response = client.delete(f"/api/v1/mailbox/recipient-rules/{rule_id}", headers=headers)
+        deleted_list_response = client.get("/api/v1/mailbox/recipient-rules", headers=headers)
+
+    assert empty_response.status_code == 200
+    assert empty_response.json() == {"mailboxEmail": "admin@example.com", "rules": []}
+    assert saved_response.status_code == 200
+    assert saved_response.json()["mailboxEmail"] == "admin@example.com"
+    assert saved_response.json()["recipientEmail"] == "recipient@example.net"
+    assert saved_response.json()["action"] == "block"
+    assert saved_response.json()["notes"] == "Outbound abuse"
+    assert updated_response.status_code == 200
+    assert updated_response.json()["id"] == rule_id
+    assert updated_response.json()["action"] == "allow"
+    assert updated_response.json()["notes"] == "Approved"
+    assert listed_response.status_code == 200
+    assert listed_response.json()["rules"][0]["recipientEmail"] == "recipient@example.net"
+    assert listed_response.json()["rules"][0]["action"] == "allow"
+    assert delete_response.status_code == 200
+    assert delete_response.json() == {"deleted": True, "ruleId": rule_id}
+    assert deleted_list_response.json()["rules"] == []
+
+
+def test_mailbox_recipient_rule_delete_is_scoped_to_mailbox(tmp_path):
+    admin_headers = {
+        "X-FreeMail-Mailbox-Email": "admin@example.com",
+        "X-FreeMail-Mailbox-Password": "secret",
+    }
+    user_headers = {
+        "X-FreeMail-Mailbox-Email": "user@example.com",
+        "X-FreeMail-Mailbox-Password": "secret",
+    }
+
+    with make_client(tmp_path) as client:
+        user_rule = client.put(
+            "/api/v1/mailbox/recipient-rules",
+            headers=user_headers,
+            json={"recipientEmail": "blocked@example.net", "action": "block"},
+        )
+        delete_response = client.delete(
+            f"/api/v1/mailbox/recipient-rules/{user_rule.json()['id']}",
+            headers=admin_headers,
+        )
+        user_rules = client.get("/api/v1/mailbox/recipient-rules", headers=user_headers)
+
+    assert user_rule.status_code == 200
+    assert delete_response.status_code == 200
+    assert delete_response.json() == {"deleted": False, "ruleId": user_rule.json()["id"]}
+    assert user_rules.json()["rules"][0]["recipientEmail"] == "blocked@example.net"
+
+
 def test_mailbox_message_requires_mailbox_credentials(tmp_path):
     with make_client(tmp_path) as client:
         response = client.get("/api/v1/mailbox/message?folder=INBOX&message_id=1")
@@ -2966,6 +3044,33 @@ def test_mailbox_send_returns_submission_payload(tmp_path, monkeypatch):
     assert response.json()["messageId"] == "<message@example.com>"
     assert response.json()["sentFolder"] == "Sent Items"
     assert response.json()["sentFolderSaved"] is True
+
+
+def test_mailbox_send_rejects_blocked_recipient_before_smtp(tmp_path, monkeypatch):
+    def fake_send(**_kwargs):
+        raise AssertionError("SMTP send should not run for blocked recipient")
+
+    monkeypatch.setattr("freemail_api.main.send_mailbox_message", fake_send)
+
+    headers = {
+        "X-FreeMail-Mailbox-Email": "admin@example.com",
+        "X-FreeMail-Mailbox-Password": "secret",
+    }
+    with make_client(tmp_path) as client:
+        rule_response = client.put(
+            "/api/v1/mailbox/recipient-rules",
+            headers=headers,
+            json={"recipientEmail": "blocked@example.net", "action": "block"},
+        )
+        response = client.post(
+            "/api/v1/mailbox/send",
+            headers=headers,
+            json={"recipients": ["blocked@example.net"], "subject": "Hello", "body": "Body"},
+        )
+
+    assert rule_response.status_code == 200
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Blocked recipient rule matched: blocked@example.net"
 
 
 def test_mailbox_draft_returns_imap_draft_payload(tmp_path, monkeypatch):

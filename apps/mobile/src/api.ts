@@ -140,6 +140,21 @@ export type MailboxSenderRules = {
   rules: MailboxSenderRule[];
 };
 
+export type MailboxRecipientRule = {
+  id: number;
+  mailboxEmail: string;
+  recipientEmail: string;
+  action: "allow" | "block";
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type MailboxRecipientRules = {
+  mailboxEmail: string;
+  rules: MailboxRecipientRule[];
+};
+
 export type AppliedSenderRules = {
   folder: string;
   targetFolder: string;
@@ -390,6 +405,37 @@ export async function applyMailboxSenderRules(
     body: JSON.stringify({ folder, targetFolder }),
   });
   return response.json();
+}
+
+export async function loadMailboxRecipientRules(session: MailboxSession): Promise<MailboxRecipientRules> {
+  const response = await request(session.apiBaseUrl, "/api/v1/mailbox/recipient-rules", {
+    headers: mailboxHeaders(session),
+  });
+  return response.json();
+}
+
+export async function saveMailboxRecipientRule(
+  session: MailboxSession,
+  recipientEmail: string,
+  action: "allow" | "block",
+  notes = "",
+): Promise<MailboxRecipientRule> {
+  const response = await request(session.apiBaseUrl, "/api/v1/mailbox/recipient-rules", {
+    method: "PUT",
+    headers: {
+      ...mailboxHeaders(session),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ recipientEmail, action, notes }),
+  });
+  return response.json();
+}
+
+export async function deleteMailboxRecipientRule(session: MailboxSession, ruleId: number): Promise<void> {
+  await request(session.apiBaseUrl, `/api/v1/mailbox/recipient-rules/${ruleId}`, {
+    method: "DELETE",
+    headers: mailboxHeaders(session),
+  });
 }
 
 export async function loadMailboxMessage(

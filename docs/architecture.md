@@ -35,6 +35,7 @@ The first persistence boundary is:
 - `audit_log`: administrative changes
 - `mailbox_preferences`: mailbox-scoped display names and default compose signatures
 - `mailbox_sender_rules`: mailbox-scoped sender allow/block rules for abuse triage
+- `mailbox_recipient_rules`: mailbox-scoped recipient allow/block rules for outbound abuse control
 - `admin_sessions`: runtime-only hashed administrator bearer sessions, excluded from metadata backups
 
 Future migrations can move this store to PostgreSQL without changing the external API contract.
@@ -83,7 +84,7 @@ Current spike evidence:
 Remaining spike work:
 
 - configure one controlled production domain and mailbox
-- finish the production spam/deliverability policy beyond the baseline in `docs/deliverability-abuse-policy.md` before private beta
+- collect final production spam/deliverability evidence beyond the baseline in `docs/deliverability-abuse-policy.md` before private beta
 - move from disposable `example.com` smoke metadata to a controlled production test domain
 - exercise outbound retry and bounce behavior against a controlled external target and record queue evidence with `scripts/qa_stalwart_queue.py`
 

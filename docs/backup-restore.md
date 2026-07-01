@@ -5,7 +5,7 @@ FreeMail currently has two persistence surfaces:
 - API metadata in SQLite at `FREEMAIL_DB_PATH`.
 - Mail-core data in the Docker volume mounted at `/var/lib/stalwart`.
 
-The metadata backup tools cover domains, users, encrypted administrator MFA secrets, mailboxes, aliases, DKIM keys, audit logs, mailbox preferences, saved contacts, and mailbox sender rules. They intentionally exclude admin bearer sessions, browser mailbox sessions, outbound rate-limit counters, push-device registrations, encrypted push-provider tokens, and push-notification delivery records.
+The metadata backup tools cover domains, users, encrypted administrator MFA secrets, mailboxes, aliases, DKIM keys, audit logs, mailbox preferences, saved contacts, mailbox sender rules, and mailbox recipient rules. They intentionally exclude admin bearer sessions, browser mailbox sessions, outbound rate-limit counters, push-device registrations, encrypted push-provider tokens, and push-notification delivery records.
 
 Metadata backups include DKIM private keys, encrypted administrator MFA secrets, and password hashes. Treat every backup file as sensitive operational material: encrypt it at rest, keep it out of Git, and restrict access to administrators.
 

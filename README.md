@@ -166,7 +166,7 @@ npm audit --audit-level=moderate
 Pop-Location
 ```
 
-The mobile scaffold lives in `apps\mobile`, uses Expo/React Native, defaults to `https://freemail.kuzuryu.ai`, and persists bearer sessions through `expo-secure-store` rather than browser-style storage. It currently covers sign-in, inbox/folder snapshots with load-more pagination, thread-aware conversation lookup, message reading, header inspection, EML import/export/share, persistent mailbox preferences and default compose signatures, read/unread and star state, targeted and bulk mailbox session revocation, bulk read/unread/star/unstar/archive/spam/delete actions, compose/send, draft saving and draft reopen into compose with bounded document-picker attachments, reply/forward drafts, folder-scoped paginated search, saved address-book contacts, extracted contacts, non-core folder management plus Trash/Junk/custom-folder emptying, attachment metadata plus authenticated download/share handling, secure offline metadata caching for the last loaded mailbox views, bearer-authenticated push-device registration, and provider-neutral push notification delivery status.
+The mobile scaffold lives in `apps\mobile`, uses Expo/React Native, defaults to `https://freemail.kuzuryu.ai`, and persists bearer sessions through `expo-secure-store` rather than browser-style storage. It currently covers sign-in, inbox/folder snapshots with load-more pagination, thread-aware conversation lookup, message reading, header inspection, EML import/export/share, persistent mailbox preferences and default compose signatures, read/unread and star state, targeted and bulk mailbox session revocation, bulk read/unread/star/unstar/archive/spam/delete actions, compose/send, draft saving and draft reopen into compose with bounded document-picker attachments, reply/forward drafts, folder-scoped paginated search, saved address-book contacts, extracted contacts, sender and recipient rules, non-core folder management plus Trash/Junk/custom-folder emptying, attachment metadata plus authenticated download/share handling, secure offline metadata caching for the last loaded mailbox views, bearer-authenticated push-device registration, and provider-neutral push notification delivery status.
 
 Mobile native release posture is documented in `docs\mobile-release.md`. The open-source repo keeps signing credentials, provisioning profiles, keystores, store API keys, and generated native projects out of source control; CI validates the Expo config, Android native prebuild drill, static release checklist, and macOS iOS native prebuild drill.
 Signed mobile builds, app-store submission evidence, and real-device private-beta validation are validated with `scripts\mobile_release_gate.py` from credential-free evidence stored outside Git.
@@ -259,6 +259,14 @@ GET /api/v1/mailbox/sender-rules
 PUT /api/v1/mailbox/sender-rules
 DELETE /api/v1/mailbox/sender-rules/{ruleId}
 POST /api/v1/mailbox/sender-rules/apply
+```
+
+Mailbox recipient rules are durable mailbox metadata for outbound abuse control and are included in metadata backups. Webmail and mobile can save allow/block rules for recipient addresses. Blocked recipients are rejected before SMTP submission, before outbound rate counters are consumed, and before any message or attachment payload leaves the API process.
+
+```text
+GET /api/v1/mailbox/recipient-rules
+PUT /api/v1/mailbox/recipient-rules
+DELETE /api/v1/mailbox/recipient-rules/{ruleId}
 ```
 
 Folder management uses the browser bearer session or per-request mailbox credentials:
@@ -397,7 +405,7 @@ The exporter matches DKIM signatures by selector to avoid duplicate Stalwart sig
 
 ## Backup And Restore
 
-Read `docs/backup-restore.md` before relying on backups. The metadata backup tools export API metadata, audit logs, encrypted admin MFA secrets, DKIM key material, mailbox preferences, saved contacts, and mailbox sender rules; they intentionally exclude admin sessions, mailbox sessions, outbound rate-limit counters, push-device registrations, and Stalwart mail-store data.
+Read `docs/backup-restore.md` before relying on backups. The metadata backup tools export API metadata, audit logs, encrypted admin MFA secrets, DKIM key material, mailbox preferences, saved contacts, mailbox sender rules, and mailbox recipient rules; they intentionally exclude admin sessions, mailbox sessions, outbound rate-limit counters, push-device registrations, and Stalwart mail-store data.
 
 Collect both release-packet backup artifacts into one ignored directory:
 
