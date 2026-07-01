@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 import json
+from pathlib import Path
 import subprocess
 import sys
 
@@ -58,8 +59,11 @@ def test_create_controlled_domain_runbook_defaults_to_domain_mobile_evidence(tmp
 
     payload = json.loads((tmp_path / "runbook.json").read_text(encoding="utf-8"))
     commands = {command["id"]: command for command in payload["commands"]}
-    assert ".freemail-qa\\mobile-release-evidence.freemail.kuzuryu.ai.json" in "\\".join(
-        commands["create-release-evidence-manifest"]["argv"]
+    release_manifest_argv = commands["create-release-evidence-manifest"]["argv"]
+    mobile_evidence = release_manifest_argv[release_manifest_argv.index("--mobile-release-evidence") + 1]
+    assert Path(mobile_evidence).parts == (
+        ".freemail-qa",
+        "mobile-release-evidence.freemail.kuzuryu.ai.json",
     )
 
 
