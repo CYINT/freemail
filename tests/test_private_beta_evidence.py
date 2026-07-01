@@ -5,6 +5,7 @@ import sys
 
 import pytest
 
+from freemail_api.private_beta_acceptance import DEFAULT_KNOWN_LIMITATIONS
 from freemail_api.private_beta_evidence import (
     PrivateBetaEvidenceTemplateOptions,
     create_private_beta_evidence_templates,
@@ -40,6 +41,7 @@ def test_private_beta_evidence_templates_create_draft_packet(tmp_path):
     assert acceptance["accepted"] is False
     assert acceptance["decisionOwner"] == "Dan Fredriksen"
     assert "vpn" in acceptance["accessBoundary"].lower()
+    assert acceptance["knownLimitations"] == list(DEFAULT_KNOWN_LIMITATIONS)
     assert manifest["draftOnly"] is True
     assert result["files"]["dns_guidance"] == str(tmp_path / "dns-guidance.example.com.json")
     assert manifest["privateBetaGateInputs"]["--dns-guidance"] == "dns-guidance.example.com.json"

@@ -294,11 +294,15 @@ The acceptance JSON must include:
   "acceptedAt": "2026-06-30T00:00:00Z",
   "decisionOwner": "CEO",
   "accessBoundary": "Dragonscale/VPN clients only",
-  "knownLimitations": ["private beta only"]
+  "knownLimitations": [
+    "Private beta only; do not expose FreeMail to the public internet.",
+    "Controlled-domain DNS, mail-flow, queue, mail-core apply, deliverability, backup, and restore evidence must be current.",
+    "Signed mobile builds and store-submission evidence remain required before app-store release."
+  ]
 }
 ```
 
-The `acceptedAt` value must be a timezone-aware ISO-8601 timestamp.
+The `acceptedAt` value must be a timezone-aware ISO-8601 timestamp. The gate rejects vague acceptance text; known limitations must explicitly acknowledge the private-beta boundary, controlled-domain evidence, mobile release evidence, and store-submission evidence.
 
 Operators can generate decision-owner acceptance evidence after the controlled-domain packet and known limitations are reviewed:
 
@@ -310,10 +314,11 @@ Operators can generate decision-owner acceptance evidence after the controlled-d
   --accepted `
   --known-limitation "Private beta only; do not expose FreeMail to the public internet." `
   --known-limitation "Controlled-domain DNS, mail-flow, queue, mail-core apply, deliverability, backup, and restore evidence must be current." `
+  --known-limitation "Signed mobile builds and store-submission evidence remain required before app-store release." `
   --force
 ```
 
-The helper exits nonzero unless acceptance is explicit, the decision owner is present, the access boundary mentions VPN, and at least one known limitation is recorded. It writes credential-free JSON only.
+The helper exits nonzero unless acceptance is explicit, the decision owner is present, the access boundary mentions VPN, and the required limitation terms are recorded. It writes credential-free JSON only.
 
 The deliverability evidence JSON must include:
 

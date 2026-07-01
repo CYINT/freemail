@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 from typing import Any
 
+from .private_beta_acceptance import DEFAULT_KNOWN_LIMITATIONS
 from .private_beta_gate import PrivateBetaGateOptions
 
 
@@ -209,11 +210,7 @@ def _acceptance_template(domain: str, accepted_at: str, decision_owner: str) -> 
         "acceptedAt": accepted_at,
         "decisionOwner": decision_owner,
         "accessBoundary": "Dragonscale/VPN clients only",
-        "knownLimitations": [
-            "Private beta only; do not expose FreeMail to the public internet.",
-            "Controlled-domain DNS, mail-flow, queue, deliverability, backup, and mobile release evidence must be current.",
-            "SQLite is the only supported API metadata backend until PostgreSQL adapter work is completed.",
-        ],
+        "knownLimitations": list(DEFAULT_KNOWN_LIMITATIONS),
         "domain": domain,
     }
 

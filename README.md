@@ -658,10 +658,11 @@ Record decision-owner acceptance after the controlled-domain packet and known li
   --accepted `
   --known-limitation "Private beta only; do not expose FreeMail to the public internet." `
   --known-limitation "Controlled-domain DNS, mail-flow, queue, mail-core apply, deliverability, backup, and restore evidence must be current." `
+  --known-limitation "Signed mobile builds and store-submission evidence remain required before app-store release." `
   --force
 ```
 
-The acceptance helper writes credential-free JSON and exits nonzero unless acceptance is explicit, the decision owner is present, the access boundary mentions VPN, and at least one known limitation is recorded.
+The acceptance helper writes credential-free JSON and exits nonzero unless acceptance is explicit, the decision owner is present, the access boundary mentions VPN, and the required private-beta, controlled-domain, mobile, and store-submission limitation terms are recorded.
 
 ## VPN-Only Deployment
 
