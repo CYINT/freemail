@@ -1,5 +1,7 @@
 from datetime import UTC, datetime
 import json
+import os
+from pathlib import Path
 import subprocess
 import sys
 
@@ -11,6 +13,9 @@ from freemail_api.mobile_device_validation import (
     collect_mobile_device_validation,
 )
 from freemail_api.mobile_release_gate import MobileReleaseGateOptions, run_mobile_release_gate
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_collect_mobile_device_validation_updates_platform_record(tmp_path):
@@ -141,6 +146,47 @@ def test_collect_mobile_device_validation_script_exits_success_for_ready_platfor
 
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout)["platformReady"] is True
+
+
+def test_collect_mobile_device_validation_script_discovers_domain_specific_default_evidence(tmp_path):
+    evidence = tmp_path / ".freemail-qa" / "mobile-release-evidence.freemail.kuzuryu.ai.json"
+    evidence.parent.mkdir(parents=True)
+    write_json(evidence, mobile_evidence_with_signed_builds())
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts" / "collect_mobile_device_validation.py"),
+            "--platform",
+            "ios",
+            "--tester",
+            "release operator",
+            "--device-model",
+            "iPhone 15",
+            "--os-version",
+            "iOS 18",
+            "--evidence-url",
+            "https://example.invalid/ios-device-validation",
+            "--tested",
+            "--tested-at",
+            "2026-06-30T00:00:00Z",
+            "--all-checks-passed",
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        env={**os.environ, "PYTHONPATH": str(ROOT / "src")},
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert Path(payload["evidence"]).parts == (
+        ".freemail-qa",
+        "mobile-release-evidence.freemail.kuzuryu.ai.json",
+    )
+    updated = json.loads(evidence.read_text(encoding="utf-8"))
+    assert updated["deviceValidation"]["ios"]["tested"] is True
 
 
 def test_collect_mobile_device_validation_script_exits_nonzero_for_partial_record(tmp_path):

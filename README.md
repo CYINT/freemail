@@ -180,7 +180,7 @@ Mobile native release posture is documented in `docs\mobile-release.md`. The ope
 Mobile HTTPS app-link association endpoints are served by the API and proxied by Caddy. Configure `FREEMAIL_MOBILE_IOS_TEAM_ID` and `FREEMAIL_MOBILE_ANDROID_SHA256_CERT_FINGERPRINTS` only after the Apple team and Android signing certificate are known; these are public identifiers, not signing secrets. The endpoints intentionally return `503` when those values are missing or malformed so unsigned development deployments do not publish misleading association documents.
 The committed `apps\mobile\app.json` includes native release identifiers (`ios.buildNumber` and `android.versionCode`) so signed-build and store-submission evidence can be bound to the exact mobile artifact. The committed `apps\mobile\eas.json` contains only credential-free build and submit profile metadata for development, private-beta, and production. Static mobile QA enforces that every profile targets `https://freemail.kuzuryu.ai` and that no signing or store credentials are committed.
 Signed mobile builds, app-store submission evidence, and real-device private-beta validation are validated with `scripts\mobile_release_gate.py` from credential-free evidence stored outside Git.
-Use `scripts\create_mobile_release_evidence_template.py` to create a failing credential-free draft evidence file before private signing, store-submission, and device-validation runs.
+Use `scripts\create_mobile_release_evidence_template.py` to create the default `.freemail-qa\mobile-release-evidence.freemail.kuzuryu.ai.json` failing credential-free draft before private signing, store-submission, and device-validation runs.
 Use `scripts\collect_mobile_build_evidence.py` after each signed iOS or Android build to record credential-free artifact provenance, including the native build identifier from `apps\mobile\app.json`.
 Use `scripts\collect_mobile_device_validation.py` after each real iOS or Android private-beta device test to update the credential-free `deviceValidation` section without hand-editing JSON. The required real-device checklist includes VPN DNS resolution, authenticator login, inbox sync, message read, compose/send, HTTPS invite-link app opening, and offline metadata cache behavior.
 Use `scripts\collect_mobile_store_submission.py` after each TestFlight/App Store Connect or Play Console internal-testing submission to record credential-free store evidence for the same native build identifier as the signed artifact.
@@ -486,7 +486,7 @@ Create a top-level release evidence manifest after the private-beta packet, back
   --metadata-backup .freemail-qa\backups\metadata.json `
   --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
   --restore-drill-evidence .freemail-qa\backups\restore-drill-evidence.json `
-  --mobile-release-evidence .freemail-qa\mobile-release-evidence.json `
+  --mobile-release-evidence .freemail-qa\mobile-release-evidence.freemail.kuzuryu.ai.json `
   --require-mobile-store-submission `
   --private-beta-evidence .freemail-qa\private-beta-gate-example.com.json `
   --release-notes docs\release-notes\v0.1.0-private-beta.md `
@@ -509,7 +509,7 @@ Explicit artifact flags can override manifest entries when evidence is stored in
   --metadata-backup .freemail-qa\backups\metadata.json `
   --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
   --restore-drill-evidence .freemail-qa\backups\restore-drill-evidence.json `
-  --mobile-release-evidence .freemail-qa\mobile-release-evidence.json `
+  --mobile-release-evidence .freemail-qa\mobile-release-evidence.freemail.kuzuryu.ai.json `
   --require-mobile-store-submission `
   --private-beta-evidence .freemail-qa\private-beta-gate-example.com.json `
   --release-notes docs\release-notes\v0.1.0-private-beta.md `
@@ -533,7 +533,7 @@ The release gate also accepts explicit artifact flags, which override manifest v
   --metadata-backup .freemail-qa\backups\metadata.json `
   --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
   --restore-drill-evidence .freemail-qa\backups\restore-drill-evidence.json `
-  --mobile-release-evidence .freemail-qa\mobile-release-evidence.json `
+  --mobile-release-evidence .freemail-qa\mobile-release-evidence.freemail.kuzuryu.ai.json `
   --require-mobile-store-submission `
   --private-beta-evidence .freemail-qa\private-beta-gate-example.com.json `
   --release-notes docs\release-notes\v0.1.0-private-beta.md `

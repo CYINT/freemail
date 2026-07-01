@@ -46,6 +46,23 @@ def test_create_controlled_domain_runbook_writes_credential_free_commands(tmp_pa
     assert (tmp_path / "runbook.md").read_text(encoding="utf-8").startswith("# FreeMail Controlled-Domain Runbook")
 
 
+def test_create_controlled_domain_runbook_defaults_to_domain_mobile_evidence(tmp_path):
+    create_controlled_domain_runbook(
+        ControlledDomainRunbookOptions(
+            domain="freemail.kuzuryu.ai",
+            output=tmp_path / "runbook.json",
+            evidence_dir=tmp_path / "private-beta",
+            generated_at=datetime(2026, 6, 30, tzinfo=timezone.utc),
+        )
+    )
+
+    payload = json.loads((tmp_path / "runbook.json").read_text(encoding="utf-8"))
+    commands = {command["id"]: command for command in payload["commands"]}
+    assert ".freemail-qa\\mobile-release-evidence.freemail.kuzuryu.ai.json" in "\\".join(
+        commands["create-release-evidence-manifest"]["argv"]
+    )
+
+
 def test_create_controlled_domain_runbook_rejects_mismatched_admin_domain(tmp_path):
     with pytest.raises(ValueError, match="admin email domain must match controlled domain"):
         create_controlled_domain_runbook(

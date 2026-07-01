@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .mobile_release_evidence import MOBILE_EVIDENCE_DOMAIN_FILENAME
 from .private_beta_evidence import EVIDENCE_FILENAMES, _normalize_domain
 
 
@@ -102,7 +103,7 @@ def _commands(
     options: ControlledDomainRunbookOptions,
     paths: dict[str, Path],
 ) -> list[dict[str, Any]]:
-    mobile_evidence = options.mobile_release_evidence or Path(".freemail-qa/mobile-release-evidence.json")
+    mobile_evidence = options.mobile_release_evidence or Path(".freemail-qa") / MOBILE_EVIDENCE_DOMAIN_FILENAME
     return [
         _command(
             "create-draft-private-beta-packet",

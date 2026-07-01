@@ -97,22 +97,24 @@ This is the mobile signed-build, store-submission, and real-device validation ev
 After signed iOS and Android builds complete in the private signing environment, capture a credential-free JSON evidence file outside Git and validate it with:
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\mobile_release_gate.py --evidence .freemail-qa\mobile-release-evidence.json
+.\.venv\Scripts\python.exe scripts\mobile_release_gate.py --evidence .freemail-qa\mobile-release-evidence.freemail.kuzuryu.ai.json
 ```
 
 Create a draft evidence file before the signing run so the required fields are explicit:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\create_mobile_release_evidence_template.py `
-  --output .freemail-qa\mobile-release-evidence.json
+  --output .freemail-qa\mobile-release-evidence.freemail.kuzuryu.ai.json
 ```
 
 The generated file is a credential-free draft. It intentionally keeps `signed`, `submitted`, and device `tested` values false, artifact hashes empty, artifact byte counts zero, and evidence URLs empty until real signed-build, store-submission, and device-validation evidence is recorded.
 
+By default, the template, signed-build collector, device-validation collector, store-submission collector, and status helper use `.freemail-qa\mobile-release-evidence.freemail.kuzuryu.ai.json`. If that domain-specific file does not exist but `.freemail-qa\mobile-release-evidence.json` does, update-style collectors use the existing generic file for backward compatibility. Pass `--evidence` only when intentionally working with a relocated evidence file.
+
 Inspect the evidence packet before using it in a release candidate:
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\mobile_release_status.py --evidence .freemail-qa\mobile-release-evidence.json --require-store-submission
+.\.venv\Scripts\python.exe scripts\mobile_release_status.py --require-store-submission
 ```
 
 The status command is read-only. It reports the evidence file path, checksum, failed mobile-release checks, and whether the packet is ready for the hard release gate. It does not run native builds, access app-store APIs, sign artifacts, or connect to real devices.
@@ -121,7 +123,6 @@ After each signed build completes in the private signing environment, update the
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\collect_mobile_build_evidence.py `
-  --evidence .freemail-qa\mobile-release-evidence.json `
   --platform ios `
   --signed `
   --build-url "https://example.invalid/ios-build" `
@@ -131,7 +132,6 @@ After each signed build completes in the private signing environment, update the
   --artifact-sha256 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
 .\.venv\Scripts\python.exe scripts\collect_mobile_build_evidence.py `
-  --evidence .freemail-qa\mobile-release-evidence.json `
   --platform android `
   --signed `
   --build-url "https://example.invalid/android-build" `
@@ -147,7 +147,6 @@ After each real-device private-beta test, update the credential-free `deviceVali
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\collect_mobile_device_validation.py `
-  --evidence .freemail-qa\mobile-release-evidence.json `
   --platform ios `
   --tester "release operator" `
   --device-model "iPhone 15" `
@@ -158,7 +157,6 @@ After each real-device private-beta test, update the credential-free `deviceVali
   --all-checks-passed
 
 .\.venv\Scripts\python.exe scripts\collect_mobile_device_validation.py `
-  --evidence .freemail-qa\mobile-release-evidence.json `
   --platform android `
   --tester "release operator" `
   --device-model "Pixel 8" `
@@ -174,14 +172,13 @@ The collector exits nonzero for partial records. Omit `--all-checks-passed` and 
 After TestFlight and Play internal-testing submission, require store submission evidence too:
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\mobile_release_gate.py --evidence .freemail-qa\mobile-release-evidence.json --require-store-submission
+.\.venv\Scripts\python.exe scripts\mobile_release_gate.py --evidence .freemail-qa\mobile-release-evidence.freemail.kuzuryu.ai.json --require-store-submission
 ```
 
 Record those store submissions with:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\collect_mobile_store_submission.py `
-  --evidence .freemail-qa\mobile-release-evidence.json `
   --platform ios `
   --submitted `
   --track testflight `
@@ -191,7 +188,6 @@ Record those store submissions with:
   --review-state "processing"
 
 .\.venv\Scripts\python.exe scripts\collect_mobile_store_submission.py `
-  --evidence .freemail-qa\mobile-release-evidence.json `
   --platform android `
   --submitted `
   --track internal-testing `

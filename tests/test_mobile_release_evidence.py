@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 import json
+import os
+from pathlib import Path
 import subprocess
 import sys
 
@@ -10,6 +12,9 @@ from freemail_api.mobile_release_evidence import (
     create_mobile_release_evidence_template,
 )
 from freemail_api.mobile_release_gate import MobileReleaseGateOptions, run_mobile_release_gate
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_mobile_release_evidence_template_uses_app_config_and_failing_defaults(tmp_path):
@@ -143,6 +148,43 @@ def test_mobile_release_evidence_template_script(tmp_path):
     payload = json.loads(result.stdout)
     assert payload["file"] == str(evidence)
     assert evidence.is_file()
+
+
+def test_mobile_release_evidence_template_script_defaults_to_domain_specific_path(tmp_path):
+    app_config = tmp_path / "apps" / "mobile" / "app.json"
+    app_config.parent.mkdir(parents=True)
+    write_json(
+        app_config,
+        {
+            "expo": {
+                "name": "FreeMail",
+                "version": "0.1.0-dev",
+                "ios": {"buildNumber": "1"},
+                "android": {"versionCode": 1},
+                "extra": {"apiBaseUrl": "https://freemail.kuzuryu.ai"},
+            }
+        },
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts" / "create_mobile_release_evidence_template.py"),
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        env={**os.environ, "PYTHONPATH": str(ROOT / "src")},
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert Path(payload["file"]).parts == (
+        ".freemail-qa",
+        "mobile-release-evidence.freemail.kuzuryu.ai.json",
+    )
+    assert (tmp_path / ".freemail-qa" / "mobile-release-evidence.freemail.kuzuryu.ai.json").is_file()
 
 
 def write_json(path, payload):

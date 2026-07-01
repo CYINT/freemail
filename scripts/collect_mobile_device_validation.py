@@ -11,7 +11,7 @@ from freemail_api.mobile_device_validation import (  # noqa: E402
     REQUIRED_DEVICE_CHECKS,
     collect_mobile_device_validation,
 )
-from freemail_api.mobile_release_evidence import MOBILE_EVIDENCE_FILENAME  # noqa: E402
+from freemail_api.mobile_release_evidence import default_mobile_release_evidence_path  # noqa: E402
 
 
 def main() -> int:
@@ -19,7 +19,7 @@ def main() -> int:
     parser.add_argument(
         "--evidence",
         type=Path,
-        default=Path(".freemail-qa") / MOBILE_EVIDENCE_FILENAME,
+        default=default_mobile_release_evidence_path(),
         help="Existing mobile release evidence JSON to update.",
     )
     parser.add_argument("--platform", choices=["ios", "android"], required=True)

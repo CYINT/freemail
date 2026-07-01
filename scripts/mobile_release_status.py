@@ -5,14 +5,8 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from freemail_api.mobile_release_evidence import MOBILE_EVIDENCE_FILENAME  # noqa: E402
+from freemail_api.mobile_release_evidence import default_mobile_release_evidence_path  # noqa: E402
 from freemail_api.mobile_release_status import summarize_mobile_release_evidence  # noqa: E402
-
-
-DEFAULT_MOBILE_RELEASE_EVIDENCE_CANDIDATES = (
-    Path(".freemail-qa/mobile-release-evidence.freemail.kuzuryu.ai.json"),
-    Path(".freemail-qa") / MOBILE_EVIDENCE_FILENAME,
-)
 
 
 def main() -> int:
@@ -27,20 +21,12 @@ def main() -> int:
     args = parser.parse_args()
 
     result = summarize_mobile_release_evidence(
-        evidence=args.evidence or _default_mobile_release_evidence(),
+        evidence=args.evidence or default_mobile_release_evidence_path(),
         app_config=args.app_config,
         require_store_submission=args.require_store_submission,
     )
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0 if result["ready"] else 1
-
-
-def _default_mobile_release_evidence() -> Path:
-    return next(
-        (path for path in DEFAULT_MOBILE_RELEASE_EVIDENCE_CANDIDATES if path.exists()),
-        DEFAULT_MOBILE_RELEASE_EVIDENCE_CANDIDATES[-1],
-    )
-
 
 if __name__ == "__main__":
     sys.exit(main())

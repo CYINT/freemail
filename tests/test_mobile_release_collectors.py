@@ -1,5 +1,7 @@
 from datetime import UTC, datetime
 import json
+import os
+from pathlib import Path
 import subprocess
 import sys
 
@@ -12,6 +14,9 @@ from freemail_api.mobile_release_collectors import (
     collect_mobile_store_submission,
 )
 from freemail_api.mobile_release_gate import MobileReleaseGateOptions, run_mobile_release_gate
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_collect_mobile_build_evidence_updates_platform_record(tmp_path):
@@ -199,6 +204,45 @@ def test_collect_mobile_build_evidence_script_exits_success_for_ready_platform(t
     assert json.loads(result.stdout)["platformReady"] is True
 
 
+def test_collect_mobile_build_evidence_script_discovers_domain_specific_default_evidence(tmp_path):
+    evidence = tmp_path / ".freemail-qa" / "mobile-release-evidence.freemail.kuzuryu.ai.json"
+    evidence.parent.mkdir(parents=True)
+    write_json(evidence, mobile_evidence_with_device_validation())
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts" / "collect_mobile_build_evidence.py"),
+            "--platform",
+            "ios",
+            "--signed",
+            "--build-url",
+            "https://example.invalid/ios-build",
+            "--native-build-id",
+            "1",
+            "--artifact-type",
+            "ipa",
+            "--artifact-bytes",
+            "123",
+            "--artifact-sha256",
+            "a" * 64,
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        env={**os.environ, "PYTHONPATH": str(ROOT / "src")},
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert Path(payload["evidence"]).parts == (
+        ".freemail-qa",
+        "mobile-release-evidence.freemail.kuzuryu.ai.json",
+    )
+    assert json.loads(evidence.read_text(encoding="utf-8"))["builds"]["ios"]["signed"] is True
+
+
 def test_collect_mobile_store_submission_script_exits_nonzero_without_submitted_flag(tmp_path):
     evidence = tmp_path / "mobile-release-evidence.json"
     write_json(evidence, mobile_evidence_with_device_validation())
@@ -229,6 +273,45 @@ def test_collect_mobile_store_submission_script_exits_nonzero_without_submitted_
 
     assert result.returncode == 2
     assert json.loads(result.stdout)["platformReady"] is False
+
+
+def test_collect_mobile_store_submission_script_discovers_domain_specific_default_evidence(tmp_path):
+    evidence = tmp_path / ".freemail-qa" / "mobile-release-evidence.freemail.kuzuryu.ai.json"
+    evidence.parent.mkdir(parents=True)
+    write_json(evidence, mobile_evidence_with_device_validation())
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts" / "collect_mobile_store_submission.py"),
+            "--platform",
+            "android",
+            "--submitted",
+            "--track",
+            "internal-testing",
+            "--submission-url",
+            "https://example.invalid/play-internal",
+            "--native-build-id",
+            "1",
+            "--submitted-at",
+            "2026-06-30T00:00:00Z",
+            "--review-state",
+            "draft-release-created",
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        env={**os.environ, "PYTHONPATH": str(ROOT / "src")},
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert Path(payload["evidence"]).parts == (
+        ".freemail-qa",
+        "mobile-release-evidence.freemail.kuzuryu.ai.json",
+    )
+    assert json.loads(evidence.read_text(encoding="utf-8"))["storeSubmissions"]["android"]["submitted"] is True
 
 
 def mobile_evidence_with_device_validation():

@@ -10,12 +10,12 @@ from freemail_api.mobile_release_collectors import (  # noqa: E402
     MobileStoreSubmissionOptions,
     collect_mobile_store_submission,
 )
-from freemail_api.mobile_release_evidence import MOBILE_EVIDENCE_FILENAME  # noqa: E402
+from freemail_api.mobile_release_evidence import default_mobile_release_evidence_path  # noqa: E402
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Record credential-free FreeMail mobile store-submission evidence.")
-    parser.add_argument("--evidence", type=Path, default=Path(".freemail-qa") / MOBILE_EVIDENCE_FILENAME)
+    parser.add_argument("--evidence", type=Path, default=default_mobile_release_evidence_path())
     parser.add_argument("--platform", choices=["ios", "android"], required=True)
     parser.add_argument("--submitted", action="store_true", help="Explicitly record that this submission was made.")
     parser.add_argument("--track", required=True)

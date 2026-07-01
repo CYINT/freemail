@@ -12,6 +12,18 @@ from .mobile_release_gate import EXPECTED_IOS_BUNDLE_ID
 
 
 MOBILE_EVIDENCE_FILENAME = "mobile-release-evidence.json"
+MOBILE_EVIDENCE_DOMAIN_FILENAME = "mobile-release-evidence.freemail.kuzuryu.ai.json"
+DEFAULT_MOBILE_RELEASE_EVIDENCE_CANDIDATES = (
+    Path(".freemail-qa") / MOBILE_EVIDENCE_DOMAIN_FILENAME,
+    Path(".freemail-qa") / MOBILE_EVIDENCE_FILENAME,
+)
+
+
+def default_mobile_release_evidence_path() -> Path:
+    return next(
+        (path for path in DEFAULT_MOBILE_RELEASE_EVIDENCE_CANDIDATES if path.exists()),
+        DEFAULT_MOBILE_RELEASE_EVIDENCE_CANDIDATES[0],
+    )
 
 
 @dataclass(frozen=True)

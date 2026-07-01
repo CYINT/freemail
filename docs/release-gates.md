@@ -10,7 +10,7 @@ After collecting backups, mobile evidence, private-beta gate output, and release
   --metadata-backup .freemail-qa\backups\metadata.json `
   --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
   --restore-drill-evidence .freemail-qa\backups\restore-drill-evidence.json `
-  --mobile-release-evidence .freemail-qa\mobile-release-evidence.json `
+  --mobile-release-evidence .freemail-qa\mobile-release-evidence.freemail.kuzuryu.ai.json `
   --require-mobile-store-submission `
   --private-beta-evidence .freemail-qa\private-beta-gate-example.com.json `
   --release-notes docs\release-notes\v0.1.0-private-beta.md `
@@ -61,7 +61,7 @@ Explicit artifact flags override manifest values when an artifact has been reloc
   --metadata-backup .freemail-qa\backups\metadata.json `
   --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
   --restore-drill-evidence .freemail-qa\backups\restore-drill-evidence.json `
-  --mobile-release-evidence .freemail-qa\mobile-release-evidence.json `
+  --mobile-release-evidence .freemail-qa\mobile-release-evidence.freemail.kuzuryu.ai.json `
   --require-mobile-store-submission `
   --private-beta-evidence .freemail-qa\private-beta-gate-example.com.json `
   --release-notes docs\release-notes\v0.1.0-private-beta.md `
@@ -74,11 +74,10 @@ Mobile release evidence can also be inspected directly before adding it to the r
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\mobile_release_status.py `
-  --evidence .freemail-qa\mobile-release-evidence.json `
   --require-store-submission
 ```
 
-This mobile status command is read-only and reports missing or failing signed-build and store-submission checks without running native build tools or contacting store APIs. The top-level packet status command expects `--require-mobile-store-submission` whenever mobile evidence is present; `--allow-pre-store-mobile-packet` is reserved for explicit pre-store dry runs and must not be used as final release evidence.
+This mobile status command is read-only and reports missing or failing signed-build and store-submission checks without running native build tools or contacting store APIs. By default, mobile evidence helpers use `.freemail-qa\mobile-release-evidence.freemail.kuzuryu.ai.json`, falling back to an existing `.freemail-qa\mobile-release-evidence.json` only for backward compatibility. The top-level packet status command expects `--require-mobile-store-submission` whenever mobile evidence is present; `--allow-pre-store-mobile-packet` is reserved for explicit pre-store dry runs and must not be used as final release evidence.
 
 Stamp the runtime with the candidate commit before collecting release evidence:
 
@@ -101,7 +100,7 @@ The release gate also accepts explicit artifact flags, which override manifest v
   --metadata-backup .freemail-qa\backups\metadata.json `
   --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
   --restore-drill-evidence .freemail-qa\backups\restore-drill-evidence.json `
-  --mobile-release-evidence .freemail-qa\mobile-release-evidence.json `
+  --mobile-release-evidence .freemail-qa\mobile-release-evidence.freemail.kuzuryu.ai.json `
   --require-mobile-store-submission `
   --private-beta-evidence .freemail-qa\private-beta-gate-example.com.json `
   --release-notes docs\release-notes\v0.1.0-private-beta.md `
