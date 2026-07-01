@@ -77,6 +77,46 @@ def test_deployment_is_not_public_internet():
     assert payload["publicInternet"] is False
 
 
+def test_mobile_association_endpoints_require_release_identifiers_by_default():
+    apple_response = client.get("/.well-known/apple-app-site-association")
+    android_response = client.get("/.well-known/assetlinks.json")
+
+    assert apple_response.status_code == 503
+    assert apple_response.json()["detail"] == "Mobile iOS associated domain is not configured"
+    assert android_response.status_code == 503
+    assert android_response.json()["detail"] == "Mobile Android asset links are not configured"
+
+
+def test_mobile_association_endpoints_return_configured_documents(tmp_path):
+    database_path = tmp_path / "freemail.sqlite"
+    fingerprint = "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99"
+    isolated_app = create_app(
+        Settings(
+            database_path=str(database_path),
+            mobile_ios_team_id="abcde12345",
+            mobile_android_sha256_cert_fingerprints=fingerprint,
+        )
+    )
+    with TestClient(isolated_app) as isolated_client:
+        apple_response = isolated_client.get("/.well-known/apple-app-site-association")
+        android_response = isolated_client.get("/.well-known/assetlinks.json")
+
+    assert apple_response.status_code == 200
+    apple_payload = apple_response.json()
+    details = apple_payload["applinks"]["details"]
+    assert details[0]["appIDs"] == ["ABCDE12345.technology.cyint.freemail"]
+    assert details[0]["components"][0]["?"] == {"invite": "*"}
+    assert apple_response.headers["content-type"] == "application/json"
+
+    assert android_response.status_code == 200
+    android_payload = android_response.json()
+    assert android_payload[0]["relation"] == ["delegate_permission/common.handle_all_urls"]
+    assert android_payload[0]["target"]["namespace"] == "android_app"
+    assert android_payload[0]["target"]["package_name"] == "technology.cyint.freemail"
+    assert android_payload[0]["target"]["sha256_cert_fingerprints"] == [fingerprint]
+    assert android_response.headers["content-type"] == "application/json"
+
+
 def test_metadata_readiness_reports_sqlite_schema_without_paths(tmp_path):
     database_path = tmp_path / "freemail.sqlite"
     isolated_app = create_app(Settings(database_path=str(database_path)))

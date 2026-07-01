@@ -1,6 +1,15 @@
 :80 {
 	root * /usr/share/caddy
 	encode zstd gzip
+
+	handle /.well-known/apple-app-site-association {
+		reverse_proxy admin-api:8080
+	}
+
+	handle /.well-known/assetlinks.json {
+		reverse_proxy admin-api:8080
+	}
+
 	file_server
 
 	header {

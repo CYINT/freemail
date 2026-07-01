@@ -24,6 +24,19 @@ class Settings(BaseSettings):
     apns_bundle_id: str | None = Field(default=None, validation_alias="FREEMAIL_APNS_BUNDLE_ID")
     apns_use_sandbox: bool = Field(default=False, validation_alias="FREEMAIL_APNS_USE_SANDBOX")
     push_delivery_timeout_seconds: float = Field(default=10.0, validation_alias="FREEMAIL_PUSH_DELIVERY_TIMEOUT_SECONDS")
+    mobile_ios_team_id: str | None = Field(default=None, validation_alias="FREEMAIL_MOBILE_IOS_TEAM_ID")
+    mobile_ios_bundle_id: str = Field(
+        default="technology.cyint.freemail",
+        validation_alias="FREEMAIL_MOBILE_IOS_BUNDLE_ID",
+    )
+    mobile_android_package: str = Field(
+        default="technology.cyint.freemail",
+        validation_alias="FREEMAIL_MOBILE_ANDROID_PACKAGE",
+    )
+    mobile_android_sha256_cert_fingerprints: str | None = Field(
+        default=None,
+        validation_alias="FREEMAIL_MOBILE_ANDROID_SHA256_CERT_FINGERPRINTS",
+    )
     max_attachment_bytes: int = Field(default=1_048_576, validation_alias="FREEMAIL_MAX_ATTACHMENT_BYTES")
     allowed_attachment_content_types: str = Field(
         default="text/plain,text/csv,application/pdf,image/png,image/jpeg",

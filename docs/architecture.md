@@ -111,7 +111,7 @@ The current mobile foundation covers:
 
 - VPN-only default API target at `https://freemail.kuzuryu.ai`
 - mobile invitation signup from deep links or pasted invite tokens
-- native invite-link routing through the `freemail` URL scheme, iOS associated domains, and Android verified HTTPS intent filters
+- native invite-link routing through the `freemail` URL scheme, iOS associated domains, Android verified HTTPS intent filters, and hosted association documents
 - mailbox session creation and revocation
 - SecureStore-backed bearer-session persistence
 - paginated inbox snapshot/search, message read, read/unread and star-state controls, bulk message actions, compose/send, reply, and forward workflows
@@ -126,7 +126,9 @@ The current mobile foundation covers:
 
 Raw and encrypted push-provider tokens are never returned by API responses and are excluded from metadata backups. APNS/FCM dispatch remains disabled until operators configure `FREEMAIL_PUSH_TOKEN_SECRET` plus the corresponding provider credentials in deployment secrets.
 
-Remaining mobile release work is macOS iOS native build-drill evidence, app-store signing, and private-beta device validation.
+The API owns the public mobile association documents at `/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json`, and the web Caddy container proxies those paths to the API before serving static webmail files. `FREEMAIL_MOBILE_IOS_TEAM_ID`, `FREEMAIL_MOBILE_IOS_BUNDLE_ID`, `FREEMAIL_MOBILE_ANDROID_PACKAGE`, and `FREEMAIL_MOBILE_ANDROID_SHA256_CERT_FINGERPRINTS` configure these documents. Missing or malformed identifiers produce `503` responses so development deployments do not publish invalid association metadata.
+
+Remaining mobile release work is app-store signing, app-store submission evidence, and private-beta device validation.
 
 ## Web And API Security Headers
 

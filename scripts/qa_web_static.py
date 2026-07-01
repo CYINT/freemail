@@ -123,6 +123,11 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str, caddy_text: 
         "nosniff",
         "X-Frame-Options",
         "DENY",
+        "/.well-known/apple-app-site-association",
+        "/.well-known/assetlinks.json",
+        "reverse_proxy admin-api:8080",
+        "FREEMAIL_MOBILE_IOS_TEAM_ID",
+        "FREEMAIL_MOBILE_ANDROID_SHA256_CERT_FINGERPRINTS",
     ]:
         if marker not in f"{compose_text}\n{caddy_text}":
             failures.append(f"missing web security header marker: {marker}")

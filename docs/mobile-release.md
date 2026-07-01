@@ -8,6 +8,7 @@ FreeMail Mobile is an Expo/React Native client that must remain self-hostable an
 - iOS bundle identifier: `technology.cyint.freemail`.
 - Android package: `technology.cyint.freemail`.
 - Default API base URL: `https://freemail.kuzuryu.ai`.
+- Hosted app-link association paths: `/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json`.
 - License metadata: `AGPL-3.0-or-later`.
 - Mobile bearer sessions use `expo-secure-store`.
 - The app must not persist mailbox passwords.
@@ -32,6 +33,17 @@ Pop-Location
 `npm run native:prebuild:check` copies the mobile app into a temporary directory, runs an Android Expo native prebuild, verifies generated identifiers, and removes the temporary native projects when the drill passes.
 
 The committed `apps/mobile/eas.json` is credential-free release metadata. It defines `development`, `private-beta`, and `production` build and submit profiles, keeps all profiles pointed at `https://freemail.kuzuryu.ai`, uses `internal` distribution for private beta, produces Android `app-bundle` artifacts, and leaves signing credentials to the private EAS or CI environment. Static mobile QA validates these invariants.
+
+Before signed private-beta builds are used for HTTPS invite-link testing, configure the deployment with the public association identifiers:
+
+```powershell
+FREEMAIL_MOBILE_IOS_TEAM_ID=<10-character Apple Team ID>
+FREEMAIL_MOBILE_IOS_BUNDLE_ID=technology.cyint.freemail
+FREEMAIL_MOBILE_ANDROID_PACKAGE=technology.cyint.freemail
+FREEMAIL_MOBILE_ANDROID_SHA256_CERT_FINGERPRINTS=<Android signing cert SHA-256 fingerprint>
+```
+
+These values are public metadata consumed by Apple and Android app-link verification. They are not a substitute for signing material, and they must not be confused with Apple certificates, provisioning profiles, Android keystores, store API keys, service-account JSON, passwords, private keys, or raw tokens. Until the identifiers are configured, the association endpoints return `503` by design.
 
 ## Native Build Drill
 

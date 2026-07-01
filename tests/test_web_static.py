@@ -10,9 +10,15 @@ CADDY_FIXTURE = (
     "Permissions-Policy \"camera=(), geolocation=(), microphone=(), payment=(), usb=()\" "
     "Referrer-Policy \"no-referrer\" "
     "X-Content-Type-Options \"nosniff\" "
-    "X-Frame-Options \"DENY\""
+    "X-Frame-Options \"DENY\" "
+    "/.well-known/apple-app-site-association "
+    "/.well-known/assetlinks.json "
+    "reverse_proxy admin-api:8080"
 )
-COMPOSE_FIXTURE = "./ops/caddy/Caddyfile:/etc/caddy/Caddyfile:ro"
+COMPOSE_FIXTURE = (
+    "./ops/caddy/Caddyfile:/etc/caddy/Caddyfile:ro "
+    "FREEMAIL_MOBILE_IOS_TEAM_ID FREEMAIL_MOBILE_ANDROID_SHA256_CERT_FINGERPRINTS"
+)
 
 
 def test_static_web_parser_collects_classes_and_text():

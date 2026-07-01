@@ -256,7 +256,7 @@ COMPONENT_READINESS = {
     "mobile": {
         "status": "source-ready",
         "evidence": [
-            "Expo/React Native client with VPN API target, invitation signup, native invite-link routing, icon tab shell, mailbox sessions, targeted and bulk session revocation, paginated and thread-aware message workflows, conversation lookup, header inspection, EML import/export/share, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder and empty-folder controls, extracted and saved contacts, sender allow/block rules with current-folder block enforcement, recipient allow/block rules with pre-SMTP outbound enforcement, attachments, offline metadata cache, SecureStore-backed development push identity, and push-device flows",
+            "Expo/React Native client with VPN API target, invitation signup, native invite-link routing, hosted app-link association endpoints, icon tab shell, mailbox sessions, targeted and bulk session revocation, paginated and thread-aware message workflows, conversation lookup, header inspection, EML import/export/share, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder and empty-folder controls, extracted and saved contacts, sender allow/block rules with current-folder block enforcement, recipient allow/block rules with pre-SMTP outbound enforcement, attachments, offline metadata cache, SecureStore-backed development push identity, and push-device flows",
             "bulk read/star/archive/spam/delete/move client controls over the shared mailbox API",
             "mobile preference controls for default compose signatures",
             "compose/send path uses the shared mailbox API contract with Sent Items persistence status",
@@ -503,6 +503,42 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "publicInternet": False,
             "requiredBoundary": "Dragonscale/VPN clients only",
         }
+
+    @app.get("/.well-known/apple-app-site-association")
+    def apple_app_site_association() -> dict[str, object]:
+        team_id = _mobile_ios_team_id_or_raise(active_settings)
+        app_id = f"{team_id}.{active_settings.mobile_ios_bundle_id}"
+        return {
+            "applinks": {
+                "apps": [],
+                "details": [
+                    {
+                        "appIDs": [app_id],
+                        "components": [
+                            {
+                                "/": "/",
+                                "?": {"invite": "*"},
+                                "comment": "FreeMail invitation links",
+                            }
+                        ],
+                    }
+                ],
+            }
+        }
+
+    @app.get("/.well-known/assetlinks.json")
+    def android_asset_links() -> list[dict[str, object]]:
+        fingerprints = _mobile_android_fingerprints_or_raise(active_settings)
+        return [
+            {
+                "relation": ["delegate_permission/common.handle_all_urls"],
+                "target": {
+                    "namespace": "android_app",
+                    "package_name": active_settings.mobile_android_package,
+                    "sha256_cert_fingerprints": fingerprints,
+                },
+            }
+        ]
 
     @app.get("/api/v1/metadata/readiness")
     def metadata_readiness(connection: sqlite3.Connection = Depends(get_connection)) -> dict[str, object]:
@@ -2297,6 +2333,48 @@ def _invitation_token_hash(token: str) -> str:
 
 def _invitation_url(hostname: str, token: str) -> str:
     return f"https://{hostname}/?invite={quote(token)}"
+
+
+def _mobile_ios_team_id_or_raise(settings: Settings) -> str:
+    team_id = str(settings.mobile_ios_team_id or "").strip().upper()
+    if not team_id:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Mobile iOS associated domain is not configured",
+        )
+    if len(team_id) != 10 or not team_id.isalnum():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Mobile iOS team identifier is invalid",
+        )
+    return team_id
+
+
+def _mobile_android_fingerprints_or_raise(settings: Settings) -> list[str]:
+    raw_value = settings.mobile_android_sha256_cert_fingerprints or ""
+    fingerprints = [
+        candidate.strip().upper()
+        for value in raw_value.replace("\n", ",").replace(";", ",").split(",")
+        if (candidate := value.strip())
+    ]
+    if not fingerprints:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Mobile Android asset links are not configured",
+        )
+    if any(not _is_sha256_fingerprint(fingerprint) for fingerprint in fingerprints):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Mobile Android SHA-256 certificate fingerprint is invalid",
+        )
+    return fingerprints
+
+
+def _is_sha256_fingerprint(value: str) -> bool:
+    parts = value.split(":")
+    return len(parts) == 32 and all(
+        len(part) == 2 and all(character in "0123456789ABCDEF" for character in part) for part in parts
+    )
 
 
 def _normalized_admin_role(is_admin: bool, requested_role: str) -> str:

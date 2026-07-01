@@ -11,7 +11,7 @@ The current mobile implementation is a source-level foundation, not a production
 - Secure bearer-session persistence through `expo-secure-store`.
 - Icon tab shell navigation for mail, people/rules, security/session, and compose workflows.
 - Mobile invitation signup with deep-link or pasted invite-token loading, prefilled email/display metadata, and user-chosen password acceptance.
-- Native invite-link configuration for the `freemail` URL scheme plus iOS associated domains and Android verified HTTPS intent filters for `freemail.kuzuryu.ai`.
+- Native invite-link configuration for the `freemail` URL scheme plus iOS associated domains, Android verified HTTPS intent filters, and hosted app-link association documents for `freemail.kuzuryu.ai`.
 - Paginated and thread-aware inbox snapshot/search, conversation lookup, message read, mailbox preferences/signatures, compose/send with Sent Items persistence status, save draft, reply, forward, mark read/unread, bulk read/star/archive/spam/delete actions, and sign-out workflows.
 - Folder navigation plus create, rename, empty, and delete controls for supported folders.
 - Folder-scoped search, saved contacts, contacts loaded from mailbox headers, sender block-rule application for the current folder, and recipient block rules before outbound SMTP submission.
@@ -40,6 +40,8 @@ https://freemail.kuzuryu.ai
 
 Devices must be on the Dragonscale/VPN network. Do not point a production mobile build at public internet ingress during the current release phase.
 
+The API serves mobile HTTPS association documents at `/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json`; Caddy proxies those paths to the API. Configure `FREEMAIL_MOBILE_IOS_TEAM_ID` and `FREEMAIL_MOBILE_ANDROID_SHA256_CERT_FINGERPRINTS` in deployment only after the real Apple team and Android signing certificate are known. These values are public app-link identifiers, not signing credentials. The endpoints return `503` when they are missing or invalid.
+
 ## QA
 
 Static mobile QA runs from the repository root and does not require a native toolchain:
@@ -48,7 +50,7 @@ Static mobile QA runs from the repository root and does not require a native too
 .\.venv\Scripts\python.exe scripts\qa_mobile_static.py
 ```
 
-The static gate checks that the mobile client uses provider-neutral FreeMail language, exposes the icon tab shell, references the expected mailbox API endpoints for invitation signup, sessions, paginated and thread-aware snapshots, paginated search, conversation lookup, saved and extracted contacts, sender rules and current-folder block application, recipient rules, folders, mailbox preferences/signatures, message details, header inspection, message read-state/star-state/archive/move/bulk actions, attachments, EML import/export, push-device registration, send, draft saving, and draft reopen into compose, defaults to the VPN hostname, declares native invite-link routing, and does not persist mailbox passwords or bearer sessions in insecure browser-style storage. It also guards the document-picker/base64 compose attachment path plus the authenticated attachment download/share path. The offline cache stores mailbox metadata only and the static gate fails if credential markers are added to that cache path.
+The static gate checks that the mobile client uses provider-neutral FreeMail language, exposes the icon tab shell, references the expected mailbox API endpoints for invitation signup, sessions, paginated and thread-aware snapshots, paginated search, conversation lookup, saved and extracted contacts, sender rules and current-folder block application, recipient rules, folders, mailbox preferences/signatures, message details, header inspection, message read-state/star-state/archive/move/bulk actions, attachments, EML import/export, push-device registration, send, draft saving, and draft reopen into compose, defaults to the VPN hostname, declares native invite-link routing and hosted association routes, and does not persist mailbox passwords or bearer sessions in insecure browser-style storage. It also guards the document-picker/base64 compose attachment path plus the authenticated attachment download/share path. The offline cache stores mailbox metadata only and the static gate fails if credential markers are added to that cache path.
 
 Push-provider delivery is provider-neutral at this stage. The mobile client can create a stable local FreeMail device identity in SecureStore, register that identity through the development provider for VPN beta tests, revoke a provider token through the FreeMail API, send a push test, and read recent notification delivery status. The API stores a hashed provider token for lookup and stores encrypted runtime token material only when `FREEMAIL_PUSH_TOKEN_SECRET` is configured. `contract-only` and `development` registrations use a deterministic development provider; APNS/FCM delivery runs only when the operator configures the corresponding provider credentials through deployment secrets, otherwise notifications remain queued as `pending_provider`.
 
