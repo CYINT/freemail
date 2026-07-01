@@ -20,6 +20,7 @@ class ReleasePacketStatusOptions:
     release_notes: Path | None = None
     release_version: str | None = None
     require_mobile_store_submission: bool = False
+    allow_pre_store_mobile_packet: bool = False
 
 
 def summarize_release_packet(options: ReleasePacketStatusOptions) -> dict[str, Any]:
@@ -38,6 +39,11 @@ def summarize_release_packet(options: ReleasePacketStatusOptions) -> dict[str, A
             options.mobile_release_evidence,
             options.mobile_app_config,
             require_store_submission=options.require_mobile_store_submission,
+        ),
+        _mobile_store_submission_requirement_check(
+            options.mobile_release_evidence,
+            require_store_submission=options.require_mobile_store_submission,
+            allow_pre_store_packet=options.allow_pre_store_mobile_packet,
         ),
         _private_beta_check(options.private_beta_evidence),
         _release_notes_check(options.release_notes, options.release_version),
@@ -119,6 +125,31 @@ def _mobile_failed_requirements(checks: list[dict[str, Any]]) -> dict[str, list[
         for failed_requirements in [check.get("details", {}).get("failedRequirements")]
         if check["status"] != "pass" and isinstance(failed_requirements, list) and failed_requirements
     }
+
+
+def _mobile_store_submission_requirement_check(
+    evidence: Path | None,
+    *,
+    require_store_submission: bool,
+    allow_pre_store_packet: bool,
+) -> dict[str, Any]:
+    if evidence is None or not evidence.is_file():
+        return _check(
+            "mobile-store-submission-requirement",
+            True,
+            {"skipped": True, "reason": "mobile release evidence file is not available"},
+        )
+    return _check(
+        "mobile-store-submission-requirement",
+        require_store_submission or allow_pre_store_packet,
+        {
+            "requireStoreSubmission": require_store_submission,
+            "allowPreStoreMobilePacket": allow_pre_store_packet,
+            "error": None
+            if require_store_submission or allow_pre_store_packet
+            else "release packet status must require mobile store-submission evidence; use --allow-pre-store-mobile-packet only for pre-store dry runs",
+        },
+    )
 
 
 def _restore_drill_check(path: Path | None) -> dict[str, Any]:

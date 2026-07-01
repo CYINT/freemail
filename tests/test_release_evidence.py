@@ -47,6 +47,7 @@ def test_release_evidence_manifest_loads_release_gate_and_status_options(tmp_pat
     assert gate_options.require_mobile_store_submission is True
     assert status_options.private_beta_evidence == artifacts["private_beta_evidence"]
     assert status_options.require_mobile_store_submission is True
+    assert status_options.allow_pre_store_mobile_packet is False
 
 
 def test_release_packet_status_script_accepts_manifest(tmp_path):
@@ -101,6 +102,7 @@ def test_release_packet_status_script_cli_paths_override_manifest(tmp_path):
             private_beta_evidence=artifacts["private_beta_evidence"],
             release_notes=artifacts["release_notes"],
             release_version="v0.1.0-private-beta",
+            require_mobile_store_submission=True,
         )
     )
 

@@ -38,6 +38,11 @@ def main() -> int:
     parser.add_argument("--release-notes", type=Path)
     parser.add_argument("--release-version")
     parser.add_argument("--require-mobile-store-submission", action="store_true")
+    parser.add_argument(
+        "--allow-pre-store-mobile-packet",
+        action="store_true",
+        help="Allow packet status without mobile store-submission evidence for pre-store dry runs only.",
+    )
     args = parser.parse_args()
 
     manifest_path = args.manifest or _default_manifest()
@@ -68,6 +73,7 @@ def _options_from_args(
         release_version=args.release_version or _manifest_value(manifest, "release_version"),
         require_mobile_store_submission=args.require_mobile_store_submission
         or bool(_manifest_value(manifest, "require_mobile_store_submission")),
+        allow_pre_store_mobile_packet=args.allow_pre_store_mobile_packet,
     )
 
 

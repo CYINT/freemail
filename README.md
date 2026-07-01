@@ -516,7 +516,7 @@ Explicit artifact flags can override manifest entries when evidence is stored in
   --release-version v0.1.0-private-beta
 ```
 
-The packet status command is read-only. It reports missing, empty, and failing packet artifacts without invoking Docker, GitHub, or live runtime URLs.
+The packet status command is read-only. It reports missing, empty, and failing packet artifacts without invoking Docker, GitHub, or live runtime URLs. When mobile evidence is present, packet status expects `--require-mobile-store-submission`; use `--allow-pre-store-mobile-packet` only for an explicit pre-store dry run.
 
 Run the local release gate only after the candidate commit has been pushed, GitHub Actions CI has passed for that exact commit, and the VPN-only runtime has been stamped with that commit through `FREEMAIL_RELEASE_COMMIT`:
 
