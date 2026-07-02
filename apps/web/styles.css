@@ -359,7 +359,70 @@ textarea:focus-visible,
 .workspace {
   min-width: 0;
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto auto 1fr;
+}
+
+.view-tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid #cfd8e2;
+  background: #ffffff;
+  padding: 0.35rem 0.75rem 0;
+  overflow-x: auto;
+}
+
+.view-tab {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px 6px 0 0;
+  color: #243140;
+  text-decoration: none;
+  font-size: 0.9rem;
+  border: 1px solid transparent;
+  border-bottom: none;
+}
+
+.view-tab.active,
+.view-tab:hover {
+  background: #f8fafc;
+  border-color: #cfd8e2;
+  color: #0f766e;
+}
+
+.view-section {
+  display: none;
+}
+
+.app-shell[data-view="mail"] .view-section[data-view-section="mail"],
+.app-shell[data-view="compose"] .view-section[data-view-section="compose"],
+.app-shell[data-view="organize"] .view-section[data-view-section="organize"],
+.app-shell[data-view="sessions"] .view-section[data-view-section="sessions"],
+.app-shell[data-view="admin"] .view-section[data-view-section="admin"] {
+  display: block;
+}
+
+.app-shell[data-view="mail"] .mail-layout,
+.app-shell[data-view="admin"] .admin-console {
+  display: grid;
+}
+
+.app-shell[data-view="mail"] .view-tab[data-view="mail"].active,
+.app-shell[data-view="compose"] .view-tab[data-view="compose"].active,
+.app-shell[data-view="organize"] .view-tab[data-view="organize"].active,
+.app-shell[data-view="sessions"] .view-tab[data-view="sessions"].active,
+.app-shell[data-view="admin"] .view-tab[data-view="admin"].active {
+  background: #e2ece9;
+  border-color: #0f766e;
+  color: #0f766e;
+}
+
+.organize-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: 1rem;
+  padding: 0.75rem;
 }
 
 .topbar {

@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="./material.css">
   </head>
   <body data-design-system="material-3">
-    <div class="app-shell">
+    <div class="app-shell" data-view="mail">
       <aside class="sidebar" aria-label="Mailbox navigation">
         <div class="brand">
           <span class="brand-mark" aria-hidden="true">F</span>
@@ -48,76 +48,16 @@
             <button id="folder-delete-action" type="button">Delete</button>
           </div>
         </form>
-        <section class="contacts-panel" aria-label="Contacts">
-          <div>
-            <strong>Contacts</strong>
-            <button id="contacts-action" type="button">Load</button>
-          </div>
-          <form class="saved-contact-form" id="saved-contact-form" aria-label="Save contact">
-            <input id="saved-contact-name" name="displayName" type="text" placeholder="Name" maxlength="160">
-            <input id="saved-contact-email" name="email" type="email" placeholder="person@example.com">
-            <button type="submit">Save</button>
-          </form>
-          <div class="contacts-list" id="contacts-list">
-            <p>Load contacts from mailbox headers.</p>
-          </div>
-        </section>
-        <form class="preferences-panel" id="mailbox-preferences" aria-label="Mailbox preferences">
-          <strong>Preferences</strong>
-          <label>Display name <input id="preference-display-name" name="displayName" type="text" maxlength="160"></label>
-          <label>Signature <textarea id="preference-signature" name="signature" rows="4" maxlength="4000" placeholder="Regards,&#10;FreeMail"></textarea></label>
-          <button type="submit">Save preferences</button>
-        </form>
-        <section class="sender-rules-panel" aria-label="Sender rules">
-          <div>
-            <strong>Sender rules</strong>
-            <button id="sender-rules-refresh" type="button">Load</button>
-            <button id="sender-rules-apply" type="button">Apply blocks</button>
-          </div>
-          <form class="sender-rule-form" id="sender-rule-form" aria-label="Save sender rule">
-            <input id="sender-rule-email" name="senderEmail" type="email" placeholder="sender@example.com">
-            <select id="sender-rule-action" name="action">
-              <option value="block">Block</option>
-              <option value="allow">Allow</option>
-            </select>
-            <input id="sender-rule-notes" name="notes" type="text" placeholder="Notes" maxlength="2000">
-            <button type="submit">Save rule</button>
-          </form>
-          <div id="sender-rules-list">
-            <p>Sign in to manage sender rules.</p>
-          </div>
-        </section>
-        <section class="recipient-rules-panel" aria-label="Recipient rules">
-          <div>
-            <strong>Recipient rules</strong>
-            <button id="recipient-rules-refresh" type="button">Load</button>
-          </div>
-          <form class="recipient-rule-form" id="recipient-rule-form" aria-label="Save recipient rule">
-            <input id="recipient-rule-email" name="recipientEmail" type="email" placeholder="recipient@example.com">
-            <select id="recipient-rule-action" name="action">
-              <option value="block">Block</option>
-              <option value="allow">Allow</option>
-            </select>
-            <input id="recipient-rule-notes" name="notes" type="text" placeholder="Notes" maxlength="2000">
-            <button type="submit">Save rule</button>
-          </form>
-          <div id="recipient-rules-list">
-            <p>Sign in to manage recipient rules.</p>
-          </div>
-        </section>
-        <section class="sessions-panel" aria-label="Mailbox sessions">
-          <div>
-            <strong>Sessions</strong>
-            <button id="mailbox-sessions-refresh" type="button">Refresh</button>
-          </div>
-          <div id="mailbox-sessions-list">
-            <p>Sign in to view active sessions.</p>
-          </div>
-          <button id="mailbox-sessions-revoke-all" type="button">Sign out everywhere</button>
-        </section>
       </aside>
 
       <main class="workspace">
+        <nav class="view-tabs" aria-label="Top level navigation">
+          <a href="#mail" class="view-tab active" data-view="mail">Mail</a>
+          <a href="#compose" class="view-tab" data-view="compose">Compose</a>
+          <a href="#organize" class="view-tab" data-view="organize">Organize</a>
+          <a href="#sessions" class="view-tab" data-view="sessions">Sessions</a>
+          <a href="#admin" class="view-tab" data-view="admin">Admin</a>
+        </nav>
         <header class="topbar">
           <div>
             <p class="eyebrow">VPN-only webmail preview</p>
@@ -146,7 +86,7 @@
           </form>
         </section>
 
-        <section class="mail-layout" aria-label="Mailbox">
+        <section class="mail-layout view-section" data-view-section="mail" aria-label="Mailbox">
           <section class="message-list" id="message-list" aria-label="Inbox messages">
             <div class="bulk-toolbar" aria-label="Bulk message actions">
               <button id="bulk-read-action" type="button">Read</button>
@@ -213,21 +153,99 @@
             </div>
             <section class="message-headers" id="message-headers" aria-label="Message headers"></section>
             <section class="message-attachments" id="message-attachments" aria-label="Message attachments"></section>
-            <form class="compose-panel" id="compose-form" aria-label="Compose message">
-              <h2>Compose</h2>
-              <label>To <input id="compose-to" name="to" type="email" value="postmaster@example.com" required></label>
-              <label>Subject <input id="compose-subject" name="subject" type="text" value="Controlled-domain validation" required></label>
-              <label>Message <textarea id="compose-body" name="body" rows="5" required>Draft the next smoke plan for a controlled FreeMail domain.</textarea></label>
-              <label class="attachment-field">Attachments <input id="compose-attachments" name="attachments" type="file" multiple></label>
-              <div class="compose-actions">
-                <button id="save-draft-action" type="button">Save draft</button>
-                <button class="send" type="submit">Send</button>
-              </div>
-            </form>
           </article>
         </section>
 
-        <section class="admin-console" aria-label="Admin console">
+        <section class="view-section" data-view-section="compose" aria-label="Compose">
+          <form class="compose-panel" id="compose-form" aria-label="Compose message">
+            <h2>Compose</h2>
+            <label>To <input id="compose-to" name="to" type="email" value="postmaster@example.com" required></label>
+            <label>Subject <input id="compose-subject" name="subject" type="text" value="Controlled-domain validation" required></label>
+            <label>Message <textarea id="compose-body" name="body" rows="5" required>Draft the next smoke plan for a controlled FreeMail domain.</textarea></label>
+            <label class="attachment-field">Attachments <input id="compose-attachments" name="attachments" type="file" multiple></label>
+            <div class="compose-actions">
+              <button id="save-draft-action" type="button">Save draft</button>
+              <button class="send" type="submit">Send</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="view-section" data-view-section="organize" aria-label="Organize (Contacts, Rules, Preferences)">
+          <div class="organize-grid">
+            <section class="contacts-panel" aria-label="Contacts">
+              <div>
+                <strong>Contacts</strong>
+                <button id="contacts-action" type="button">Load</button>
+              </div>
+              <form class="saved-contact-form" id="saved-contact-form" aria-label="Save contact">
+                <input id="saved-contact-name" name="displayName" type="text" placeholder="Name" maxlength="160">
+                <input id="saved-contact-email" name="email" type="email" placeholder="person@example.com">
+                <button type="submit">Save</button>
+              </form>
+              <div class="contacts-list" id="contacts-list">
+                <p>Load contacts from mailbox headers.</p>
+              </div>
+            </section>
+            <form class="preferences-panel" id="mailbox-preferences" aria-label="Mailbox preferences">
+              <strong>Preferences</strong>
+              <label>Display name <input id="preference-display-name" name="displayName" type="text" maxlength="160"></label>
+              <label>Signature <textarea id="preference-signature" name="signature" rows="4" maxlength="4000" placeholder="Regards,&#10;FreeMail"></textarea></label>
+              <button type="submit">Save preferences</button>
+            </form>
+            <section class="sender-rules-panel" aria-label="Sender rules">
+              <div>
+                <strong>Sender rules</strong>
+                <button id="sender-rules-refresh" type="button">Load</button>
+                <button id="sender-rules-apply" type="button">Apply blocks</button>
+              </div>
+              <form class="sender-rule-form" id="sender-rule-form" aria-label="Save sender rule">
+                <input id="sender-rule-email" name="senderEmail" type="email" placeholder="sender@example.com">
+                <select id="sender-rule-action" name="action">
+                  <option value="block">Block</option>
+                  <option value="allow">Allow</option>
+                </select>
+                <input id="sender-rule-notes" name="notes" type="text" placeholder="Notes" maxlength="2000">
+                <button type="submit">Save rule</button>
+              </form>
+              <div id="sender-rules-list">
+                <p>Sign in to manage sender rules.</p>
+              </div>
+            </section>
+            <section class="recipient-rules-panel" aria-label="Recipient rules">
+              <div>
+                <strong>Recipient rules</strong>
+                <button id="recipient-rules-refresh" type="button">Load</button>
+              </div>
+              <form class="recipient-rule-form" id="recipient-rule-form" aria-label="Save recipient rule">
+                <input id="recipient-rule-email" name="recipientEmail" type="email" placeholder="recipient@example.com">
+                <select id="recipient-rule-action" name="action">
+                  <option value="block">Block</option>
+                  <option value="allow">Allow</option>
+                </select>
+                <input id="recipient-rule-notes" name="notes" type="text" placeholder="Notes" maxlength="2000">
+                <button type="submit">Save rule</button>
+              </form>
+              <div id="recipient-rules-list">
+                <p>Sign in to manage recipient rules.</p>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view-section" data-view-section="sessions" aria-label="Sessions">
+          <section class="sessions-panel" aria-label="Mailbox sessions">
+            <div>
+              <strong>Sessions</strong>
+              <button id="mailbox-sessions-refresh" type="button">Refresh</button>
+            </div>
+            <div id="mailbox-sessions-list">
+              <p>Sign in to view active sessions.</p>
+            </div>
+            <button id="mailbox-sessions-revoke-all" type="button">Sign out everywhere</button>
+          </section>
+        </section>
+
+        <section class="view-section admin-console" data-view-section="admin" aria-label="Admin console">
           <header class="admin-header">
             <div>
               <p class="eyebrow">Admin console</p>

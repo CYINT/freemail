@@ -99,6 +99,10 @@ const invitationSignup = document.querySelector("#invitation-signup");
 const invitationSignupForm = document.querySelector("#invitation-signup-form");
 const invitationSummary = document.querySelector("#invitation-summary");
 
+const appShell = document.querySelector(".app-shell");
+const viewTabs = document.querySelectorAll(".view-tab");
+const composePrimary = document.querySelector(".compose-primary");
+
 const mailboxSessionStorageKey = "freemail.mailboxSession";
 const adminSessionStorageKey = "freemail.adminSession";
 const protectedFolders = ["inbox", "sent items", "drafts", "junk mail", "deleted items", "archive"];
@@ -144,6 +148,7 @@ let adminAuditLogQuery = {
 restoreMailboxSession();
 restoreAdminSession();
 loadInvitationFromUrl();
+initViewController();
 
 loginForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -211,6 +216,7 @@ replyAction?.addEventListener("click", () => {
     return;
   }
   prefillReply(selectedMessageDetail);
+  switchView("compose");
 });
 
 forwardAction?.addEventListener("click", () => {
@@ -219,6 +225,7 @@ forwardAction?.addEventListener("click", () => {
     return;
   }
   prefillForward(selectedMessageDetail);
+  switchView("compose");
 });
 
 loadThreadAction?.addEventListener("click", async () => {
@@ -243,6 +250,7 @@ editDraftAction?.addEventListener("click", () => {
     return;
   }
   prefillSavedDraft(selectedMessageDetail);
+  switchView("compose");
 });
 
 downloadSourceAction?.addEventListener("click", async () => {
@@ -3231,6 +3239,60 @@ function shortDate(value) {
     return value;
   }
   return parsed.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function initViewController() {
+  if (!appShell) return;
+
+  viewTabs.forEach((tab) => {
+    tab.addEventListener("click", (event) => {
+      event.preventDefault();
+      const view = tab.getAttribute("data-view");
+      if (view) switchView(view);
+    });
+  });
+
+  if (composePrimary) {
+    composePrimary.addEventListener("click", () => {
+      switchView("compose");
+    });
+  }
+
+  const initial = (location.hash || "").replace(/^#/, "");
+  const valid = ["mail", "compose", "organize", "sessions", "admin"];
+  if (valid.includes(initial)) {
+    switchView(initial);
+  } else {
+    switchView("mail");
+  }
+
+  window.addEventListener("hashchange", () => {
+    const h = (location.hash || "").replace(/^#/, "");
+    if (valid.includes(h)) switchView(h, { push: false });
+  });
+}
+
+function switchView(view, { push = true } = {}) {
+  if (!appShell || !view) return;
+  const validViews = ["mail", "compose", "organize", "sessions", "admin"];
+  const target = validViews.includes(view) ? view : "mail";
+  appShell.setAttribute("data-view", target);
+  viewTabs.forEach((t) => {
+    const isActive = t.getAttribute("data-view") === target;
+    t.classList.toggle("active", isActive);
+    if (isActive) t.setAttribute("aria-current", "page");
+    else t.removeAttribute("aria-current");
+  });
+  if (push) {
+    const newHash = `#${target}`;
+    if (location.hash !== newHash) {
+      history.replaceState(null, "", newHash);
+    }
+  }
+  if (target === "mail") {
+    const h1 = document.querySelector(".topbar h1");
+    if (h1) h1.textContent = mailboxSession.folder || "Inbox";
+  }
 }
 
 function readableError(error) {

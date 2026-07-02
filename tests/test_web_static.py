@@ -63,6 +63,11 @@ def test_static_web_validation_flags_credential_storage():
         '<body data-design-system="material-3"><link href="material.css">'
         '<aside class="sidebar"></aside><main class="app-shell workspace">'
         '<script src="./app.js"></script><nav></nav><header></header>'
+        '<nav class="view-tabs"><a class="view-tab" data-view="mail">Mail</a>'
+        '<a class="view-tab" data-view="compose">Compose</a>'
+        '<a class="view-tab" data-view="organize">Organize</a>'
+        '<a class="view-tab" data-view="sessions">Sessions</a>'
+        '<a class="view-tab" data-view="admin">Admin</a></nav>'
         '<form class="mailbox-login" id="mailbox-login">'
         '<input id="api-base-url"><p id="mailbox-status">Ready</p></form>'
         '<button id="mailbox-logout">Sign out</button>'
@@ -95,7 +100,10 @@ def test_static_web_validation_flags_credential_storage():
         '<button id="bulk-archive-action">Archive</button><button id="bulk-spam-action">Spam</button>'
         '<button id="bulk-delete-action">Delete</button><button id="load-more-action">Load more</button>'
         '<section class="message-list"><div class="bulk-toolbar"></div><article class="message-row reader compose-panel">'
-        "Inbox Compose Reply Forward Headers Download EML Import EML Mark read Mark unread Attach Send Junk Mail Spam Delete</article></section></main></body>"
+        "Inbox Compose Reply Forward Headers Download EML Import EML Mark read Mark unread Attach Send Junk Mail Spam Delete</article></section>"
+        '<div class="view-section" data-view-section="organize"><div class="organize-grid">'
+        '<section class="contacts-panel"></section><section class="sessions-panel"></section></div></div>'
+        '<section class="admin-console"><div class="admin-card"></div></section></main></body>'
     )
 
     failures = _validate(

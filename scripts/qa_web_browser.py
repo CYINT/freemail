@@ -78,7 +78,7 @@ def _check_viewport(browser, expect, base_url: str, output_dir: Path, name: str,
             "#mailbox-login",
             "#message-list",
             "#message-reader",
-            "#compose-form",
+            ".view-tabs",
             "#reply-action",
             "#forward-action",
             "#star-action",
@@ -86,14 +86,23 @@ def _check_viewport(browser, expect, base_url: str, output_dir: Path, name: str,
             "#archive-action",
         ]:
             expect(page.locator(selector)).to_be_visible()
+        # Verify view tabs exist and view split (compose not forced visible on mail view)
+        expect(page.locator(".view-tab")).to_have_count(5)
+        expect(page.locator("#compose-form")).to_have_count(1)
+        expect(page.locator('[data-view-section="compose"]')).to_have_count(1)
+        # Switch to compose via tab and verify it becomes visible
+        page.locator('.view-tab[data-view="compose"]').first.click()
+        expect(page.locator('[data-view-section="compose"]')).to_be_visible()
+        expect(page.locator("#compose-form")).to_be_visible()
+        # Return to mail view for metrics and screenshot
+        page.locator('.view-tab[data-view="mail"]').first.click()
+        expect(page.locator('[data-view-section="mail"]')).to_be_visible()
         metrics = page.evaluate(
             """() => ({
                 windowWidth: window.innerWidth,
                 documentWidth: document.documentElement.scrollWidth,
                 bodyWidth: document.body.scrollWidth,
-                shellHeight: document.querySelector('.app-shell')?.getBoundingClientRect().height || 0,
-                composeTop: document.querySelector('#compose-form')?.getBoundingClientRect().top || 0,
-                readerTop: document.querySelector('#message-reader')?.getBoundingClientRect().top || 0
+                shellHeight: document.querySelector('.app-shell')?.getBoundingClientRect().height || 0
             })"""
         )
         if max(metrics["documentWidth"], metrics["bodyWidth"]) > metrics["windowWidth"] + 1:
@@ -103,8 +112,6 @@ def _check_viewport(browser, expect, base_url: str, output_dir: Path, name: str,
             )
         if metrics["shellHeight"] < viewport["height"]:
             failures.append(f"{name}: app shell does not fill viewport height")
-        if metrics["composeTop"] <= metrics["readerTop"]:
-            failures.append(f"{name}: compose panel is not positioned after the reader header")
         overlap_count = page.evaluate(
             """() => Array.from(document.querySelectorAll('.folder-nav a')).filter((link) => {
                 const label = link.querySelector('span:first-child')?.getBoundingClientRect();

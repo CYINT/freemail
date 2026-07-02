@@ -63,6 +63,12 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str, caddy_text: 
         "reader",
         "compose-panel",
         "mailbox-login",
+        "view-tabs",
+        "view-tab",
+        "view-section",
+        "organize-grid",
+        "contacts-panel",
+        "sessions-panel",
         "admin-console",
         "admin-card",
     }
