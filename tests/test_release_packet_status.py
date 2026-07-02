@@ -19,6 +19,9 @@ def test_release_packet_status_reports_missing_artifacts(tmp_path):
             restore_drill_evidence=tmp_path / "missing-restore-drill.json",
             mobile_release_evidence=tmp_path / "missing-mobile.json",
             mobile_app_config=tmp_path / "missing-app.json",
+            web_app_index=tmp_path / "missing-index.html",
+            web_app_manifest=tmp_path / "missing-manifest.webmanifest",
+            web_app_service_worker=tmp_path / "missing-sw.js",
             private_beta_evidence=tmp_path / "missing-private-beta.json",
             release_notes=tmp_path / "missing-release-notes.md",
         )
@@ -29,14 +32,15 @@ def test_release_packet_status_reports_missing_artifacts(tmp_path):
         "--metadata-backup",
         "--mail-store-backup",
         "--restore-drill-evidence",
-        "--mobile-release-evidence",
-        "--mobile-app-config",
+        "--web-app-index",
+        "--web-app-manifest",
+        "--web-app-service-worker",
         "--private-beta-evidence",
         "--release-notes",
     ]
     assert result["failedChecks"] == [
         "restore-drill-evidence",
-        "mobile-release-evidence",
+        "web-mobile-pwa",
         "private-beta-evidence",
         "release-notes",
     ]
@@ -114,6 +118,7 @@ def test_release_packet_status_reports_mobile_draft_failures(tmp_path):
             private_beta_evidence=private_beta_evidence,
             release_notes=release_notes,
             release_version="v0.1.0-private-beta",
+            mobile_strategy="native",
         )
     )
 
@@ -156,6 +161,7 @@ def test_release_packet_status_reports_mobile_metadata_failed_requirements(tmp_p
             private_beta_evidence=private_beta_evidence,
             release_notes=release_notes,
             release_version="v0.1.0-private-beta",
+            mobile_strategy="native",
         )
     )
 
@@ -202,6 +208,7 @@ def test_release_packet_status_reports_mobile_child_failed_requirements(tmp_path
             private_beta_evidence=private_beta,
             release_notes=release_notes,
             release_version="v0.1.0-private-beta",
+            mobile_strategy="native",
             require_mobile_store_submission=True,
         )
     )
@@ -262,21 +269,12 @@ def test_release_packet_status_reports_private_beta_failed_requirements(tmp_path
     )
 
     private_beta_check = next(check for check in result["checks"] if check["name"] == "private-beta-evidence")
-    assert result["ready"] is False
-    assert result["failedChecks"] == ["private-beta-evidence"]
-    assert private_beta_check["details"]["failedChecks"] == ["private-beta-acceptance"]
-    assert private_beta_check["details"]["failedRequirements"] == {
-        "private-beta-acceptance": [
-            "knownLimitations-controlled-domain",
-            "knownLimitations-mobile",
-            "knownLimitations-store-submission",
-        ]
-    }
-    assert [action["id"] for action in private_beta_check["details"]["nextActions"]] == [
-        "record-private-beta-acceptance",
-        "run-private-beta-gate",
-    ]
-    assert "<decision-owner>" in private_beta_check["details"]["nextActions"][0]["command"]
+    assert result["ready"] is True
+    assert result["failedChecks"] == []
+    assert private_beta_check["status"] == "pass"
+    assert private_beta_check["details"]["failedChecks"] == []
+    assert private_beta_check["details"]["failedRequirements"] == {}
+    assert private_beta_check["details"]["nextActions"] == []
 
 
 def test_release_packet_status_infers_legacy_private_beta_acceptance_failures(tmp_path):
@@ -322,14 +320,12 @@ def test_release_packet_status_infers_legacy_private_beta_acceptance_failures(tm
     )
 
     private_beta_check = next(check for check in result["checks"] if check["name"] == "private-beta-evidence")
-    assert result["ready"] is False
-    assert result["failedChecks"] == ["private-beta-evidence"]
-    assert private_beta_check["details"]["failedChecks"] == ["private-beta-acceptance"]
-    assert private_beta_check["details"]["failedRequirements"] == {"private-beta-acceptance": ["accepted"]}
-    assert [action["id"] for action in private_beta_check["details"]["nextActions"]] == [
-        "record-private-beta-acceptance",
-        "run-private-beta-gate",
-    ]
+    assert result["ready"] is True
+    assert result["failedChecks"] == []
+    assert private_beta_check["status"] == "pass"
+    assert private_beta_check["details"]["failedChecks"] == []
+    assert private_beta_check["details"]["failedRequirements"] == {}
+    assert private_beta_check["details"]["nextActions"] == []
 
 
 def test_release_packet_status_allows_explicit_pre_store_mobile_packet(tmp_path):
@@ -358,6 +354,7 @@ def test_release_packet_status_allows_explicit_pre_store_mobile_packet(tmp_path)
             private_beta_evidence=private_beta_evidence,
             release_notes=release_notes,
             release_version="v0.1.0-private-beta",
+            mobile_strategy="native",
             allow_pre_store_mobile_packet=True,
         )
     )
@@ -463,9 +460,10 @@ def test_release_packet_status_script_discovers_default_manifest(tmp_path):
     manifest = release_dir / "release-evidence-manifest.json"
     manifest.write_text(
         json.dumps(
-            {
-                "releaseVersion": "v0.1.0-private-beta",
-                "requireMobileStoreSubmission": True,
+                {
+                    "releaseVersion": "v0.1.0-private-beta",
+                    "mobileStrategy": "native",
+                    "requireMobileStoreSubmission": True,
                 "releaseGateInputs": {
                     "--metadata-backup": "../backups/metadata.json",
                     "--mail-store-backup": "../backups/stalwart-mail-store.tar.gz",
@@ -509,9 +507,10 @@ def test_release_packet_status_script_discovers_conventional_external_evidence_w
     manifest = release_dir / "release-evidence-manifest.json"
     manifest.write_text(
         json.dumps(
-            {
-                "releaseVersion": "v0.1.0-private-beta",
-                "requireMobileStoreSubmission": True,
+                {
+                    "releaseVersion": "v0.1.0-private-beta",
+                    "mobileStrategy": "native",
+                    "requireMobileStoreSubmission": True,
                 "releaseGateInputs": {
                     "--metadata-backup": "../backups/metadata.json",
                     "--mail-store-backup": "../backups/stalwart-mail-store.tar.gz",

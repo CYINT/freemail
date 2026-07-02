@@ -1,6 +1,8 @@
 # Mobile Release
 
-FreeMail Mobile is an Expo/React Native client that must remain self-hostable and VPN-first. The open-source repository contains source, metadata, and validation gates only. It must not contain Apple certificates, provisioning profiles, Android keystores, store API keys, generated native project directories, or private service credentials.
+The current private-beta mobile strategy is PWA-first. See `docs/pwa-mobile.md` for the supported iPhone and mobile-browser path.
+
+FreeMail Mobile is also an experimental Expo/React Native client that must remain self-hostable and VPN-first. Native signing, TestFlight, Play Console, and store-submission evidence are required only for a future native app-store release candidate or when release tooling is run with `--mobile-strategy native`. The open-source repository contains source, metadata, and validation gates only. It must not contain Apple certificates, provisioning profiles, Android keystores, store API keys, generated native project directories, or private service credentials.
 
 ## Release Invariants
 

@@ -184,7 +184,7 @@ def _commands(
         ),
         _command(
             "collect-private-beta-acceptance",
-            "Record decision-owner acceptance after reviewing the completed packet.",
+            "Optionally record decision-owner acceptance after reviewing the completed packet.",
             [
                 ".\\.venv\\Scripts\\python.exe",
                 "scripts\\collect_private_beta_acceptance.py",

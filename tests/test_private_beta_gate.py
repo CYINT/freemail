@@ -635,7 +635,6 @@ def test_private_beta_gate_requires_beta_evidence_when_enabled():
         "metadata-backup-evidence",
         "mail-store-backup-evidence",
         "restore-drill-evidence",
-        "private-beta-acceptance",
     ]
 
 

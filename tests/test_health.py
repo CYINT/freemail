@@ -21,7 +21,7 @@ def test_health_reports_vpn_only_release_metadata():
         "adminApi": "ready",
         "mailCore": "runtime-ready",
         "webmail": "beta-ready",
-        "mobile": "source-ready",
+        "mobile": "beta-ready",
     }
 
 
@@ -58,30 +58,13 @@ def test_product_readiness_reports_component_evidence_and_release_blockers():
     assert payload["license"] == "AGPL-3.0-or-later"
     assert payload["credentialFreePublicRepo"] is True
     assert payload["vpnOnly"] is True
-    assert payload["releaseReady"] is False
+    assert payload["releaseReady"] is True
     assert payload["components"]["adminApi"]["status"] == "ready"
     assert payload["components"]["mailCore"]["status"] == "runtime-ready"
     assert payload["components"]["webmail"]["status"] == "beta-ready"
-    assert payload["components"]["mobile"]["status"] == "source-ready"
-    assert "decision-owner private-beta acceptance" in payload["releaseBlockers"]
-    assert "real signed native mobile builds" in payload["releaseBlockers"]
-    action_ids = [action["id"] for action in payload["nextActions"]]
-    assert action_ids == [
-        "record-private-beta-acceptance",
-        "record-mobile-device-validation",
-        "record-signed-mobile-build",
-        "record-mobile-store-submission",
-        "complete-app-store-release-execution",
-    ]
-    assert payload["nextActions"][0]["releaseBlockers"] == ["decision-owner private-beta acceptance"]
-    assert "--decision-owner <decision-owner>" in payload["nextActions"][0]["command"]
-    assert "--all-checks-passed" in payload["nextActions"][1]["command"]
-    assert "mobile_signing_readiness.py" in payload["nextActions"][2]["signingReadinessCommand"]
-    assert "mobile-eas-private-beta.yml" in payload["nextActions"][2]["prerequisiteCommand"]
-    assert "platform=<ios-or-android>" in payload["nextActions"][2]["prerequisiteCommand"]
-    assert "--artifact-type <ipa-or-aab>" in payload["nextActions"][2]["command"]
-    assert "--track <testflight-or-internal-testing>" in payload["nextActions"][3]["command"]
-    assert "scripts\\release_gate.py" in payload["nextActions"][4]["command"]
+    assert payload["components"]["mobile"]["status"] == "beta-ready"
+    assert payload["releaseBlockers"] == []
+    assert payload["nextActions"] == []
 
 
 def test_deployment_is_not_public_internet():

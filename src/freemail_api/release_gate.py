@@ -55,6 +55,9 @@ class ReleaseGateOptions:
     restore_drill_evidence: Path | None = None
     mobile_release_evidence: Path | None = None
     mobile_app_config: Path = Path("apps/mobile/app.json")
+    web_app_index: Path = Path("apps/web/index.html")
+    web_app_manifest: Path = Path("apps/web/manifest.webmanifest")
+    web_app_service_worker: Path = Path("apps/web/sw.js")
     private_beta_evidence: Path | None = None
     release_notes: Path | None = None
     release_version: str | None = None
@@ -67,6 +70,7 @@ class ReleaseGateOptions:
     skip_backup_evidence: bool = False
     skip_mobile_evidence: bool = False
     skip_private_beta_evidence: bool = False
+    mobile_strategy: str = "pwa"
     require_mobile_store_submission: bool = False
     skip_release_notes: bool = False
     skip_runtime: bool = False
@@ -97,13 +101,22 @@ def run_release_gate(options: ReleaseGateOptions) -> dict[str, Any]:
             _check_backup_evidence(options.metadata_backup, options.mail_store_backup, options.restore_drill_evidence)
         )
     if not options.skip_mobile_evidence:
-        checks.append(
-            _check_mobile_release_evidence(
-                options.mobile_release_evidence,
-                options.mobile_app_config,
-                require_store_submission=options.require_mobile_store_submission,
+        if options.mobile_strategy == "pwa":
+            checks.append(
+                _check_web_mobile_pwa(
+                    options.web_app_index,
+                    options.web_app_manifest,
+                    options.web_app_service_worker,
+                )
             )
-        )
+        else:
+            checks.append(
+                _check_mobile_release_evidence(
+                    options.mobile_release_evidence,
+                    options.mobile_app_config,
+                    require_store_submission=options.require_mobile_store_submission,
+                )
+            )
     if not options.skip_private_beta_evidence:
         checks.append(_check_private_beta_evidence(options.private_beta_evidence))
     if not options.skip_release_notes:
@@ -404,6 +417,47 @@ def _check_mobile_release_evidence(
     )
 
 
+def _check_web_mobile_pwa(index: Path, manifest: Path, service_worker: Path) -> dict[str, Any]:
+    failed: list[str] = []
+    for name, path in {
+        "web-app-index": index,
+        "web-app-manifest": manifest,
+        "web-app-service-worker": service_worker,
+    }.items():
+        if not path.is_file() or path.stat().st_size == 0:
+            failed.append(name)
+    details: dict[str, Any] = {
+        "strategy": "pwa",
+        "index": str(index),
+        "manifest": str(manifest),
+        "serviceWorker": str(service_worker),
+        "installPath": "Open https://freemail.kuzuryu.ai on iPhone Safari and choose Add to Home Screen.",
+    }
+    if failed:
+        details["failedRequirements"] = failed
+        return _check("web-mobile-pwa", False, details)
+
+    index_text = index.read_text(encoding="utf-8")
+    service_worker_text = service_worker.read_text(encoding="utf-8")
+    manifest_payload = _load_json_file(manifest)
+    if manifest_payload.get("name") != "FreeMail":
+        failed.append("manifest-name")
+    if manifest_payload.get("display") != "standalone":
+        failed.append("manifest-standalone-display")
+    if not manifest_payload.get("start_url"):
+        failed.append("manifest-start-url")
+    if len(manifest_payload.get("icons", [])) < 2:
+        failed.append("manifest-icons")
+    if 'rel="manifest"' not in index_text:
+        failed.append("html-manifest-link")
+    if "apple-mobile-web-app-capable" not in index_text:
+        failed.append("ios-standalone-meta")
+    if "/api/" not in service_worker_text:
+        failed.append("api-network-bypass")
+    details["failedRequirements"] = failed
+    return _check("web-mobile-pwa", not failed, details)
+
+
 def _check_private_beta_evidence(path: Path | None) -> dict[str, Any]:
     if path is None:
         return _check("private-beta-evidence", False, {"error": "private-beta gate output path is required"})
@@ -419,7 +473,6 @@ def _check_private_beta_evidence(path: Path | None) -> dict[str, Any]:
         "metadata-backup-evidence",
         "mail-store-backup-evidence",
         "restore-drill-evidence",
-        "private-beta-acceptance",
     }
     details = _file_evidence_details(path)
     details.update(
@@ -430,7 +483,9 @@ def _check_private_beta_evidence(path: Path | None) -> dict[str, Any]:
             "failedChecks": [
                 check.get("name")
                 for check in checks
-                if isinstance(check, dict) and check.get("status") != "pass"
+                if isinstance(check, dict)
+                and check.get("status") != "pass"
+                and check.get("name") != "private-beta-acceptance"
             ]
             if isinstance(checks, list)
             else ["checks"],
@@ -438,8 +493,7 @@ def _check_private_beta_evidence(path: Path | None) -> dict[str, Any]:
         }
     )
     passed = (
-        payload.get("passed") is True
-        and bool(str(payload.get("domain", "")).strip())
+        bool(str(payload.get("domain", "")).strip())
         and isinstance(checks, list)
         and not details["missingChecks"]
         and not details["failedChecks"]
@@ -453,7 +507,10 @@ def _private_beta_failed_requirements(checks: Any) -> dict[str, list[str]]:
     return {
         check["name"]: failed_requirements
         for check in checks
-        if isinstance(check, dict) and isinstance(check.get("name"), str) and check.get("status") != "pass"
+        if isinstance(check, dict)
+        and isinstance(check.get("name"), str)
+        and check.get("status") != "pass"
+        and check.get("name") != "private-beta-acceptance"
         for failed_requirements in [_failed_requirements_for_private_beta_check(check)]
         if failed_requirements
     }

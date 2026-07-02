@@ -29,6 +29,9 @@ def main() -> int:
     parser.add_argument("--restore-drill-evidence", type=Path)
     parser.add_argument("--mobile-release-evidence", type=Path)
     parser.add_argument("--mobile-app-config", type=Path)
+    parser.add_argument("--web-app-index", type=Path)
+    parser.add_argument("--web-app-manifest", type=Path)
+    parser.add_argument("--web-app-service-worker", type=Path)
     parser.add_argument("--private-beta-evidence", type=Path)
     parser.add_argument("--release-notes", type=Path)
     parser.add_argument("--release-version")
@@ -41,6 +44,7 @@ def main() -> int:
     parser.add_argument("--skip-backup-evidence", action="store_true")
     parser.add_argument("--skip-mobile-evidence", action="store_true")
     parser.add_argument("--skip-private-beta-evidence", action="store_true")
+    parser.add_argument("--mobile-strategy", choices=["pwa", "native"])
     parser.add_argument("--require-mobile-store-submission", action="store_true")
     parser.add_argument("--skip-release-notes", action="store_true")
     parser.add_argument("--skip-runtime", action="store_true")
@@ -76,6 +80,13 @@ def _options_from_args(args: argparse.Namespace, manifest: ReleaseGateOptions | 
         mobile_app_config=args.mobile_app_config
         or _manifest_value(manifest, "mobile_app_config")
         or Path("apps/mobile/app.json"),
+        web_app_index=args.web_app_index or _manifest_value(manifest, "web_app_index") or Path("apps/web/index.html"),
+        web_app_manifest=args.web_app_manifest
+        or _manifest_value(manifest, "web_app_manifest")
+        or Path("apps/web/manifest.webmanifest"),
+        web_app_service_worker=args.web_app_service_worker
+        or _manifest_value(manifest, "web_app_service_worker")
+        or Path("apps/web/sw.js"),
         private_beta_evidence=args.private_beta_evidence or _manifest_value(manifest, "private_beta_evidence"),
         release_notes=args.release_notes or _manifest_value(manifest, "release_notes"),
         release_version=args.release_version or _manifest_value(manifest, "release_version"),
@@ -88,6 +99,7 @@ def _options_from_args(args: argparse.Namespace, manifest: ReleaseGateOptions | 
         skip_backup_evidence=args.skip_backup_evidence,
         skip_mobile_evidence=args.skip_mobile_evidence,
         skip_private_beta_evidence=args.skip_private_beta_evidence,
+        mobile_strategy=args.mobile_strategy or _manifest_value(manifest, "mobile_strategy") or "pwa",
         require_mobile_store_submission=args.require_mobile_store_submission
         or bool(_manifest_value(manifest, "require_mobile_store_submission")),
         skip_release_notes=args.skip_release_notes,

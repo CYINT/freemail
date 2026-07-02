@@ -16,9 +16,13 @@ def main() -> int:
     parser.add_argument("--restore-drill-evidence", type=Path)
     parser.add_argument("--mobile-release-evidence", type=Path)
     parser.add_argument("--mobile-app-config", type=Path, default=Path("apps/mobile/app.json"))
+    parser.add_argument("--web-app-index", type=Path, default=Path("apps/web/index.html"))
+    parser.add_argument("--web-app-manifest", type=Path, default=Path("apps/web/manifest.webmanifest"))
+    parser.add_argument("--web-app-service-worker", type=Path, default=Path("apps/web/sw.js"))
     parser.add_argument("--private-beta-evidence", type=Path)
     parser.add_argument("--release-notes", type=Path)
     parser.add_argument("--release-version")
+    parser.add_argument("--mobile-strategy", choices=["pwa", "native"], default="pwa")
     parser.add_argument("--require-mobile-store-submission", action="store_true")
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
@@ -31,9 +35,13 @@ def main() -> int:
             restore_drill_evidence=args.restore_drill_evidence,
             mobile_release_evidence=args.mobile_release_evidence,
             mobile_app_config=args.mobile_app_config,
+            web_app_index=args.web_app_index,
+            web_app_manifest=args.web_app_manifest,
+            web_app_service_worker=args.web_app_service_worker,
             private_beta_evidence=args.private_beta_evidence,
             release_notes=args.release_notes,
             release_version=args.release_version,
+            mobile_strategy=args.mobile_strategy,
             require_mobile_store_submission=args.require_mobile_store_submission,
             force=args.force,
         )

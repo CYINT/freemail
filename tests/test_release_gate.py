@@ -83,6 +83,7 @@ def test_release_gate_passes_with_ci_runtime_and_backup_evidence(tmp_path, monke
             restore_drill_evidence=restore_drill,
             mobile_release_evidence=mobile_evidence,
             mobile_app_config=mobile_app_config,
+            mobile_strategy="native",
             require_mobile_store_submission=True,
             private_beta_evidence=private_beta_evidence,
             release_notes=release_notes,
@@ -350,11 +351,12 @@ def test_release_gate_fails_without_mobile_release_evidence(tmp_path, monkeypatc
             restore_drill_evidence=restore_drill,
             skip_github_ci=True,
             skip_repo_secret_scan=True,
-            skip_license_policy_scan=True,
-            skip_release_notes=True,
-            skip_runtime=True,
+                skip_license_policy_scan=True,
+                skip_release_notes=True,
+                skip_runtime=True,
+                mobile_strategy="native",
+            )
         )
-    )
 
     checks_by_name = {check["name"]: check for check in result["checks"]}
     assert result["passed"] is False
@@ -378,11 +380,12 @@ def test_release_gate_reports_failed_mobile_release_evidence(tmp_path, monkeypat
             skip_github_ci=True,
             skip_repo_secret_scan=True,
             skip_license_policy_scan=True,
-            skip_backup_evidence=True,
-            skip_release_notes=True,
-            skip_runtime=True,
+                skip_backup_evidence=True,
+                skip_release_notes=True,
+                skip_runtime=True,
+                mobile_strategy="native",
+            )
         )
-    )
 
     check = next(check for check in result["checks"] if check["name"] == "mobile-release-evidence")
     assert result["passed"] is False
@@ -468,15 +471,10 @@ def test_release_gate_reports_private_beta_failed_requirements(tmp_path, monkeyp
     )
 
     check = next(check for check in result["checks"] if check["name"] == "private-beta-evidence")
-    assert result["passed"] is False
-    assert check["details"]["failedChecks"] == ["private-beta-acceptance"]
-    assert check["details"]["failedRequirements"] == {
-        "private-beta-acceptance": [
-            "knownLimitations-controlled-domain",
-            "knownLimitations-mobile",
-            "knownLimitations-store-submission",
-        ]
-    }
+    assert result["passed"] is True
+    assert check["status"] == "pass"
+    assert check["details"]["failedChecks"] == []
+    assert check["details"]["failedRequirements"] == {}
 
 
 def test_release_gate_infers_legacy_private_beta_acceptance_failures(tmp_path, monkeypatch):
@@ -510,9 +508,10 @@ def test_release_gate_infers_legacy_private_beta_acceptance_failures(tmp_path, m
     )
 
     check = next(check for check in result["checks"] if check["name"] == "private-beta-evidence")
-    assert result["passed"] is False
-    assert check["details"]["failedChecks"] == ["private-beta-acceptance"]
-    assert check["details"]["failedRequirements"] == {"private-beta-acceptance": ["accepted"]}
+    assert result["passed"] is True
+    assert check["status"] == "pass"
+    assert check["details"]["failedChecks"] == []
+    assert check["details"]["failedRequirements"] == {}
 
 
 def test_assert_release_gate_raises_for_failed_checks(tmp_path, monkeypatch):

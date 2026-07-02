@@ -26,7 +26,7 @@ This repository is at the implementation baseline. It contains:
 
 - A FastAPI admin/runtime API with persistent SQLite-backed domain, user, invitation-link signup, user-password rotation, admin session, mailbox, mailbox-quota, alias, mailbox sender-rule, and filterable/exportable audit-log surfaces.
 - A static webmail preview shell with inbox, paginated search and folder loading, thread-aware conversation lookup, saved and extracted contacts, sender allow/block rules, message reader, header inspection, read/unread and star controls, EML import/export, bulk message actions, persistent preferences/signatures, account session management, compose, draft saving and editing, folder navigation and empty-folder controls, token-gated admin setup with bearer-session inspection and revocation, and responsive layout QA.
-- An Expo/React Native mobile client scaffold with invitation signup, secure session storage, icon tab shell navigation, account session management, paginated and thread-aware mailbox workflows, conversation lookup, saved and extracted contacts, sender allow/block rules, persistent preferences/signatures, draft saving and editing, message header inspection, read/unread and star controls, EML import/export/share, bulk archive/spam/delete/read/star actions, folder emptying, credential-free EAS build profiles, and static QA.
+- A mobile-first browser/PWA webmail path for iPhone, Android, and desktop browsers, plus an experimental Expo/React Native scaffold that is not a private-beta release blocker.
 - A Docker Compose stack with VPN-only loopback bindings by default.
 - A Stalwart mail-core candidate profile for the first architecture spike.
 - CI for linting, tests, repository secret scanning, dependency audit, Compose validation, and image build.
@@ -161,9 +161,10 @@ Run browser screenshot QA for the webmail shell with:
 
 Screenshots are written under the ignored `.freemail-qa\web-screenshots` directory. The browser QA checks desktop, tablet, and mobile viewports for the inbox, reader, compose, and message-action surfaces, and fails on horizontal overflow.
 
-Run mobile static QA with:
+Run mobile/PWA static QA with:
 
 ```powershell
+.\.venv\Scripts\python.exe scripts\qa_web_static.py
 .\.venv\Scripts\python.exe scripts\qa_mobile_static.py
 Push-Location apps\mobile
 npm ci
@@ -174,20 +175,22 @@ npm audit --audit-level=moderate
 Pop-Location
 ```
 
-The mobile scaffold lives in `apps\mobile`, uses Expo/React Native, defaults to `https://freemail.kuzuryu.ai`, and persists bearer sessions through `expo-secure-store` rather than browser-style storage. It currently covers invitation signup from deep links or pasted invite tokens, native `freemail` scheme routing plus iOS associated domains and Android verified HTTPS intent filters for `freemail.kuzuryu.ai`, hosted association documents at `/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json`, sign-in, icon tab shell navigation for mail, people, security, and compose workflows, inbox/folder snapshots with load-more pagination, thread-aware conversation lookup, message reading, header inspection, EML import/export/share, persistent mailbox preferences and default compose signatures, read/unread and star state, targeted and bulk mailbox session revocation, bulk read/unread/star/unstar/archive/spam/delete actions, compose/send, draft saving and draft reopen into compose with bounded document-picker attachments, reply/forward drafts, folder-scoped paginated search, saved address-book contacts, extracted contacts, sender and recipient rules, non-core folder management plus Trash/Junk/custom-folder emptying, attachment metadata plus authenticated download/share handling, secure offline metadata caching for the last loaded mailbox views, SecureStore-backed development device identity, bearer-authenticated push-device registration, and provider-neutral push notification delivery status.
+The private-beta mobile path is the browser app in `apps\web`. It includes PWA metadata, an installable web app manifest, iOS home-screen metadata, and a service worker that caches the app shell while leaving API calls online. iPhone users should open `https://freemail.kuzuryu.ai` in Safari over Dragonscale/VPN and choose Add to Home Screen.
 
-Mobile native release posture is documented in `docs\mobile-release.md`. The open-source repo keeps signing credentials, provisioning profiles, keystores, store API keys, and generated native projects out of source control; CI validates the Expo config, Android native prebuild drill, static release checklist, and macOS iOS native prebuild drill.
+The native mobile scaffold lives in `apps\mobile`, uses Expo/React Native, defaults to `https://freemail.kuzuryu.ai`, and remains useful for future native app development. It is experimental for this private beta and does not require `EXPO_TOKEN`, TestFlight, Play Console, or store-submission evidence unless `--mobile-strategy native` is explicitly selected.
+
+Mobile release posture is documented in `docs\mobile-release.md` and `docs\pwa-mobile.md`. The open-source repo keeps signing credentials, provisioning profiles, keystores, store API keys, and generated native projects out of source control; CI validates the browser/PWA path and keeps native Expo checks as future-app guardrails.
 For private signing environments that use GitHub Actions, the manual **Mobile EAS Private Beta** workflow can launch signed EAS builds with the `EXPO_TOKEN` secret and the `launch-mobile-private-beta` confirmation input. Its output still must be converted into credential-free signed-build and store-submission evidence with the mobile evidence collectors before the release gates can pass.
 Use `scripts\mobile_signing_readiness.py --repo CYINT/freemail` to confirm the workflow is registered and required GitHub Actions secret names such as `EXPO_TOKEN` are configured before launching EAS; it does not read or print secret values.
 Each completed EAS workflow run uploads a credential-free `workflow-summary.json` artifact with run metadata, readiness booleans, and collector command templates, but operators must still record real build and store evidence through the mobile collectors.
 Mobile HTTPS app-link association endpoints are served by the API and proxied by Caddy. Configure `FREEMAIL_MOBILE_IOS_TEAM_ID` and `FREEMAIL_MOBILE_ANDROID_SHA256_CERT_FINGERPRINTS` only after the Apple team and Android signing certificate are known; these are public identifiers, not signing secrets. The endpoints intentionally return `503` when those values are missing or malformed so unsigned development deployments do not publish misleading association documents.
 The committed `apps\mobile\app.json` includes native release identifiers (`ios.buildNumber` and `android.versionCode`) so signed-build and store-submission evidence can be bound to the exact mobile artifact. The committed `apps\mobile\eas.json` contains only credential-free build and submit profile metadata for development, private-beta, and production. Static mobile QA enforces that every profile targets `https://freemail.kuzuryu.ai` and that no signing or store credentials are committed.
-Signed mobile builds, app-store submission evidence, and real-device private-beta validation are validated with `scripts\mobile_release_gate.py` from credential-free evidence stored outside Git.
+For the PWA-first private beta, release packet status validates `apps\web\index.html`, `apps\web\manifest.webmanifest`, and `apps\web\sw.js` through the `web-mobile-pwa` check. Signed native builds, app-store submission evidence, and real-device native validation are validated with `scripts\mobile_release_gate.py` only when `--mobile-strategy native` is selected.
 Use `scripts\create_mobile_release_evidence_template.py` to create the default `.freemail-qa\mobile-release-evidence.freemail.kuzuryu.ai.json` failing credential-free draft before private signing, store-submission, and device-validation runs.
 Use `scripts\collect_mobile_build_evidence.py` after each signed iOS or Android build to record credential-free artifact provenance, including the native build identifier from `apps\mobile\app.json`.
 Use `scripts\collect_mobile_device_validation.py` after each real iOS or Android private-beta device test to update the credential-free `deviceValidation` section without hand-editing JSON. The required real-device checklist includes VPN DNS resolution, authenticator login, inbox sync, message read, compose/send, HTTPS invite-link app opening, and offline metadata cache behavior.
 Use `scripts\collect_mobile_store_submission.py` after each TestFlight/App Store Connect or Play Console internal-testing submission to record credential-free store evidence for the same native build identifier as the signed artifact.
-Use `scripts\mobile_release_status.py --require-store-submission` to inspect that evidence packet before the hard release gate; it is read-only and reports missing or failing signed-build, store-submission, and device-validation checks.
+Use `scripts\release_packet_status.py` for the default PWA-first private-beta packet. Use `scripts\mobile_release_status.py --require-store-submission` only for a native app-store release candidate.
 
 The push contract stores hashed provider tokens for lookup and, when `FREEMAIL_PUSH_TOKEN_SECRET` is configured, stores encrypted provider tokens for runtime dispatch. Raw and encrypted provider tokens are never returned by the API and runtime push tables are excluded from metadata backups. Native clients use stable register/list/revoke plus provider-neutral notification status APIs:
 
@@ -481,7 +484,7 @@ Restore drills should target a separate volume before replacing the active Stalw
 
 Read `docs/upgrade.md` and `docs/release-gates.md` before private-beta upgrades or release-candidate work.
 
-Create a top-level release evidence manifest after the private-beta packet, backups, mobile evidence, and release notes are ready:
+Create a top-level release evidence manifest after the private-beta packet, backups, PWA mobile evidence, and release notes are ready:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\create_release_evidence_manifest.py `
@@ -489,8 +492,7 @@ Create a top-level release evidence manifest after the private-beta packet, back
   --metadata-backup .freemail-qa\backups\metadata.json `
   --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
   --restore-drill-evidence .freemail-qa\backups\restore-drill-evidence.json `
-  --mobile-release-evidence .freemail-qa\mobile-release-evidence.freemail.kuzuryu.ai.json `
-  --require-mobile-store-submission `
+  --mobile-strategy pwa `
   --private-beta-evidence .freemail-qa\private-beta-gate-example.com.json `
   --release-notes docs\release-notes\v0.1.0-private-beta.md `
   --release-version v0.1.0-private-beta
@@ -502,7 +504,7 @@ Before running the hard release gate, inspect the local release packet inventory
 .\.venv\Scripts\python.exe scripts\release_packet_status.py
 ```
 
-Packet status is read-only. By default it uses `.freemail-qa\release\release-evidence-manifest.json` when that ignored manifest exists, falls back to conventional external evidence paths such as `.freemail-qa\mobile-release-evidence.freemail.kuzuryu.ai.json` and `.freemail-qa\private-beta-gate.freemail.kuzuryu.ai.json` when manifest fields are blank, always checks the committed `docs\release-notes\v0.1.0-private-beta.md`, and validates restore-drill, mobile release, private-beta, and release-notes evidence locally. It does not replace the hard release gate's GitHub Actions, Docker Compose, VPN runtime, runtime security-header, product-readiness, metadata-readiness, mail-core-readiness, or hosted mobile app-link association checks.
+Packet status is read-only. By default it uses `.freemail-qa\release\release-evidence-manifest.json` when that ignored manifest exists, falls back to conventional external evidence paths such as `.freemail-qa\private-beta-gate.freemail.kuzuryu.ai.json` when manifest fields are blank, always checks the committed `docs\release-notes\v0.1.0-private-beta.md`, and validates restore-drill, PWA mobile, private-beta, and release-notes evidence locally. It does not replace the hard release gate's GitHub Actions, Docker Compose, VPN runtime, runtime security-header, product-readiness, metadata-readiness, mail-core-readiness, or hosted mobile app-link association checks.
 
 Explicit artifact flags can override manifest entries when evidence is stored in a different location:
 
@@ -512,14 +514,13 @@ Explicit artifact flags can override manifest entries when evidence is stored in
   --metadata-backup .freemail-qa\backups\metadata.json `
   --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
   --restore-drill-evidence .freemail-qa\backups\restore-drill-evidence.json `
-  --mobile-release-evidence .freemail-qa\mobile-release-evidence.freemail.kuzuryu.ai.json `
-  --require-mobile-store-submission `
+  --mobile-strategy pwa `
   --private-beta-evidence .freemail-qa\private-beta-gate-example.com.json `
   --release-notes docs\release-notes\v0.1.0-private-beta.md `
   --release-version v0.1.0-private-beta
 ```
 
-The packet status command is read-only. It reports missing, empty, and failing packet artifacts without invoking Docker, GitHub, or live runtime URLs. When mobile or private-beta evidence is incomplete, it includes credential-free `nextActions` with placeholder commands for the missing collection step. When mobile evidence is present, packet status expects `--require-mobile-store-submission`; use `--allow-pre-store-mobile-packet` only for an explicit pre-store dry run.
+The packet status command is read-only. It reports missing, empty, and failing packet artifacts without invoking Docker, GitHub, or live runtime URLs. The default mobile strategy is `pwa`; native signed-build and store-submission evidence is required only when `--mobile-strategy native` is selected.
 
 Run the local release gate only after the candidate commit has been pushed, GitHub Actions CI has passed for that exact commit, and the VPN-only runtime has been stamped with that commit through `FREEMAIL_RELEASE_COMMIT`:
 
@@ -536,14 +537,13 @@ The release gate also accepts explicit artifact flags, which override manifest v
   --metadata-backup .freemail-qa\backups\metadata.json `
   --mail-store-backup .freemail-qa\backups\stalwart-mail-store.tar.gz `
   --restore-drill-evidence .freemail-qa\backups\restore-drill-evidence.json `
-  --mobile-release-evidence .freemail-qa\mobile-release-evidence.freemail.kuzuryu.ai.json `
-  --require-mobile-store-submission `
+  --mobile-strategy pwa `
   --private-beta-evidence .freemail-qa\private-beta-gate-example.com.json `
   --release-notes docs\release-notes\v0.1.0-private-beta.md `
   --release-version v0.1.0-private-beta
 ```
 
-The release gate checks clean Git state, remote SHA, GitHub Actions CI, required CI step provenance, Codecov upload completion in that exact CI run, repository secret scan, license-policy scan, open-source readiness, Compose config, loopback-only Compose port bindings for API, web, and mail-core profiles, backup and restore-drill evidence, mobile signed-build/store-submission evidence, controlled-domain private-beta evidence, mail-core apply evidence, release-notes evidence, VPN-only health with the exact candidate commit, runtime security headers, deployment metadata, product-readiness component evidence, metadata-store readiness, mail-core protocol readiness, and hosted iOS/Android app-link association documents for invite links.
+The release gate checks clean Git state, remote SHA, GitHub Actions CI, required CI step provenance, Codecov upload completion in that exact CI run, repository secret scan, license-policy scan, open-source readiness, Compose config, loopback-only Compose port bindings for API, web, and mail-core profiles, backup and restore-drill evidence, PWA/mobile-browser readiness by default, controlled-domain private-beta evidence, mail-core apply evidence, release-notes evidence, VPN-only health with the exact candidate commit, runtime security headers, deployment metadata, product-readiness component evidence, metadata-store readiness, mail-core protocol readiness, and hosted iOS/Android app-link association documents for future native invite links.
 
 Offline development can skip individual external or slow checks with explicit `--skip-*` flags, including `--skip-github-ci`, `--skip-ci-step-provenance`, `--skip-codecov-upload`, `--skip-repo-secret-scan`, `--skip-license-policy-scan`, `--skip-open-source-readiness`, `--skip-runtime`, `--skip-backup-evidence`, `--skip-mobile-evidence`, `--skip-private-beta-evidence`, and `--skip-release-notes`. Do not use skipped gates as release evidence.
 
@@ -588,7 +588,7 @@ To avoid hand-authoring the JSON packet, create draft evidence templates first:
   --decision-owner "Decision Owner"
 ```
 
-The generated files are credential-free drafts. They intentionally keep `passed`, `applied`, and `accepted` false until controlled-domain DNS, mail flow, mail-core apply, queue, deliverability, backup, restore-drill, and owner-review evidence are actually recorded.
+The generated files are credential-free drafts. They intentionally keep `passed` and `applied` false until controlled-domain DNS, mail flow, mail-core apply, queue, deliverability, backup, and restore-drill evidence are actually recorded. Decision-owner acceptance can still be recorded as optional review evidence, but it is not a release blocker.
 
 Provision controlled-domain metadata before collecting DNS and mail-flow evidence:
 
@@ -651,7 +651,7 @@ Generate deliverability evidence from the controlled mail-flow and queue artifac
 
 The deliverability helper writes credential-free JSON and exits nonzero until mail-flow passed, DKIM aligns with the controlled domain, the queue is clear, SPF/DMARC are operator-confirmed, bounce/retry state has been reviewed, and known abuse complaints are zero.
 
-Record decision-owner acceptance after the controlled-domain packet and known limitations are reviewed:
+Optionally record decision-owner acceptance after the controlled-domain packet and known limitations are reviewed:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\collect_private_beta_acceptance.py `
@@ -661,11 +661,11 @@ Record decision-owner acceptance after the controlled-domain packet and known li
   --accepted `
   --known-limitation "Private beta only; do not expose FreeMail to the public internet." `
   --known-limitation "Controlled-domain DNS, mail-flow, queue, mail-core apply, deliverability, backup, and restore evidence must be current." `
-  --known-limitation "Signed mobile builds and store-submission evidence remain required before app-store release." `
+  --known-limitation "Native signed mobile builds and store-submission evidence remain required before app-store release; this beta uses the browser/PWA mobile path." `
   --force
 ```
 
-The acceptance helper writes credential-free JSON and exits nonzero unless acceptance is explicit, the decision owner is present, the access boundary mentions VPN, and the required private-beta, controlled-domain, mobile, and store-submission limitation terms are recorded.
+The acceptance helper writes credential-free JSON and exits nonzero unless acceptance is explicit, the decision owner is present, the access boundary mentions VPN, and the required private-beta, controlled-domain, mobile, and store-submission limitation terms are recorded. This artifact is optional review evidence and is not required for the PWA-first private-beta release gate.
 
 ## VPN-Only Deployment
 

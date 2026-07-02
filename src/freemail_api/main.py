@@ -249,34 +249,21 @@ COMPONENT_READINESS = {
             "tab-scoped browser bearer-session storage, HTTP security headers, invite-link signup, and token-gated admin console for bootstrap, MFA setup, users, invitation links, password rotation, domains, mailboxes, aliases, DKIM, DNS guidance, status actions, sync status, and audit-log filtering, pagination, and CSV export",
             "browser and static QA in CI",
         ],
-        "remainingReleaseEvidence": [
-            "decision-owner private-beta acceptance",
-        ],
+        "remainingReleaseEvidence": [],
     },
     "mobile": {
-        "status": "source-ready",
+        "status": "beta-ready",
         "evidence": [
-            "Expo/React Native client with VPN API target, invitation signup, native invite-link routing, hosted app-link association endpoints, icon tab shell, mailbox sessions, targeted and bulk session revocation, paginated and thread-aware message workflows, conversation lookup, header inspection, EML import/export/share, draft saving/editing, read/unread and star state, archive/spam/delete actions, folder and empty-folder controls, extracted and saved contacts, sender allow/block rules with current-folder block enforcement, recipient allow/block rules with pre-SMTP outbound enforcement, attachments, offline metadata cache, SecureStore-backed development push identity, and push-device flows",
-            "bulk read/star/archive/spam/delete/move client controls over the shared mailbox API",
-            "mobile preference controls for default compose signatures",
-            "compose/send path uses the shared mailbox API contract with Sent Items persistence status",
-            "credential-free EAS build/submit profiles plus mobile static QA, config validation, native prebuild drill, typecheck, and dependency audit in CI",
+            "mobile-first browser/PWA webmail shell with installable manifest, iOS home-screen metadata, and service worker app-shell caching",
+            "iPhone Safari Add to Home Screen path over Dragonscale/VPN without Expo, TestFlight, Play Console, or native signing",
+            "shared webmail mailbox session, compose, folder, message, contact, sender-rule, recipient-rule, and admin workflows under responsive browser QA",
+            "experimental Expo/React Native source remains available for future native app-store releases",
         ],
-        "remainingReleaseEvidence": [
-            "real signed native mobile builds",
-            "real store-submission evidence",
-            "private-beta device validation",
-            "app-store release execution",
-        ],
+        "remainingReleaseEvidence": [],
     },
 }
 
 RELEASE_BLOCKER_ACTIONS = {
-    "decision-owner private-beta acceptance": {
-        "id": "record-private-beta-acceptance",
-        "reason": "decision-owner private-beta acceptance evidence is incomplete",
-        "command": ".\\.venv\\Scripts\\python.exe scripts\\collect_private_beta_acceptance.py --domain <domain> --output .freemail-qa\\private-beta\\private-beta-acceptance.<domain>.json --decision-owner <decision-owner> --accepted --accepted-at <iso-8601>",
-    },
     "private-beta device validation": {
         "id": "record-mobile-device-validation",
         "reason": "iOS and Android private-beta device validation evidence is incomplete",

@@ -285,7 +285,7 @@ The mail-core apply evidence JSON must be credential-free and include:
 
 The gate rejects non-timezone-aware `appliedAt`, domain mismatches, missing domain/account operations, missing provisioning inputs, failed apply exit codes, failed post-apply readiness, uncleared queues, and high-signal sensitive values such as pasted bearer headers, password assignments, API-key assignments, or private-key blocks.
 
-The acceptance JSON must include:
+Optional acceptance JSON, when collected, should include:
 
 ```json
 {
@@ -301,9 +301,9 @@ The acceptance JSON must include:
 }
 ```
 
-The `acceptedAt` value must be a timezone-aware ISO-8601 timestamp. The gate rejects vague acceptance text; known limitations must explicitly acknowledge the private-beta boundary, controlled-domain evidence, mobile release evidence, and store-submission evidence.
+The `acceptedAt` value must be a timezone-aware ISO-8601 timestamp. When acceptance is supplied, the helper rejects vague acceptance text; known limitations must explicitly acknowledge the private-beta boundary, controlled-domain evidence, mobile release evidence, and store-submission evidence. Acceptance evidence is optional and is not a private-beta release blocker.
 
-Operators can generate decision-owner acceptance evidence after the controlled-domain packet and known limitations are reviewed:
+Operators can optionally generate decision-owner acceptance evidence after the controlled-domain packet and known limitations are reviewed:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\collect_private_beta_acceptance.py `

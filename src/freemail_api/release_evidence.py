@@ -19,9 +19,13 @@ class ReleaseEvidenceManifestOptions:
     restore_drill_evidence: Path | None = None
     mobile_release_evidence: Path | None = None
     mobile_app_config: Path = Path("apps/mobile/app.json")
+    web_app_index: Path = Path("apps/web/index.html")
+    web_app_manifest: Path = Path("apps/web/manifest.webmanifest")
+    web_app_service_worker: Path = Path("apps/web/sw.js")
     private_beta_evidence: Path | None = None
     release_notes: Path | None = None
     release_version: str | None = None
+    mobile_strategy: str = "pwa"
     require_mobile_store_submission: bool = False
     force: bool = False
     generated_at: datetime | None = None
@@ -35,6 +39,7 @@ def create_release_evidence_manifest(options: ReleaseEvidenceManifestOptions) ->
         "generatedAt": generated_at,
         "draftOnly": True,
         "releaseVersion": _non_empty(options.release_version),
+        "mobileStrategy": options.mobile_strategy,
         "requireMobileStoreSubmission": options.require_mobile_store_submission,
         "releaseGateInputs": {
             "--metadata-backup": _manifest_path(manifest_dir, options.metadata_backup),
@@ -42,6 +47,9 @@ def create_release_evidence_manifest(options: ReleaseEvidenceManifestOptions) ->
             "--restore-drill-evidence": _manifest_path(manifest_dir, options.restore_drill_evidence),
             "--mobile-release-evidence": _manifest_path(manifest_dir, options.mobile_release_evidence),
             "--mobile-app-config": _manifest_path(manifest_dir, options.mobile_app_config),
+            "--web-app-index": _manifest_path(manifest_dir, options.web_app_index),
+            "--web-app-manifest": _manifest_path(manifest_dir, options.web_app_manifest),
+            "--web-app-service-worker": _manifest_path(manifest_dir, options.web_app_service_worker),
             "--private-beta-evidence": _manifest_path(manifest_dir, options.private_beta_evidence),
             "--release-notes": _manifest_path(manifest_dir, options.release_notes),
         },
@@ -64,11 +72,20 @@ def load_release_gate_options_from_manifest(path: Path) -> ReleaseGateOptions:
         restore_drill_evidence=_manifest_input_path(path, inputs, "--restore-drill-evidence"),
         mobile_release_evidence=_manifest_input_path(path, inputs, "--mobile-release-evidence"),
         mobile_app_config=_manifest_input_path(path, inputs, "--mobile-app-config") or Path("apps/mobile/app.json"),
+        web_app_index=_manifest_input_path(path, inputs, "--web-app-index") or Path("apps/web/index.html"),
+        web_app_manifest=_manifest_input_path(path, inputs, "--web-app-manifest") or Path("apps/web/manifest.webmanifest"),
+        web_app_service_worker=_manifest_input_path(path, inputs, "--web-app-service-worker") or Path("apps/web/sw.js"),
         private_beta_evidence=_manifest_input_path(path, inputs, "--private-beta-evidence"),
         release_notes=_manifest_input_path(path, inputs, "--release-notes"),
         release_version=_manifest_release_version(payload),
+        mobile_strategy=_manifest_mobile_strategy(payload),
         require_mobile_store_submission=payload.get("requireMobileStoreSubmission") is True,
     )
+
+
+def _manifest_mobile_strategy(payload: dict[str, Any]) -> str:
+    value = str(payload.get("mobileStrategy") or "pwa").strip().lower()
+    return value if value in {"pwa", "native"} else "pwa"
 
 
 def load_release_packet_status_options_from_manifest(path: Path) -> ReleasePacketStatusOptions:
@@ -80,9 +97,13 @@ def load_release_packet_status_options_from_manifest(path: Path) -> ReleasePacke
         restore_drill_evidence=_manifest_input_path(path, inputs, "--restore-drill-evidence"),
         mobile_release_evidence=_manifest_input_path(path, inputs, "--mobile-release-evidence"),
         mobile_app_config=_manifest_input_path(path, inputs, "--mobile-app-config") or Path("apps/mobile/app.json"),
+        web_app_index=_manifest_input_path(path, inputs, "--web-app-index") or Path("apps/web/index.html"),
+        web_app_manifest=_manifest_input_path(path, inputs, "--web-app-manifest") or Path("apps/web/manifest.webmanifest"),
+        web_app_service_worker=_manifest_input_path(path, inputs, "--web-app-service-worker") or Path("apps/web/sw.js"),
         private_beta_evidence=_manifest_input_path(path, inputs, "--private-beta-evidence"),
         release_notes=_manifest_input_path(path, inputs, "--release-notes"),
         release_version=_manifest_release_version(payload),
+        mobile_strategy=_manifest_mobile_strategy(payload),
         require_mobile_store_submission=payload.get("requireMobileStoreSubmission") is True,
     )
 

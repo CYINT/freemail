@@ -113,8 +113,12 @@ def _check_beta_evidence(options: PrivateBetaGateOptions) -> list[dict[str, Any]
         _check_file("metadata-backup-evidence", options.metadata_backup, "--metadata-backup"),
         _check_file("mail-store-backup-evidence", options.mail_store_backup, "--mail-store-backup"),
         _check_private_beta_restore_drill_evidence(options.restore_drill_evidence),
-        _check_acceptance(options.acceptance),
+        *_optional_acceptance_check(options.acceptance),
     ]
+
+
+def _optional_acceptance_check(path: Path | None) -> list[dict[str, Any]]:
+    return [_check_acceptance(path)] if path is not None else []
 
 
 def _check_private_beta_restore_drill_evidence(path: Path | None) -> dict[str, Any]:

@@ -12,6 +12,9 @@ from freemail_api.release_packet_status import ReleasePacketStatusOptions, summa
 DEFAULT_MANIFEST = Path(".freemail-qa/release/release-evidence-manifest.json")
 DEFAULT_RELEASE_NOTES = Path("docs/release-notes/v0.1.0-private-beta.md")
 DEFAULT_MOBILE_APP_CONFIG = Path("apps/mobile/app.json")
+DEFAULT_WEB_APP_INDEX = Path("apps/web/index.html")
+DEFAULT_WEB_APP_MANIFEST = Path("apps/web/manifest.webmanifest")
+DEFAULT_WEB_APP_SERVICE_WORKER = Path("apps/web/sw.js")
 DEFAULT_MOBILE_RELEASE_EVIDENCE_CANDIDATES = (
     Path(".freemail-qa/mobile-release-evidence.freemail.kuzuryu.ai.json"),
     Path(".freemail-qa/mobile-release-evidence.json"),
@@ -34,9 +37,13 @@ def main() -> int:
     parser.add_argument("--restore-drill-evidence", type=Path)
     parser.add_argument("--mobile-release-evidence", type=Path)
     parser.add_argument("--mobile-app-config", type=Path)
+    parser.add_argument("--web-app-index", type=Path)
+    parser.add_argument("--web-app-manifest", type=Path)
+    parser.add_argument("--web-app-service-worker", type=Path)
     parser.add_argument("--private-beta-evidence", type=Path)
     parser.add_argument("--release-notes", type=Path)
     parser.add_argument("--release-version")
+    parser.add_argument("--mobile-strategy", choices=["pwa", "native"])
     parser.add_argument("--require-mobile-store-submission", action="store_true")
     parser.add_argument(
         "--allow-pre-store-mobile-packet",
@@ -66,11 +73,19 @@ def _options_from_args(
         mobile_app_config=args.mobile_app_config
         or _manifest_value(manifest, "mobile_app_config")
         or DEFAULT_MOBILE_APP_CONFIG,
+        web_app_index=args.web_app_index or _manifest_value(manifest, "web_app_index") or DEFAULT_WEB_APP_INDEX,
+        web_app_manifest=args.web_app_manifest
+        or _manifest_value(manifest, "web_app_manifest")
+        or DEFAULT_WEB_APP_MANIFEST,
+        web_app_service_worker=args.web_app_service_worker
+        or _manifest_value(manifest, "web_app_service_worker")
+        or DEFAULT_WEB_APP_SERVICE_WORKER,
         private_beta_evidence=args.private_beta_evidence
         or _manifest_value(manifest, "private_beta_evidence")
         or _default_existing(DEFAULT_PRIVATE_BETA_EVIDENCE_CANDIDATES),
         release_notes=args.release_notes or _manifest_value(manifest, "release_notes") or DEFAULT_RELEASE_NOTES,
         release_version=args.release_version or _manifest_value(manifest, "release_version"),
+        mobile_strategy=args.mobile_strategy or _manifest_value(manifest, "mobile_strategy") or "pwa",
         require_mobile_store_submission=args.require_mobile_store_submission
         or bool(_manifest_value(manifest, "require_mobile_store_submission")),
         allow_pre_store_mobile_packet=args.allow_pre_store_mobile_packet,

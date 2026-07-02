@@ -107,6 +107,16 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str, caddy_text: 
         failures.append("missing visible focus styling")
     if "border-radius: 8px" not in css_text:
         failures.append("missing bounded 8px radius")
+    if "./manifest.webmanifest" not in parser.attributes.get("href", []):
+        failures.append("missing PWA web app manifest link")
+    if "./icons/icon-192.svg" not in parser.attributes.get("href", []):
+        failures.append("missing iOS home-screen icon link")
+    if "theme-color" not in parser.attributes.get("name", []):
+        failures.append("missing PWA theme-color meta")
+    if "apple-mobile-web-app-capable" not in parser.attributes.get("name", []):
+        failures.append("missing iOS standalone web app meta")
+    if "navigator.serviceWorker.register(\"./sw.js\")" not in js_text:
+        failures.append("missing service worker registration")
     for marker in [
         "./ops/caddy/Caddyfile:/etc/caddy/Caddyfile:ro",
         "Content-Security-Policy",
