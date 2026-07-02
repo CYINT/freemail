@@ -1745,6 +1745,7 @@ function renderFolders(folders, activeFolder) {
       const link = document.createElement("a");
       link.href = `#${encodeURIComponent(folder.name)}`;
       link.dataset.folder = folder.name;
+      link.dataset.icon = folderMaterialIcon(folder.name);
       link.className = folder.name === activeFolder ? "active" : "";
       link.innerHTML = `<span>${escapeHtml(folder.name)}</span><span>${folder.unreadCount || folder.messageCount || 0}</span>`;
       link.addEventListener("click", (event) => {
@@ -1755,6 +1756,29 @@ function renderFolders(folders, activeFolder) {
     }),
   );
   renderFolderTools(activeFolder);
+}
+
+function folderMaterialIcon(folderName) {
+  const normalized = String(folderName || "").toLowerCase();
+  if (normalized === "inbox") {
+    return "IN";
+  }
+  if (normalized.includes("sent")) {
+    return "SE";
+  }
+  if (normalized.includes("draft")) {
+    return "DR";
+  }
+  if (normalized.includes("junk") || normalized.includes("spam")) {
+    return "JK";
+  }
+  if (normalized.includes("delete") || normalized.includes("trash")) {
+    return "TR";
+  }
+  if (normalized.includes("archive")) {
+    return "AR";
+  }
+  return normalized.slice(0, 2).toUpperCase() || "FM";
 }
 
 function renderMessages(messages, { append = false } = {}) {

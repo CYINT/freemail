@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192" role="img" aria-label="FreeMail">
-  <rect width="192" height="192" rx="40" fill="#155e75"/>
-  <path d="M42 58h108a10 10 0 0 1 10 10v56a10 10 0 0 1-10 10H42a10 10 0 0 1-10-10V68a10 10 0 0 1 10-10Z" fill="#f8fafc"/>
-  <path d="M40 72l56 40 56-40" fill="none" stroke="#155e75" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M58 148h76" stroke="#f8fafc" stroke-width="12" stroke-linecap="round"/>
+  <rect width="192" height="192" rx="40" fill="#006a6a"/>
+  <path d="M42 58h108a10 10 0 0 1 10 10v56a10 10 0 0 1-10 10H42a10 10 0 0 1-10-10V68a10 10 0 0 1 10-10Z" fill="#f4fbfa"/>
+  <path d="M40 72l56 40 56-40" fill="none" stroke="#006a6a" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M58 148h76" stroke="#f4fbfa" stroke-width="12" stroke-linecap="round"/>
 </svg>

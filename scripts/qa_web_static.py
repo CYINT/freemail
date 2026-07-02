@@ -31,12 +31,13 @@ def main() -> int:
     root = Path(__file__).resolve().parents[1]
     html = root / "apps" / "web" / "index.html"
     css = root / "apps" / "web" / "styles.css"
+    material_css = root / "apps" / "web" / "material.css"
     js = root / "apps" / "web" / "app.js"
     caddyfile = root / "ops" / "caddy" / "Caddyfile"
     compose = root / "docker-compose.yml"
     parser = StaticWebParser()
     parser.feed(html.read_text(encoding="utf-8"))
-    css_text = css.read_text(encoding="utf-8")
+    css_text = f"{css.read_text(encoding='utf-8')}\n{material_css.read_text(encoding='utf-8')}"
     js_text = js.read_text(encoding="utf-8")
     caddy_text = caddyfile.read_text(encoding="utf-8")
     compose_text = compose.read_text(encoding="utf-8")
@@ -107,6 +108,20 @@ def _validate(parser: StaticWebParser, css_text: str, js_text: str, caddy_text: 
         failures.append("missing visible focus styling")
     if "border-radius: 8px" not in css_text:
         failures.append("missing bounded 8px radius")
+    for marker in [
+        "data-design-system",
+        "material.css",
+        "material-3",
+        "--md-sys-color-primary",
+        "--md-sys-color-surface-container",
+        "--md-sys-elevation-1",
+        "--md-sys-shape-corner-small",
+        'body[data-design-system="material-3"] .folder-nav a',
+        'body[data-design-system="material-3"] .compose-primary',
+        'body[data-design-system="material-3"] .message-row.selected',
+    ]:
+        if marker not in f"{html_text(parser)}\n{css_text}":
+            failures.append(f"missing Material Design marker: {marker}")
     if "./manifest.webmanifest" not in parser.attributes.get("href", []):
         failures.append("missing PWA web app manifest link")
     if "./icons/icon-192.svg" not in parser.attributes.get("href", []):

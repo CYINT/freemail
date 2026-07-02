@@ -1,7 +1,14 @@
 from scripts.qa_web_static import StaticWebParser, _validate
 
 
-CSS_FIXTURE = "@media (max-width: 640px) {} button { min-height: 38px; outline: 1px solid; border-radius: 8px; }"
+CSS_FIXTURE = (
+    "@media (max-width: 640px) {} button { min-height: 38px; outline: 1px solid; border-radius: 8px; } "
+    "--md-sys-color-primary --md-sys-color-surface-container --md-sys-elevation-1 "
+    "--md-sys-shape-corner-small "
+    'body[data-design-system="material-3"] .folder-nav a '
+    'body[data-design-system="material-3"] .compose-primary '
+    'body[data-design-system="material-3"] .message-row.selected'
+)
 CADDY_FIXTURE = (
     "Content-Security-Policy \"default-src 'self'; "
     "connect-src 'self' http://127.0.0.1:18090 https://freemail.kuzuryu.ai; "
@@ -32,10 +39,11 @@ def test_static_web_parser_collects_classes_and_text():
 def test_static_web_validation_flags_provider_trade_dress_text():
     parser = StaticWebParser()
     parser.feed(
+        '<body data-design-system="material-3"><link href="material.css">'
         '<aside class="sidebar"></aside><main class="app-shell workspace">'
         '<nav></nav><header></header><section class="message-list">'
         '<article class="message-row reader compose-panel">Gmail Inbox Compose Reply Forward Attach Send Junk Mail</article>'
-        "</section></main>"
+        "</section></main></body>"
     )
 
     failures = _validate(
@@ -52,6 +60,7 @@ def test_static_web_validation_flags_provider_trade_dress_text():
 def test_static_web_validation_flags_credential_storage():
     parser = StaticWebParser()
     parser.feed(
+        '<body data-design-system="material-3"><link href="material.css">'
         '<aside class="sidebar"></aside><main class="app-shell workspace">'
         '<script src="./app.js"></script><nav></nav><header></header>'
         '<form class="mailbox-login" id="mailbox-login">'
@@ -86,7 +95,7 @@ def test_static_web_validation_flags_credential_storage():
         '<button id="bulk-archive-action">Archive</button><button id="bulk-spam-action">Spam</button>'
         '<button id="bulk-delete-action">Delete</button><button id="load-more-action">Load more</button>'
         '<section class="message-list"><div class="bulk-toolbar"></div><article class="message-row reader compose-panel">'
-        "Inbox Compose Reply Forward Headers Download EML Import EML Mark read Mark unread Attach Send Junk Mail Spam Delete</article></section></main>"
+        "Inbox Compose Reply Forward Headers Download EML Import EML Mark read Mark unread Attach Send Junk Mail Spam Delete</article></section></main></body>"
     )
 
     failures = _validate(

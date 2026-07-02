@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#155e75">
+    <meta name="theme-color" content="#006a6a">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="FreeMail">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -11,8 +11,9 @@
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" href="./icons/icon-192.svg">
     <link rel="stylesheet" href="./styles.css">
+    <link rel="stylesheet" href="./material.css">
   </head>
-  <body>
+  <body data-design-system="material-3">
     <div class="app-shell">
       <aside class="sidebar" aria-label="Mailbox navigation">
         <div class="brand">
@@ -22,7 +23,7 @@
             <span>freemail.kuzuryu.ai</span>
           </div>
         </div>
-        <button class="compose-primary" type="button">Compose</button>
+        <button class="compose-primary" type="button" data-icon="+">Compose</button>
         <form class="mailbox-login" id="mailbox-login" aria-label="Mailbox sign in">
           <label>Email <input id="mailbox-email" name="email" type="email" autocomplete="username" value="admin@example.com" required></label>
           <label>Password <input id="mailbox-password" name="password" type="password" autocomplete="current-password" required></label>
@@ -32,11 +33,11 @@
           <p class="form-status" id="mailbox-status" role="status">Mailbox passwords stay server-side; browser sessions are tab-scoped.</p>
         </form>
         <nav class="folder-nav" id="folder-nav" aria-label="Folders">
-          <a class="active" href="#INBOX" data-folder="INBOX"><span>Inbox</span><span>0</span></a>
-          <a href="#Sent%20Items" data-folder="Sent Items"><span>Sent</span><span>0</span></a>
-          <a href="#Drafts" data-folder="Drafts"><span>Drafts</span><span>0</span></a>
-          <a href="#Junk%20Mail" data-folder="Junk Mail"><span>Junk Mail</span><span>0</span></a>
-          <a href="#Deleted%20Items" data-folder="Deleted Items"><span>Trash</span><span>0</span></a>
+          <a class="active" href="#INBOX" data-folder="INBOX" data-icon="IN"><span>Inbox</span><span>0</span></a>
+          <a href="#Sent%20Items" data-folder="Sent Items" data-icon="SE"><span>Sent</span><span>0</span></a>
+          <a href="#Drafts" data-folder="Drafts" data-icon="DR"><span>Drafts</span><span>0</span></a>
+          <a href="#Junk%20Mail" data-folder="Junk Mail" data-icon="JK"><span>Junk Mail</span><span>0</span></a>
+          <a href="#Deleted%20Items" data-folder="Deleted Items" data-icon="TR"><span>Trash</span><span>0</span></a>
         </nav>
         <form class="folder-tools" id="folder-tools" aria-label="Manage folders">
           <label>Folder <input id="folder-name" name="folderName" type="text" placeholder="Clients" maxlength="160"></label>

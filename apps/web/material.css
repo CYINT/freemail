@@ -1,0 +1,640 @@
+:root {
+  --md-ref-typeface-plain: Roboto, "Segoe UI", Arial, sans-serif;
+  --md-ref-typeface-brand: Roboto, "Segoe UI", Arial, sans-serif;
+  --md-sys-color-primary: #006a6a;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #bcece8;
+  --md-sys-color-on-primary-container: #002020;
+  --md-sys-color-secondary: #4a6363;
+  --md-sys-color-secondary-container: #d7e8e6;
+  --md-sys-color-on-secondary-container: #051f1f;
+  --md-sys-color-tertiary: #4b607c;
+  --md-sys-color-tertiary-container: #d3e4ff;
+  --md-sys-color-error: #ba1a1a;
+  --md-sys-color-error-container: #ffdad6;
+  --md-sys-color-on-error-container: #410002;
+  --md-sys-color-background: #f4fbfa;
+  --md-sys-color-on-background: #171d1c;
+  --md-sys-color-surface: #fbfdfc;
+  --md-sys-color-surface-container-lowest: #ffffff;
+  --md-sys-color-surface-container-low: #eff7f6;
+  --md-sys-color-surface-container: #e9f1f0;
+  --md-sys-color-surface-container-high: #e3ebea;
+  --md-sys-color-on-surface: #171d1c;
+  --md-sys-color-on-surface-variant: #3f4948;
+  --md-sys-color-outline: #6f7978;
+  --md-sys-color-outline-variant: #bec9c7;
+  --md-sys-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.18), 0 1px 3px rgba(0, 0, 0, 0.12);
+  --md-sys-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.16), 0 2px 6px rgba(0, 0, 0, 0.14);
+  --md-sys-elevation-3: 0 2px 4px rgba(0, 0, 0, 0.14), 0 4px 10px rgba(0, 0, 0, 0.12);
+  --md-sys-shape-corner-extra-small: 4px;
+  --md-sys-shape-corner-small: 8px;
+  --md-sys-shape-corner-full: 999px;
+}
+
+body[data-design-system="material-3"] {
+  background: var(--md-sys-color-background);
+  color: var(--md-sys-color-on-background);
+  font-family: var(--md-ref-typeface-plain);
+  letter-spacing: 0;
+}
+
+body[data-design-system="material-3"] button,
+body[data-design-system="material-3"] input,
+body[data-design-system="material-3"] textarea,
+body[data-design-system="material-3"] select {
+  font: inherit;
+  letter-spacing: 0;
+}
+
+body[data-design-system="material-3"] button {
+  min-height: 40px;
+  border: 0;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-primary);
+  padding: 0 1rem;
+  font-size: 0.875rem;
+  font-weight: 650;
+  line-height: 1;
+  transition: background-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+body[data-design-system="material-3"] button:hover {
+  background: var(--md-sys-color-secondary-container);
+  box-shadow: var(--md-sys-elevation-1);
+}
+
+body[data-design-system="material-3"] button:active {
+  transform: translateY(1px);
+}
+
+body[data-design-system="material-3"] button:disabled {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 10%, transparent);
+  color: color-mix(in srgb, var(--md-sys-color-on-surface) 34%, transparent);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+body[data-design-system="material-3"] button:focus-visible,
+body[data-design-system="material-3"] a:focus-visible,
+body[data-design-system="material-3"] input:focus-visible,
+body[data-design-system="material-3"] textarea:focus-visible,
+body[data-design-system="material-3"] select:focus-visible,
+body[data-design-system="material-3"] .message-row:focus-visible {
+  outline: 3px solid var(--md-sys-color-tertiary);
+  outline-offset: 2px;
+}
+
+body[data-design-system="material-3"] input,
+body[data-design-system="material-3"] textarea,
+body[data-design-system="material-3"] select {
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: var(--md-sys-shape-corner-extra-small);
+  background: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+  caret-color: var(--md-sys-color-primary);
+  font-weight: 400;
+}
+
+body[data-design-system="material-3"] input:hover,
+body[data-design-system="material-3"] textarea:hover,
+body[data-design-system="material-3"] select:hover {
+  border-color: var(--md-sys-color-on-surface);
+}
+
+body[data-design-system="material-3"] input:focus,
+body[data-design-system="material-3"] textarea:focus,
+body[data-design-system="material-3"] select:focus {
+  border-color: var(--md-sys-color-primary);
+  box-shadow: inset 0 0 0 1px var(--md-sys-color-primary);
+}
+
+body[data-design-system="material-3"] .app-shell {
+  min-height: 100vh;
+  grid-template-columns: minmax(17.5rem, 19rem) minmax(0, 1fr);
+  background: var(--md-sys-color-surface-container-low);
+}
+
+body[data-design-system="material-3"] .sidebar {
+  position: sticky;
+  top: 0;
+  max-height: 100vh;
+  overflow: auto;
+  border-right: 1px solid var(--md-sys-color-outline-variant);
+  background: var(--md-sys-color-surface-container-low);
+  padding: 1rem 0.75rem;
+  scrollbar-width: thin;
+}
+
+body[data-design-system="material-3"] .brand {
+  min-height: 56px;
+  padding: 0 0.5rem;
+}
+
+body[data-design-system="material-3"] .brand strong {
+  display: block;
+  color: var(--md-sys-color-on-surface);
+  font-family: var(--md-ref-typeface-brand);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+body[data-design-system="material-3"] .brand span {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 0.78rem;
+}
+
+body[data-design-system="material-3"] .brand-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  box-shadow: var(--md-sys-elevation-1);
+}
+
+body[data-design-system="material-3"] .compose-primary {
+  min-height: 56px;
+  justify-content: center;
+  border-radius: var(--md-sys-shape-corner-small);
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  box-shadow: var(--md-sys-elevation-2);
+  font-size: 0.95rem;
+}
+
+body[data-design-system="material-3"] .compose-primary::before {
+  content: attr(data-icon);
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-right: 0.5rem;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: color-mix(in srgb, var(--md-sys-color-on-primary-container) 12%, transparent);
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+body[data-design-system="material-3"] .mailbox-login,
+body[data-design-system="material-3"] .folder-tools,
+body[data-design-system="material-3"] .compose-panel,
+body[data-design-system="material-3"] .admin-auth,
+body[data-design-system="material-3"] .admin-card,
+body[data-design-system="material-3"] .admin-result-card {
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-small);
+  background: var(--md-sys-color-surface-container-lowest);
+  box-shadow: none;
+}
+
+body[data-design-system="material-3"] .mailbox-login,
+body[data-design-system="material-3"] .folder-tools {
+  padding: 0.85rem;
+}
+
+body[data-design-system="material-3"] label,
+body[data-design-system="material-3"] .mailbox-login label,
+body[data-design-system="material-3"] .folder-tools label,
+body[data-design-system="material-3"] .compose-panel label,
+body[data-design-system="material-3"] .admin-auth label,
+body[data-design-system="material-3"] .admin-card label,
+body[data-design-system="material-3"] .preferences-panel label,
+body[data-design-system="material-3"] .audit-log-filter label {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 0.78rem;
+  font-weight: 650;
+  text-transform: none;
+}
+
+body[data-design-system="material-3"] .folder-nav {
+  gap: 0.15rem;
+}
+
+body[data-design-system="material-3"] .folder-nav a {
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr) auto;
+  gap: 0.6rem;
+  align-items: center;
+  border-radius: var(--md-sys-shape-corner-full);
+  color: var(--md-sys-color-on-surface-variant);
+  padding: 0 0.8rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+body[data-design-system="material-3"] .folder-nav a::before {
+  content: attr(data-icon);
+  display: inline-grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: color-mix(in srgb, var(--md-sys-color-secondary) 10%, transparent);
+  color: var(--md-sys-color-secondary);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+body[data-design-system="material-3"] .folder-nav a.active,
+body[data-design-system="material-3"] .folder-nav a:hover {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+
+body[data-design-system="material-3"] .folder-nav a span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body[data-design-system="material-3"] .folder-nav a span:last-child {
+  min-width: 1.5rem;
+  color: inherit;
+  font-size: 0.78rem;
+  text-align: right;
+}
+
+body[data-design-system="material-3"] .workspace {
+  min-height: 100vh;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background: var(--md-sys-color-surface);
+}
+
+body[data-design-system="material-3"] .topbar {
+  min-height: 72px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  background: color-mix(in srgb, var(--md-sys-color-surface) 92%, var(--md-sys-color-primary) 8%);
+  padding: 0.75rem 1rem;
+}
+
+body[data-design-system="material-3"] .eyebrow {
+  color: var(--md-sys-color-primary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+body[data-design-system="material-3"] h1 {
+  color: var(--md-sys-color-on-surface);
+  font-size: 1.55rem;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+body[data-design-system="material-3"] h2 {
+  color: var(--md-sys-color-on-surface);
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+body[data-design-system="material-3"] h3 {
+  color: var(--md-sys-color-on-surface);
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+
+body[data-design-system="material-3"] .search {
+  width: min(34rem, 48vw);
+}
+
+body[data-design-system="material-3"] .search span {
+  color: var(--md-sys-color-on-surface-variant);
+  font-weight: 650;
+}
+
+body[data-design-system="material-3"] .search div {
+  min-height: 48px;
+  align-items: center;
+  gap: 0.55rem;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-sys-color-surface-container-high);
+  padding: 0.25rem 0.35rem 0.25rem 1rem;
+}
+
+body[data-design-system="material-3"] .search input {
+  min-height: 40px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+}
+
+body[data-design-system="material-3"] .search button {
+  flex: 0 0 auto;
+  min-height: 40px;
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+}
+
+body[data-design-system="material-3"] .mail-layout {
+  min-height: 0;
+  grid-template-columns: minmax(21rem, 26rem) minmax(0, 1fr);
+  background: var(--md-sys-color-surface-container-low);
+}
+
+body[data-design-system="material-3"] .message-list {
+  border-right: 1px solid var(--md-sys-color-outline-variant);
+  background: var(--md-sys-color-surface);
+}
+
+body[data-design-system="material-3"] .bulk-toolbar {
+  gap: 0.3rem;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  background: var(--md-sys-color-surface-container);
+  padding: 0.5rem;
+}
+
+body[data-design-system="material-3"] .bulk-toolbar button,
+body[data-design-system="material-3"] .reader-actions button,
+body[data-design-system="material-3"] .admin-header-actions button,
+body[data-design-system="material-3"] .folder-tools button,
+body[data-design-system="material-3"] .sender-rules-panel button,
+body[data-design-system="material-3"] .recipient-rules-panel button,
+body[data-design-system="material-3"] .sessions-panel button,
+body[data-design-system="material-3"] .contacts-panel > div:first-child button,
+body[data-design-system="material-3"] .admin-row-action {
+  min-height: 32px;
+  padding: 0 0.75rem;
+  font-size: 0.78rem;
+}
+
+body[data-design-system="material-3"] .message-row {
+  min-height: 88px;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  background: var(--md-sys-color-surface);
+  padding: 0.75rem 4.25rem 0.75rem 0.85rem;
+}
+
+body[data-design-system="material-3"] .message-row:hover {
+  background: var(--md-sys-color-surface-container-low);
+}
+
+body[data-design-system="material-3"] .message-row.selected {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+
+body[data-design-system="material-3"] .message-row-content {
+  min-width: 0;
+  display: grid;
+  gap: 0.12rem;
+}
+
+body[data-design-system="material-3"] .sender,
+body[data-design-system="material-3"] .message-row strong {
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body[data-design-system="material-3"] .message-row p,
+body[data-design-system="material-3"] .thread-hint {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--md-sys-color-on-surface-variant);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body[data-design-system="material-3"] .message-row.selected p,
+body[data-design-system="material-3"] .message-row.selected .thread-hint {
+  color: color-mix(in srgb, var(--md-sys-color-on-secondary-container) 78%, transparent);
+}
+
+body[data-design-system="material-3"] .message-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--md-sys-color-primary);
+}
+
+body[data-design-system="material-3"] .message-row time {
+  top: 0.8rem;
+  right: 0.85rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+body[data-design-system="material-3"] .reader {
+  padding: 1rem;
+  background: var(--md-sys-color-surface-container-low);
+}
+
+body[data-design-system="material-3"] .reader-header,
+body[data-design-system="material-3"] .message-body,
+body[data-design-system="material-3"] .message-headers,
+body[data-design-system="material-3"] .message-attachments,
+body[data-design-system="material-3"] .compose-panel {
+  max-width: 56rem;
+}
+
+body[data-design-system="material-3"] .reader-header {
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-small);
+  background: var(--md-sys-color-surface-container-lowest);
+  padding: 1rem;
+}
+
+body[data-design-system="material-3"] .reader-actions,
+body[data-design-system="material-3"] .compose-actions,
+body[data-design-system="material-3"] .admin-header-actions {
+  gap: 0.4rem;
+}
+
+body[data-design-system="material-3"] .message-body {
+  margin-top: 0.75rem;
+  border-radius: var(--md-sys-shape-corner-small);
+  background: var(--md-sys-color-surface-container-lowest);
+  padding: 1.25rem;
+}
+
+body[data-design-system="material-3"] .message-body p {
+  color: var(--md-sys-color-on-surface);
+  font-size: 0.95rem;
+}
+
+body[data-design-system="material-3"] .compose-panel {
+  margin-top: 0.75rem;
+  padding: 1rem;
+  box-shadow: var(--md-sys-elevation-1);
+}
+
+body[data-design-system="material-3"] .compose-actions .send,
+body[data-design-system="material-3"] .send,
+body[data-design-system="material-3"] .mailbox-login button[type="submit"],
+body[data-design-system="material-3"] .invitation-signup button[type="submit"],
+body[data-design-system="material-3"] .admin-auth button[type="submit"],
+body[data-design-system="material-3"] .admin-card button[type="submit"] {
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+}
+
+body[data-design-system="material-3"] #delete-action,
+body[data-design-system="material-3"] #bulk-delete-action,
+body[data-design-system="material-3"] #spam-action,
+body[data-design-system="material-3"] #bulk-spam-action,
+body[data-design-system="material-3"] #admin-mfa-disable-action,
+body[data-design-system="material-3"] #folder-delete-action {
+  background: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
+}
+
+body[data-design-system="material-3"] .form-status {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 0.78rem;
+}
+
+body[data-design-system="material-3"] .form-status[data-state="ready"] {
+  color: var(--md-sys-color-primary);
+}
+
+body[data-design-system="material-3"] .form-status[data-state="error"] {
+  color: var(--md-sys-color-error);
+}
+
+body[data-design-system="material-3"] .contacts-panel,
+body[data-design-system="material-3"] .sender-rules-panel,
+body[data-design-system="material-3"] .recipient-rules-panel,
+body[data-design-system="material-3"] .sessions-panel,
+body[data-design-system="material-3"] .preferences-panel {
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+}
+
+body[data-design-system="material-3"] .contact-item {
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-small);
+  background: var(--md-sys-color-surface-container-lowest);
+}
+
+body[data-design-system="material-3"] .contact-item.saved-contact {
+  border-color: color-mix(in srgb, var(--md-sys-color-primary) 38%, var(--md-sys-color-outline-variant));
+  background: color-mix(in srgb, var(--md-sys-color-primary-container) 42%, var(--md-sys-color-surface));
+}
+
+body[data-design-system="material-3"] .invitation-signup {
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  background: var(--md-sys-color-tertiary-container);
+}
+
+body[data-design-system="material-3"] .admin-console {
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+  background: var(--md-sys-color-surface-container-low);
+}
+
+body[data-design-system="material-3"] .admin-header {
+  min-height: 56px;
+}
+
+body[data-design-system="material-3"] .admin-grid {
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+}
+
+body[data-design-system="material-3"] .admin-card {
+  gap: 0.65rem;
+  padding: 1rem;
+}
+
+body[data-design-system="material-3"] .admin-result-card table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+body[data-design-system="material-3"] .admin-result-card th {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 0.74rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+body[data-design-system="material-3"] .admin-result-card th,
+body[data-design-system="material-3"] .admin-result-card td {
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+}
+
+body[data-design-system="material-3"] .admin-result-card pre {
+  border-radius: var(--md-sys-shape-corner-small);
+  background: #10201f;
+}
+
+body[data-design-system="material-3"] .audit-log-filter {
+  grid-template-columns: repeat(4, minmax(8rem, 1fr)) repeat(3, auto);
+}
+
+@media (max-width: 920px) {
+  body[data-design-system="material-3"] .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  body[data-design-system="material-3"] .sidebar {
+    position: static;
+    max-height: none;
+    border-right: 0;
+    border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  }
+
+  body[data-design-system="material-3"] .mail-layout {
+    grid-template-columns: 1fr;
+  }
+
+  body[data-design-system="material-3"] .message-list {
+    max-height: 23rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  }
+
+  body[data-design-system="material-3"] .search {
+    width: min(100%, 28rem);
+  }
+}
+
+@media (max-width: 640px) {
+  body[data-design-system="material-3"] .sidebar,
+  body[data-design-system="material-3"] .reader,
+  body[data-design-system="material-3"] .admin-console {
+    padding: 0.75rem;
+  }
+
+  body[data-design-system="material-3"] .topbar {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 0.85rem;
+  }
+
+  body[data-design-system="material-3"] .search {
+    width: 100%;
+  }
+
+  body[data-design-system="material-3"] .search div {
+    border-radius: var(--md-sys-shape-corner-small);
+  }
+
+  body[data-design-system="material-3"] .folder-nav {
+    grid-template-columns: 1fr;
+  }
+
+  body[data-design-system="material-3"] .message-row {
+    min-height: 92px;
+    padding-right: 3.75rem;
+  }
+
+  body[data-design-system="material-3"] .reader-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  body[data-design-system="material-3"] .reader-actions button,
+  body[data-design-system="material-3"] .compose-actions button {
+    flex: 1 1 9rem;
+  }
+
+  body[data-design-system="material-3"] .admin-auth {
+    grid-template-columns: 1fr;
+  }
+}
